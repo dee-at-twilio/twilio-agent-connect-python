@@ -17,11 +17,11 @@ from tac.core.logging import get_logger, setup_logging
 from tac.intelligence.operator_result_processor import OperatorResultProcessor
 from tac.models.intelligence import OperatorProcessingResult
 from tac.models.memory import (
-    MemoryRetrievalResponse,
     ProfileLookupResponse,
     ProfileResponse,
 )
 from tac.models.session import ConversationSession
+from tac.models.tac import TACMemoryResponse
 
 
 class TAC:
@@ -111,10 +111,8 @@ class TAC:
         # Callback for when message is ready (supports both sync and async)
         self._message_ready_callback: Optional[
             Union[
-                Callable[[str, ConversationSession, Optional[MemoryRetrievalResponse]], None],
-                Callable[
-                    [str, ConversationSession, Optional[MemoryRetrievalResponse]], Awaitable[None]
-                ],
+                Callable[[str, ConversationSession, Optional[TACMemoryResponse]], None],
+                Callable[[str, ConversationSession, Optional[TACMemoryResponse]], Awaitable[None]],
             ]
         ] = None
 
@@ -140,105 +138,134 @@ class TAC:
         self,
         conversation_context: ConversationSession,
         query: Optional[str] = None,
-    ) -> MemoryRetrievalResponse:
+    ) -> TACMemoryResponse:
         """
-        Retrieve memories from Memora or fallback to Maestro communications.
+        Retrieve memories from Memory Service or fallback to Maestro Communications API.
+
+        This method implements a lenient, graceful degradation strategy for memory retrieval.
+        All failures in profile lookup and fetching are logged at WARNING level and handled
+        gracefully without raising exceptions.
 
         Args:
-            conversation_context: Conversation context containing profile_id and other info
-            query: Optional query string for memory retrieval (used only with Memora)
+            conversation_context: Conversation context containing conversation_id, profile_id,
+                and optional author_info. This object will be mutated to populate profile_id
+                (via automatic lookup) and profile (via automatic fetch) if not already present.
+            query: Optional semantic search query for memory retrieval (only used with Memory)
 
         Returns:
-            MemoryRetrievalResponse containing observations, summaries, communications, and metadata
+            TACMemoryResponse: Unified wrapper providing access to memory data.
+
+            When Memory is available (with profile_id):
+            - observations, summaries, and communications with full metadata
+            - communications include author name, type, and participant details
+
+            When falling back to Maestro:
+            - observations and summaries are empty lists
+            - communications have basic fields only (no author metadata)
 
         Behavior:
-            - If Memora is configured (twilio_memory_config provided):
-              Fetches full memory including observations, summaries, and communications
-              Requires profile_id in conversation_context
-            - If Memora is NOT configured:
-              Falls back to Maestro Communications API to fetch only communications
-              Observations and summaries arrays will be empty
+            Profile ID Resolution (if Memory is configured):
+            1. If profile_id is missing:
+               - Attempts lookup using author_info.address (phone number)
+               - On successful lookup: Sets profile_id and immediately fetches profile (once)
+               - On failure: Logs WARNING and falls back to Maestro
+            2. If profile_id exists but profile not fetched:
+               - Fetches profile data (one-time attempt only)
+               - On failure: Logs WARNING and continues with profile_id only
+
+            Memory Retrieval:
+            - If profile_id available: Retrieves from Memory with observations, summaries
+            - If profile_id unavailable: Falls back to Maestro Communications API
+            - If Memory not configured: Falls back to Maestro Communications API
+
+        Note:
+            All profile lookup and fetch failures are handled gracefully. The method never
+            raises exceptions for profile-related failures, ensuring memory retrieval
+            continues even when profile enrichment is unavailable.
 
         Raises:
-            ValueError: If Memora is configured but profile_id is missing
-            httpx.HTTPError: If the API request fails
+            httpx.HTTPError: Only if the Memory or Maestro API request itself fails
         """
-        # Check if Memora is configured
         if self.memora_client and self.config.twilio_memory_config:
-            # If profile_id is missing, try to lookup profile using phone number
             if not conversation_context.profile_id:
                 self.logger.debug(
                     "profile_id not found, attempting to lookup profile using phone number"
                 )
 
-                # Check if author_info and address are available
                 if (
                     not conversation_context.author_info
                     or not conversation_context.author_info.address
                 ):
-                    raise ValueError(
+                    self.logger.warning(
                         "profile_id is required for memory retrieval but was not found in "
                         "conversation context. Additionally, author_info.address is not available "
-                        "for profile lookup. Ensure either profile_id or author_info.address is "
-                        "provided when creating the ConversationSession."
+                        "for profile lookup. Memory will be retrieved without profile_id."
                     )
-
-                try:
-                    # Lookup profile using phone number
-                    lookup_response: ProfileLookupResponse = (
-                        await self.memora_client.lookup_profile(
-                            id_type="phone",
-                            value=conversation_context.author_info.address,
-                        )
-                    )
-
-                    # Check if any profiles were found
-                    if not lookup_response.profiles or len(lookup_response.profiles) == 0:
-                        phone_number = conversation_context.author_info.address
-                        raise ValueError(
-                            f"No profile found for phone number {phone_number}. "
-                            "Profile lookup returned no results. Ensure the phone number "
-                            "is registered in the identity resolution system."
-                        )
-
-                    # Use the first profile ID
-                    conversation_context.profile_id = lookup_response.profiles[0]
-
-                except Exception as e:
+                else:
+                    # Attempt to lookup profile using phone number
                     phone_number = conversation_context.author_info.address
-                    self.logger.error(f"Failed to lookup profile for {phone_number}: {e}")
-                    raise
+                    try:
+                        self.logger.debug(f"Looking up profile for phone number: {phone_number}")
 
-            try:
-                memory_response = await self.memora_client.retrieve_memory(
-                    profile_id=conversation_context.profile_id,
-                    conversation_id=conversation_context.conversation_id,
-                    query=query,
+                        lookup_response: ProfileLookupResponse = (
+                            await self.memora_client.lookup_profile(
+                                id_type="phone",
+                                value=phone_number,
+                            )
+                        )
+
+                        if not lookup_response.profiles:
+                            self.logger.warning(
+                                f"No profile found for phone number {phone_number}. "
+                                "Profile lookup returned no results. Memory will be retrieved "
+                                "without profile_id."
+                            )
+                        else:
+                            # Use the first profile ID
+                            conversation_context.profile_id = lookup_response.profiles[0]
+                            self.logger.debug(
+                                f"Found profile_id: {conversation_context.profile_id}"
+                            )
+
+                    except Exception as e:
+                        self.logger.warning(
+                            f"Failed to lookup profile for {phone_number}: {e}. "
+                            "Memory will be retrieved without profile_id."
+                        )
+
+            if conversation_context.profile_id and not conversation_context.profile:
+                conversation_context.profile = await self.fetch_profile(
+                    conversation_context.profile_id
                 )
-                return memory_response
-            except Exception as e:
-                self.logger.error(f"Failed to retrieve memory from Memora: {e}")
-                raise
+
+            # If we still don't have a profile_id after lookup attempts, fall back to Maestro
+            if not conversation_context.profile_id:
+                self.logger.warning(
+                    "Memory client is configured but profile_id is not available. "
+                    "Falling back to Maestro Communications API."
+                )
+                communications = await self.maestro_client.list_communications(
+                    conversation_id=conversation_context.conversation_id
+                )
+                return TACMemoryResponse(communications)
+
+            memory_response = await self.memora_client.retrieve_memory(
+                profile_id=conversation_context.profile_id,
+                conversation_id=conversation_context.conversation_id,
+                query=query,
+            )
+            return TACMemoryResponse(memory_response)
 
         else:
-            # Fallback to Maestro Communications API
             self.logger.info(
                 "Twilio Memory not configured, falling back to Maestro Communications API"
             )
 
-            try:
-                # Fetch communications from Maestro
-                communications = await self.maestro_client.list_communications(
-                    conversation_id=conversation_context.conversation_id
-                )
+            communications = await self.maestro_client.list_communications(
+                conversation_id=conversation_context.conversation_id
+            )
 
-                # Return MemoryRetrievalResponse with only communications populated
-                return MemoryRetrievalResponse(
-                    communications=communications,
-                )
-            except Exception as e:
-                self.logger.error(f"Failed to retrieve communications from Maestro: {e}")
-                raise
+            return TACMemoryResponse(communications)
 
     async def fetch_profile(self, profile_id: str) -> Optional[ProfileResponse]:
         """
@@ -279,16 +306,16 @@ class TAC:
             return profile_response
 
         except Exception as e:
-            self.logger.error(f"Failed to fetch profile for {profile_id}: {e}")
+            self.logger.warning(
+                f"Failed to fetch profile for {profile_id}: {e}. Continuing without profile data."
+            )
             return None
 
     def on_message_ready(
         self,
         callback: Union[
-            Callable[[str, ConversationSession, Optional[MemoryRetrievalResponse]], None],
-            Callable[
-                [str, ConversationSession, Optional[MemoryRetrievalResponse]], Awaitable[None]
-            ],
+            Callable[[str, ConversationSession, Optional[TACMemoryResponse]], None],
+            Callable[[str, ConversationSession, Optional[TACMemoryResponse]], Awaitable[None]],
         ],
     ) -> None:
         """
@@ -305,20 +332,20 @@ class TAC:
             callback: A callable that accepts:
                      - str: The user's message content
                      - ConversationSession: Contains conversation_id, profile_id, channel
-                     - Optional[MemoryRetrievalResponse]: Retrieved memory data
-                       (None for voice channel)
+                     - Optional[TACMemoryResponse]: Retrieved memory data wrapper
+                       (None if memory retrieval is skipped or fails)
 
         Example (Synchronous):
             ```python
-            from tac.core.context import ConversationSession
-            from tac.models.memory import MemoryRetrievalResponse
+            from tac.models.session import ConversationSession
+            from tac.models.tac import TACMemoryResponse
             from typing import Optional
 
 
             def handle_message(
                 user_message: str,
                 context: ConversationSession,
-                memory_response: Optional[MemoryRetrievalResponse],
+                memory_response: Optional[TACMemoryResponse],
             ):
                 print(f"User message: {user_message}")
                 print(f"Conversation {context.conversation_id} on {context.channel}")
@@ -326,7 +353,7 @@ class TAC:
                 if memory_response:
                     print(f"Observations: {len(memory_response.observations)}")
                     print(f"Summaries: {len(memory_response.summaries)}")
-                    print(f"Sessions: {len(memory_response.sessions)}")
+                    print(f"Communications: {len(memory_response.communications)}")
 
                 # Process user message with LLM
                 # llm_response = llm.process(user_message, memory_response)
@@ -344,7 +371,7 @@ class TAC:
             async def handle_message(
                 user_message: str,
                 context: ConversationSession,
-                memory_response: Optional[MemoryRetrievalResponse],
+                memory_response: Optional[TACMemoryResponse],
             ):
                 print(f"Message on {context.channel}: {user_message}")
 
@@ -363,7 +390,7 @@ class TAC:
         self,
         user_message: str,
         conversation_context: ConversationSession,
-        memory_response: Optional[MemoryRetrievalResponse] = None,
+        memory_response: Optional[TACMemoryResponse] = None,
     ) -> None:
         """
         Trigger the registered message ready callback.
@@ -413,7 +440,7 @@ class TAC:
 
         Example (Synchronous):
             ```python
-            from tac.core.context import ConversationSession
+            from tac.models.session import ConversationSession
             from tac.models.voice import InterruptMessage
 
 

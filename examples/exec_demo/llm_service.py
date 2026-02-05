@@ -31,8 +31,8 @@ from tools import (
 )
 
 from tac.core.logging import get_logger
-from tac.models.memory import MemoryRetrievalResponse
 from tac.models.session import ConversationSession
+from tac.models.tac import TACMemoryResponse
 
 logger = get_logger(__name__)
 
@@ -62,7 +62,7 @@ class LLMService:
     async def process_message(
         self,
         user_message: str,
-        memory_response: MemoryRetrievalResponse | None,
+        memory_response: TACMemoryResponse | None,
         context: ConversationSession,
         websocket: Optional[WebSocket],
         conversation_history: list[ChatCompletionMessageParam] | None = None,
@@ -143,7 +143,7 @@ class LLMService:
             )
 
     def _build_enhanced_instructions(
-        self, memory_response: MemoryRetrievalResponse | None, context: ConversationSession
+        self, memory_response: TACMemoryResponse | None, context: ConversationSession
     ) -> str:
         """
         Build enhanced agent instructions with TAC memory context.
@@ -262,12 +262,10 @@ class LLMService:
         return "\n".join(instruction_parts)
 
     def _build_conversation_history(
-        self, memory_response: MemoryRetrievalResponse | None
+        self, memory_response: TACMemoryResponse | None
     ) -> list[ChatCompletionMessageParam]:
         """
-        Build conversation history from session memories.
-
-        Session memories contain previous conversation exchanges with structured messages.
+        Build conversation history from simplified communications.
 
         Args:
             memory_response: Memory response from TAC
@@ -282,8 +280,19 @@ class LLMService:
 
         # Extract messages from session memories
         for communication in memory_response.communications:
-            # Map direction to role (inbound=user, outbound=assistant)
-            if communication.author.type == "CUSTOMER":
+            # Determine role using author.type if available (Memory API),
+            # otherwise fallback to address comparison (Maestro API)
+            is_customer = False
+            if communication.author.type is not None:
+                # Memory API provides author.type
+                is_customer = communication.author.type == "CUSTOMER"
+            else:
+                # Maestro fallback: compare author address with TAC phone number
+                # If author address matches TAC phone number, it's from AI (assistant)
+                # Otherwise, it's from customer (user)
+                is_customer = communication.author.address != self.tac.config.twilio_phone_number
+
+            if is_customer:
                 user_msg: ChatCompletionUserMessageParam = {
                     "role": "user",
                     "content": communication.content.text or "",

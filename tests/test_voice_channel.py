@@ -10,6 +10,7 @@ from tac.channels.voice import VoiceChannel
 from tac.models.conversation import ConversationResponse, ParticipantResponse
 from tac.models.memory import MemoryRetrievalResponse
 from tac.models.session import ConversationSession
+from tac.models.tac import TACMemoryResponse
 from tac.models.voice import InterruptMessage, PromptMessage, SetupMessage
 
 
@@ -71,7 +72,7 @@ class TestVoiceChannel:
         channel = VoiceChannel(tac=tac, auto_retrieve_memory=False)
 
         # Setup conversation first
-        await channel._start_conversation("CALL123", "profile_test_123")
+        channel._start_conversation("CALL123", "profile_test_123")
 
         # Create prompt message
         prompt_msg = PromptMessage(
@@ -109,7 +110,7 @@ class TestVoiceChannel:
         channel = VoiceChannel(tac=tac, auto_retrieve_memory=True)
 
         # Setup conversation with profile_id
-        await channel._start_conversation("CALL123", "profile_test_123")
+        channel._start_conversation("CALL123", "profile_test_123")
 
         # Create prompt message
         prompt_msg = PromptMessage(
@@ -131,7 +132,7 @@ class TestVoiceChannel:
         channel = VoiceChannel(tac=tac, auto_retrieve_memory=False)
 
         # Setup conversation first
-        await channel._start_conversation("CALL123", None)
+        channel._start_conversation("CALL123", None)
 
         # Create interrupt message
         interrupt_msg = InterruptMessage(
@@ -167,7 +168,7 @@ class TestVoiceChannel:
         channel = VoiceChannel(tac=tac, auto_retrieve_memory=False)
 
         # Start conversation directly
-        await channel._start_conversation("CALL123", "profile_test")
+        channel._start_conversation("CALL123", "profile_test")
 
         # Mock websocket and register it with the manager
         mock_websocket = AsyncMock()
@@ -192,7 +193,7 @@ class TestVoiceChannel:
         channel = VoiceChannel(tac=tac, auto_retrieve_memory=False)
 
         # Start conversation directly
-        await channel._start_conversation("CALL123", "profile_test")
+        channel._start_conversation("CALL123", "profile_test")
 
         # No websocket registered in manager
         # (don't add websocket to manager, so lookup returns None)
@@ -207,7 +208,7 @@ class TestVoiceChannel:
         channel = VoiceChannel(tac=tac, auto_retrieve_memory=False)
 
         # Start conversation directly
-        await channel._start_conversation("CALL123", "profile_test")
+        channel._start_conversation("CALL123", "profile_test")
 
         # Add a mock websocket to the manager
         mock_websocket = MagicMock()
@@ -247,7 +248,7 @@ class TestVoiceChannel:
         async def message_callback(
             user_message: str,
             context: ConversationSession,
-            memory_response: Optional[MemoryRetrievalResponse],
+            memory_response: Optional[TACMemoryResponse],
         ) -> None:
             nonlocal captured_context, captured_memories, captured_user_message
             captured_context = context
@@ -257,7 +258,7 @@ class TestVoiceChannel:
         tac.on_message_ready(message_callback)
 
         # Setup conversation first
-        await channel._start_conversation("CALL123", "profile_test")
+        channel._start_conversation("CALL123", "profile_test")
 
         # Create and handle prompt message
         prompt_msg = PromptMessage(
@@ -406,7 +407,7 @@ class TestVoiceChannel:
         channel = VoiceChannel(tac=tac, auto_retrieve_memory=False)
 
         # Setup conversation first
-        await channel._start_conversation("CALL111", "profile_test")
+        channel._start_conversation("CALL111", "profile_test")
 
         # Create prompt message with None voicePrompt
         prompt_msg = PromptMessage(
@@ -427,9 +428,9 @@ class TestVoiceChannel:
         channel = VoiceChannel(tac=tac, auto_retrieve_memory=False)
 
         # Start three concurrent conversations
-        await channel._start_conversation("CALL_001", "profile_001")
-        await channel._start_conversation("CALL_002", "profile_002")
-        await channel._start_conversation("CALL_003", "profile_003")
+        channel._start_conversation("CALL_001", "profile_001")
+        channel._start_conversation("CALL_002", "profile_002")
+        channel._start_conversation("CALL_003", "profile_003")
 
         # Create mock websockets for each conversation
         mock_ws_1 = AsyncMock()
@@ -474,9 +475,9 @@ class TestVoiceChannel:
         channel = VoiceChannel(tac=tac, auto_retrieve_memory=False)
 
         # Start three conversations
-        await channel._start_conversation("CALL_A", "profile_A")
-        await channel._start_conversation("CALL_B", "profile_B")
-        await channel._start_conversation("CALL_C", "profile_C")
+        channel._start_conversation("CALL_A", "profile_A")
+        channel._start_conversation("CALL_B", "profile_B")
+        channel._start_conversation("CALL_C", "profile_C")
 
         # Register websockets
         channel._websocket_manager.add_websocket("CALL_A", AsyncMock())
@@ -540,8 +541,8 @@ class TestVoiceChannel:
         channel = VoiceChannel(tac=tac, auto_retrieve_memory=False)
 
         # Setup two conversations
-        await channel._start_conversation("CONV_X", "profile_X")
-        await channel._start_conversation("CONV_Y", "profile_Y")
+        channel._start_conversation("CONV_X", "profile_X")
+        channel._start_conversation("CONV_Y", "profile_Y")
 
         # Create distinct mock websockets
         mock_ws_x = AsyncMock()
@@ -719,38 +720,41 @@ class TestVoiceChannel:
             assert comm_request.recipients[0].participant_id == "PART_RECIPIENT"
 
     @pytest.mark.asyncio
-    async def test_create_communication_without_participant_ids(self) -> None:
-        """Test _create_communication without participant IDs (optional parameters)."""
+    async def test_send_response_skips_communication_without_participant_ids(self) -> None:
+        """Test send_response skips _create_communication when participant IDs are missing."""
         config = get_test_config()
         config["enable_voice_active_hydration"] = True
         tac = TAC(config)
         channel = VoiceChannel(tac=tac, auto_retrieve_memory=False)
 
-        # Mock the maestro client's create_communication method
+        # Start conversation
+        channel._start_conversation("CALL789", "profile_test")
+
+        # Set up author and AI agent info WITHOUT participant IDs
+        from tac.models.session import AuthorInfo
+
+        channel._conversations["CALL789"].author_info = AuthorInfo(
+            address="+15551234567",
+            participant_id=None,  # Missing participant ID
+        )
+        channel._conversations["CALL789"].ai_agent_info = AuthorInfo(
+            address="+15559876543",
+            participant_id=None,  # Missing participant ID
+        )
+
+        # Mock websocket and create_communication
+        mock_websocket = AsyncMock()
+        channel._websocket_manager.add_websocket("CALL789", mock_websocket)
+
         with patch.object(
             tac.maestro_client, "create_communication", new_callable=AsyncMock
         ) as mock_add_comm:
-            # Call _create_communication without participant IDs
-            await channel._create_communication(
-                conversation_id="CONV456",
-                message_content="Test message",
-                author_address="+15551111111",
-                recipient_address="+15552222222",
-            )
+            # Send response - should skip communication creation due to missing participant IDs
+            await channel.send_response("CALL789", "Test response")
 
-            # Verify create_communication was called
-            assert mock_add_comm.call_count == 1
-
-            # Verify the request structure
-            call_args = mock_add_comm.call_args
-            assert call_args[0][0] == "CONV456"
-            comm_request = call_args[0][1]
-            assert comm_request.author.address == "+15551111111"
-            assert comm_request.author.participant_id is None  # Should be None
-            assert comm_request.content.text == "Test message"
-            assert len(comm_request.recipients) == 1
-            assert comm_request.recipients[0].address == "+15552222222"
-            assert comm_request.recipients[0].participant_id is None  # Should be None
+            # Verify websocket was called but create_communication was NOT called
+            assert mock_websocket.send_text.call_count == 1
+            assert mock_add_comm.call_count == 0
 
     @pytest.mark.asyncio
     async def test_send_response_with_active_hydration(self) -> None:
@@ -761,7 +765,7 @@ class TestVoiceChannel:
         channel = VoiceChannel(tac=tac, auto_retrieve_memory=False)
 
         # Start conversation
-        await channel._start_conversation("CALL789", "profile_test")
+        channel._start_conversation("CALL789", "profile_test")
 
         # Set up author and AI agent info
         from tac.models.session import AuthorInfo
@@ -805,7 +809,7 @@ class TestVoiceChannel:
         channel = VoiceChannel(tac=tac, auto_retrieve_memory=False)
 
         # Start conversation
-        await channel._start_conversation("CALL999", "profile_test")
+        channel._start_conversation("CALL999", "profile_test")
 
         # Set up author and AI agent info
         from tac.models.session import AuthorInfo
@@ -849,7 +853,7 @@ class TestVoiceChannel:
         channel = VoiceChannel(tac=tac, auto_retrieve_memory=False)
 
         # Start conversation without setting author/AI agent info
-        await channel._start_conversation("CALL_NO_INFO", "profile_test")
+        channel._start_conversation("CALL_NO_INFO", "profile_test")
 
         # Mock websocket
         mock_websocket = AsyncMock()

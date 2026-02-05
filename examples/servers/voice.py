@@ -31,8 +31,8 @@ from llm_service import LLMService  # type: ignore[import-not-found]
 from tac import TAC, TACConfig, VoiceServerConfig, get_logger
 from tac.channels.session_manager import ThreadSafeSessionManager
 from tac.channels.voice import VoiceChannel
-from tac.models.memory import MemoryRetrievalResponse
 from tac.models.session import ConversationSession
+from tac.models.tac import TACMemoryResponse
 from tac.tools.knowledge import KnowledgeToolConfig, create_knowledge_tool
 
 # Initialize logger
@@ -90,7 +90,7 @@ async def stream_generator(prompt: str, conv_id: str) -> AsyncGenerator[str, Non
 async def handle_message_ready(
     user_message: str,
     context: ConversationSession,
-    memory_response: Optional[MemoryRetrievalResponse],
+    memory_response: Optional[TACMemoryResponse],
 ) -> None:
     """
     Callback invoked when a message is ready to be processed.

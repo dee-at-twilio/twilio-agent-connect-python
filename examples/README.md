@@ -116,16 +116,6 @@ Use these examples when you need custom middleware, authentication, or integrati
 
 [→ View Channel Examples](channels/)
 
-### [tools/](tools/) - LLM Tool Integration
-
-Examples showing how to integrate TAC tools with popular LLM frameworks:
-
-- **`openai_chat_with_tools.py`** - OpenAI Chat Completions API + TAC tools
-- **`openai_agents_with_tools.py`** - OpenAI Agents SDK + TAC tools
-- **`messaging.py`** - Automated messaging with OpenAI Agents
-
-[→ View Tool Examples](tools/)
-
 ## What You'll Learn
 
 - ✅ Setting up TAC with Twilio services (Memory, Maestro)

@@ -177,7 +177,7 @@ class TestConversationModels:
                 "channel": "SMS",
                 "participantId": "comms_participant_01k1etx3jbfx88476ccja0889c",
             },
-            "content": {"text": "Hello World!"},
+            "content": {"type": "TEXT", "text": "Hello World!"},
             "recipients": [
                 {
                     "address": "+12025551234",
@@ -238,7 +238,7 @@ class TestConversationModels:
                 "channel": "SMS",
                 "participantId": "comms_participant_01k1etx3jbfx88476ccja0889c",
             },
-            "content": {"text": "Hello World!"},
+            "content": {"type": "TEXT", "text": "Hello World!"},
             "channelId": "SM123456",
             "recipients": [
                 {

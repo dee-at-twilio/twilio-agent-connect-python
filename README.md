@@ -66,7 +66,7 @@ from typing import Optional
 from tac import TAC, TACConfig
 from tac.channels.sms import SMSChannel
 from tac.models.session import ConversationSession
-from tac.models.memory import MemoryRetrievalResponse
+from tac.models.tac import TACMemoryResponse
 
 # 1. Configure TAC - automatically loads from environment variables
 # Set these in your .env file:
@@ -85,7 +85,7 @@ tac = TAC(config=TACConfig.from_env())
 def handle_message_ready(
     user_message: str,
     context: ConversationSession,
-    memory_response: Optional[MemoryRetrievalResponse] = None
+    memory_response: Optional[TACMemoryResponse] = None
 ):
     """Called when message is received and memory is retrieved"""
     print(f"Conversation: {context.conversation_id}")
@@ -94,6 +94,7 @@ def handle_message_ready(
 
     if memory_response:
         print(f"Memories: {len(memory_response.observations)}")
+        print(f"Communications: {len(memory_response.communications)}")
 
     # Process message and call your LLM with user message
     # llm_response = your_llm.generate(user_message, memory_response)
@@ -118,10 +119,11 @@ For the fastest way to get started with voice, use the built-in server configura
 
 ```python
 import os
+from typing import Optional
 from tac import TAC, TACConfig, VoiceServerConfig
 from tac.channels.voice import VoiceChannel
 from tac.models.session import ConversationSession
-from tac.models.memory import MemoryRetrievalResponse
+from tac.models.tac import TACMemoryResponse
 
 # 1. Configure TAC - automatically loads from environment variables
 tac = TAC(config=TACConfig.from_env())
@@ -130,7 +132,7 @@ tac = TAC(config=TACConfig.from_env())
 async def handle_message_ready(
     user_message: str,
     context: ConversationSession,
-    memory_response: Optional[MemoryRetrievalResponse] = None
+    memory_response: Optional[TACMemoryResponse] = None
 ):
     """Called when memory retrieval completes"""
     # Process memories and call your LLM
@@ -294,7 +296,6 @@ Check out the [examples](examples) directory for complete working examples:
 - **[`channels/sms.py`](examples/channels/sms.py)**: SMS webhook server with FastAPI and TAC integration
 - **[`channels/voice.py`](examples/channels/voice.py)**: Voice server with manual FastAPI, TwiML generation, and WebSocket handling
 - **[`channels/voice_escalation.py`](examples/channels/voice_escalation.py)**: Voice server with Flex escalation for agent handoff to humans
-- **[`tools/`](examples/tools)**: LLM tool integration examples with OpenAI Chat Completions and Agents SDK
 
 ---
 

@@ -30,8 +30,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from tac import TAC, TACConfig, get_logger
 from tac.channels.sms import SMSChannel
-from tac.models.memory import MemoryRetrievalResponse
 from tac.models.session import ConversationSession
+from tac.models.tac import TACMemoryResponse
 
 # Initialize logger
 logger = get_logger(__name__)
@@ -48,7 +48,7 @@ conversation_messages: dict[str, list[ChatCompletionMessageParam]] = {}
 async def handle_message_ready(
     user_message: str,
     context: ConversationSession,
-    memory_response: Optional[MemoryRetrievalResponse],
+    memory_response: Optional[TACMemoryResponse],
 ) -> None:
     """
     Callback invoked when a message is ready to be processed.
@@ -62,7 +62,7 @@ async def handle_message_ready(
         logger.info(
             f"Retrieved memories: {len(memory_response.observations)} observations, "
             f"{len(memory_response.summaries)} summaries, "
-            f"{len(memory_response.communications or [])} communications"
+            f"{len(memory_response.communications)} communications"
         )
 
     # Initialize conversation history with system message

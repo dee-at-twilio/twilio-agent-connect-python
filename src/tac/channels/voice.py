@@ -1,6 +1,5 @@
 import asyncio
 import json
-import logging
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Optional
 
@@ -263,8 +262,7 @@ class VoiceChannel(BaseChannel):
         try:
             # First message should be 'setup'
             data = await websocket.receive_json()
-            if self.logger.isEnabledFor(logging.DEBUG):
-                self.logger.debug(f"Received WebSocket data: {data}")
+            self.logger.debug(f"Received WebSocket data: {data}")
 
             if data.get("type") == "setup":
                 setup_msg = SetupMessage(**data)
@@ -294,10 +292,9 @@ class VoiceChannel(BaseChannel):
                 if self.session_manager is not None and conv_id:
                     try:
                         session_state = self.session_manager.get_or_create_session(conv_id)
-                        if self.logger.isEnabledFor(logging.DEBUG):
-                            self.logger.info(
-                                f"Session state SUCCESSFULLY created for {conv_id}: {session_state}"
-                            )
+                        self.logger.debug(
+                            f"Session state SUCCESSFULLY created for {conv_id}: {session_state}"
+                        )
                     except Exception as e:
                         self.logger.error(f"Error creating session state: {e}", exc_info=True)
             else:
@@ -346,7 +343,6 @@ class VoiceChannel(BaseChannel):
         try:
             while True:
                 data = await websocket.receive_json()
-                self.logger.debug(f"Received WebSocket data: {data}")
                 msg_type = data.get("type")
 
                 if msg_type == "prompt":
@@ -358,7 +354,6 @@ class VoiceChannel(BaseChannel):
                         f"Ignoring subsequent setup message for conversation {conv_id}"
                     )
                 else:
-                    # ignore unknown message types
                     self.logger.debug(f"Unknown message type received: {msg_type}")
 
         except WebSocketDisconnect:
@@ -400,10 +395,9 @@ class VoiceChannel(BaseChannel):
                 # Cancel previous stream task if session manager is enabled
                 if session_state:
                     if session_state.stream_task and not session_state.stream_task.done():
-                        if self.logger.isEnabledFor(logging.DEBUG):
-                            self.logger.debug(
-                                "Cancelling previous stream task", conversation_id=conv_id
-                            )
+                        self.logger.debug(
+                            "Cancelling previous stream task", conversation_id=conv_id
+                        )
                         session_state.stream_task.cancel()
                         try:
                             await asyncio.wait_for(
@@ -595,13 +589,22 @@ class VoiceChannel(BaseChannel):
         try:
             await websocket.send_text(json.dumps({"type": "text", "token": response, "last": True}))
 
+            # If active hydration is enabled, send agent response to Maestro
+            # Check all required fields are available before creating communication
             if (
                 self.tac.config.enable_voice_active_hydration
                 and conversation_id in self._conversations
             ):
                 session = self._conversations[conversation_id]
 
-                if session.author_info and session.ai_agent_info:
+                if (
+                    session.author_info
+                    and session.ai_agent_info
+                    and session.ai_agent_info.address
+                    and session.ai_agent_info.participant_id
+                    and session.author_info.address
+                    and session.author_info.participant_id
+                ):
                     # Agent is author, customer is recipient
                     await self._create_communication(
                         conversation_id=conversation_id,
@@ -613,7 +616,7 @@ class VoiceChannel(BaseChannel):
                     )
                 else:
                     self.logger.warning(
-                        "[Active Hydration] Missing author or AI agent info",
+                        "[Active Hydration] Skipping communication - missing required fields",
                         conversation_id=conversation_id,
                     )
         except (WebSocketDisconnect, RuntimeError):
@@ -650,25 +653,18 @@ class VoiceChannel(BaseChannel):
             )
             return
 
-        # Use the conversation ID from custom parameters as the canonical conversation ID
         conversation_id = message.custom_parameters.conversation_id
+        profile_id = message.custom_parameters.profile_id
 
-        # Extract profile ID from custom parameters if available
-        profile_id = None
-        if message.custom_parameters.profile_id:
-            profile_id = message.custom_parameters.profile_id
-
-        await self._start_conversation(conversation_id, profile_id)
+        self._start_conversation(conversation_id, profile_id)
 
         # If active hydration is enabled, populate author_info and ai_agent_info
         if self.tac.config.enable_voice_active_hydration:
-            # Save customer info if from_number is available
             if message.from_number:
                 self._conversations[conversation_id].author_info = AuthorInfo(
                     address=message.from_number,
                     participant_id=message.custom_parameters.customer_participant_id,
                 )
-            # Save AI agent info if to_number is available
             if message.to_number:
                 self._conversations[conversation_id].ai_agent_info = AuthorInfo(
                     address=message.to_number,
@@ -694,20 +690,30 @@ class VoiceChannel(BaseChannel):
         session = self._conversations[conv_id]
 
         # If active hydration is enabled, send user message to Maestro
-        if (
-            self.tac.config.enable_voice_active_hydration
-            and session.author_info
-            and session.ai_agent_info
-        ):
-            # Customer is author, agent is recipient
-            await self._create_communication(
-                conversation_id=conv_id,
-                message_content=message_body,
-                author_address=session.author_info.address,
-                recipient_address=session.ai_agent_info.address,
-                author_participant_id=session.author_info.participant_id,
-                recipient_participant_id=session.ai_agent_info.participant_id,
-            )
+        # Check all required fields are available before creating communication
+        if self.tac.config.enable_voice_active_hydration:
+            if (
+                session.author_info
+                and session.ai_agent_info
+                and session.author_info.address
+                and session.author_info.participant_id
+                and session.ai_agent_info.address
+                and session.ai_agent_info.participant_id
+            ):
+                # Customer is author, agent is recipient
+                await self._create_communication(
+                    conversation_id=conv_id,
+                    message_content=message_body,
+                    author_address=session.author_info.address,
+                    recipient_address=session.ai_agent_info.address,
+                    author_participant_id=session.author_info.participant_id,
+                    recipient_participant_id=session.ai_agent_info.participant_id,
+                )
+            else:
+                self.logger.warning(
+                    "[Active Hydration] Skipping communication - missing required fields",
+                    conversation_id=conv_id,
+                )
 
         # Retrieve memory if auto_retrieve_memory is enabled and Twilio Memory is configured
         memory_response = await self._retrieve_memory_if_enabled(session, message_body, conv_id)
@@ -790,31 +796,34 @@ class VoiceChannel(BaseChannel):
         message_content: str,
         author_address: str,
         recipient_address: str,
-        author_participant_id: Optional[str] = None,
-        recipient_participant_id: Optional[str] = None,
+        author_participant_id: str,
+        recipient_participant_id: str,
     ) -> None:
         """
         Add communication to Maestro for active hydration.
+
+        This method creates a communication record in Maestro using the provided participant IDs.
+        Callers must ensure participant IDs are available before invoking this method.
 
         Args:
             conversation_id: Conversation ID
             message_content: Message content
             author_address: Author's address (phone number)
             recipient_address: Recipient's address (phone number)
-            author_participant_id: Optional author's participant ID
-            recipient_participant_id: Optional recipient's participant ID
+            author_participant_id: Author's participant ID (required by Maestro API)
+            recipient_participant_id: Recipient's participant ID (required by Maestro API)
         """
         try:
             communication_request = CommunicationRequest(
                 author=CommunicationParticipant(
-                    address=author_address, channel="VOICE", participantId=author_participant_id
+                    address=author_address, channel="VOICE", participant_id=author_participant_id
                 ),
                 content=CommunicationContent(type="TEXT", text=message_content),
                 recipients=[
                     CommunicationParticipant(
                         address=recipient_address,
                         channel="VOICE",
-                        participantId=recipient_participant_id,
+                        participant_id=recipient_participant_id,
                     )
                 ],
             )

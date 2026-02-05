@@ -9,6 +9,7 @@ from tac import TAC, TACConfig
 from tac.channels.sms import SMSChannel
 from tac.models.memory import MemoryRetrievalMeta, MemoryRetrievalResponse
 from tac.models.session import ConversationSession
+from tac.models.tac import TACMemoryResponse
 
 
 def create_conversation_created_webhook(conversation_id: str, timestamp: str) -> dict[str, Any]:
@@ -182,7 +183,7 @@ class TestTACIntegration:
             def message_ready_callback(
                 user_message: str,
                 context: ConversationSession,
-                memory_response: Optional[MemoryRetrievalResponse] = None,
+                memory_response: Optional[TACMemoryResponse] = None,
             ):
                 nonlocal callback_invoked, received_context, received_memories
                 callback_invoked = True
@@ -232,7 +233,10 @@ class TestTACIntegration:
             assert received_context.conversation_id == "CH123456"
             assert received_context.profile_id == "profile_test_123"
             assert received_context.channel == "sms"
-            assert received_memories == empty_response
+
+            # Verify memory response is wrapped in TACMemoryResponse
+            assert isinstance(received_memories, TACMemoryResponse)
+            assert received_memories.raw_data == empty_response
             assert len(received_memories.observations) == 0
             assert len(received_memories.summaries) == 0
 
@@ -248,7 +252,7 @@ class TestTACIntegration:
             def message_ready_callback(
                 user_message: str,
                 context: ConversationSession,
-                memory_response: Optional[MemoryRetrievalResponse] = None,
+                memory_response: Optional[TACMemoryResponse] = None,
             ):
                 nonlocal callback_invoked
                 callback_invoked = True
@@ -297,7 +301,7 @@ class TestTACIntegration:
             def message_ready_callback(
                 user_message: str,
                 context: ConversationSession,
-                memory_response: Optional[MemoryRetrievalResponse] = None,
+                memory_response: Optional[TACMemoryResponse] = None,
             ):
                 nonlocal callback_invoked
                 callback_invoked = True
@@ -383,7 +387,7 @@ class TestTACIntegration:
             def message_ready_callback(
                 user_message: str,
                 context: ConversationSession,
-                memory_response: Optional[MemoryRetrievalResponse] = None,
+                memory_response: Optional[TACMemoryResponse] = None,
             ):
                 nonlocal callback_count
                 callback_count += 1
@@ -435,7 +439,7 @@ class TestTACIntegration:
             def message_ready_callback(
                 user_message: str,
                 context: ConversationSession,
-                memory_response: Optional[MemoryRetrievalResponse] = None,
+                memory_response: Optional[TACMemoryResponse] = None,
             ):
                 nonlocal callback_invoked, received_context
                 callback_invoked = True
@@ -481,7 +485,7 @@ class TestTACIntegration:
             def message_ready_callback(
                 user_message: str,
                 context: ConversationSession,
-                memory_response: Optional[MemoryRetrievalResponse] = None,
+                memory_response: Optional[TACMemoryResponse] = None,
             ):
                 nonlocal callback_invoked
                 callback_invoked = True

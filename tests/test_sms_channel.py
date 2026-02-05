@@ -10,6 +10,7 @@ from tac import TAC
 from tac.channels.sms import SMSChannel
 from tac.models.memory import MemoryRetrievalMeta, MemoryRetrievalResponse
 from tac.models.session import ConversationSession
+from tac.models.tac import TACMemoryResponse
 
 
 def create_conversation_created_webhook(conversation_id: str, timestamp: str) -> dict[str, Any]:
@@ -183,7 +184,7 @@ class TestSMSChannel:
         def message_callback(
             user_message: str,
             context: ConversationSession,
-            memory_response: Optional[MemoryRetrievalResponse],
+            memory_response: Optional[TACMemoryResponse],
         ) -> None:
             nonlocal captured_context, captured_memories
             captured_context = context

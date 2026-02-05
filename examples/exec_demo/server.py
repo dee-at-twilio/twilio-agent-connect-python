@@ -39,8 +39,8 @@ from tac import TAC, TACConfig
 from tac.channels import SMSChannel
 from tac.channels.voice import VoiceChannel
 from tac.core.logging import get_logger, setup_logging
-from tac.models.memory import MemoryRetrievalResponse
 from tac.models.session import ConversationSession
+from tac.models.tac import TACMemoryResponse
 from tac.util.flex import handle_flex_handoff_logic
 
 load_dotenv()
@@ -113,7 +113,7 @@ async def flex_handoff_handler(request_data: FormData) -> Response:
 async def handle_message_ready(
     user_message: str,
     context: ConversationSession,
-    memory_response: Optional[MemoryRetrievalResponse],
+    memory_response: Optional[TACMemoryResponse],
 ) -> None:
     """
     Callback invoked when a message is ready to be processed.
@@ -147,6 +147,8 @@ async def handle_message_ready(
                 memory_items.append(f"{len(memory_response.observations)} observations")
             if memory_response.summaries:
                 memory_items.append(f"{len(memory_response.summaries)} summaries")
+            if memory_response.communications:
+                memory_items.append(f"{len(memory_response.communications)} communications")
             memory_summary = ", ".join(memory_items) if memory_items else "context"
             logger.info(
                 f"MEMORY | Retrieved {memory_summary}",

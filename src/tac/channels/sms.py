@@ -9,9 +9,6 @@ from tac import TAC
 from tac.channels.base import BaseChannel
 from tac.models.conversation import (
     Communication,
-    CommunicationContent,
-    CommunicationParticipant,
-    CommunicationRequest,
     ConversationResponse,
     ParticipantResponse,
 )
@@ -111,9 +108,9 @@ class SMSChannel(BaseChannel):
         event_data = webhook_data.get("data")
 
         if event_type == "CONVERSATION_CREATED":
-            await self._handle_conversation_created(event_data)
+            self._handle_conversation_created(event_data)
         elif event_type == "PARTICIPANT_ADDED":
-            await self._handle_participant_added(event_data)
+            self._handle_participant_added(event_data)
         elif event_type == "COMMUNICATION_CREATED":
             await self._handle_communication_created(event_data)
         elif event_type == "CONVERSATION_UPDATED":
@@ -190,7 +187,7 @@ class SMSChannel(BaseChannel):
         """Get the channel name identifier."""
         return "sms"
 
-    async def _handle_conversation_created(self, event_data: Any) -> None:
+    def _handle_conversation_created(self, event_data: Any) -> None:
         """
         Handle conversation.created event.
 
@@ -199,12 +196,9 @@ class SMSChannel(BaseChannel):
         """
         conversation_data = ConversationResponse.model_validate(event_data)
         conv_id = conversation_data.id
-        self.logger.debug("Conversation created", conversation_id=conv_id)
-        # Start conversation without profile_id initially
-        # Profile ID will be added when participant.added event arrives
-        await self._start_conversation(conv_id, profile_id=None)
+        self._start_conversation(conv_id, profile_id=None)
 
-    async def _handle_participant_added(self, event_data: Any) -> None:
+    def _handle_participant_added(self, event_data: Any) -> None:
         """
         Handle participant.added event.
 
@@ -213,33 +207,26 @@ class SMSChannel(BaseChannel):
         """
         participant_data = ParticipantResponse.model_validate(event_data)
         conv_id = participant_data.conversation_id
-        # Only track CUSTOMER participants with profile_id
-        if participant_data.type == "CUSTOMER" and participant_data.profile_id:
+        profile_id = participant_data.profile_id
+        if participant_data.type == "CUSTOMER":
+            if conv_id not in self._conversations:
+                self._start_conversation(conv_id, profile_id)
+
+            if profile_id:
+                session = self._conversations[conv_id]
+                session.profile_id = profile_id
+
             self.logger.debug(
                 "Customer participant added",
                 conversation_id=conv_id,
-                profile_id=participant_data.profile_id,
+                profile_id=profile_id,
             )
-
-            # Auto-initialize conversation if not already started
-            if conv_id not in self._conversations:
-                await self._start_conversation(conv_id, participant_data.profile_id)
-            else:
-                # Update existing conversation with profile_id
-                session = self._conversations[conv_id]
-                session.profile_id = participant_data.profile_id
-
-                # Fetch profile immediately
-                if self.tac.is_twilio_memory_enabled():
-                    profile = await self.tac.fetch_profile(participant_data.profile_id)
-                    if profile:
-                        session.profile = profile
         else:
             self.logger.debug(
-                "Participant added",
+                "Ignoring participant (not a CUSTOMER)",
                 conversation_id=conv_id,
                 participant_type=participant_data.type,
-                profile_id=participant_data.profile_id,
+                profile_id=profile_id,
             )
 
     async def _handle_communication_created(self, event_data: Any) -> None:
@@ -259,11 +246,7 @@ class SMSChannel(BaseChannel):
             return
 
         conv_id = communication_data.conversation_id
-        if not conv_id:
-            self.logger.error("No conversation_id in communication data")
-            return
 
-        # TODO: Figure out a way to filter out messages from non-CUSTOMER participants
         if communication_data.author.address == self.tac.config.twilio_phone_number:
             self.logger.debug(
                 "Ignoring message from AI agent",
@@ -271,7 +254,6 @@ class SMSChannel(BaseChannel):
             )
             return
 
-        # Extract and validate message text
         message_text = communication_data.content.text
         if not message_text or not message_text.strip():
             self.logger.debug(
@@ -287,7 +269,7 @@ class SMSChannel(BaseChannel):
                 "Received message for unknown conversation, auto-initializing without profile",
                 conversation_id=conv_id,
             )
-            await self._start_conversation(conv_id, profile_id=None)
+            self._start_conversation(conv_id, profile_id=None)
 
         session = self._conversations[conv_id]
 
@@ -297,17 +279,8 @@ class SMSChannel(BaseChannel):
             participant_id=communication_data.author.participant_id,
         )
 
-        # Fetch profile for each message if profile_id is available
-        if session.profile_id and self.tac.is_twilio_memory_enabled():
-            profile = await self.tac.fetch_profile(session.profile_id)
-            if profile:
-                # Update session with fresh profile data
-                session.profile = profile
-
-        # Retrieve memory if auto_retrieve_memory is enabled and Twilio Memory is configured
         memory_response = await self._retrieve_memory_if_enabled(session, message_text, conv_id)
 
-        # Trigger message ready callback (with or without memory)
         try:
             await self.tac.trigger_message_ready(message_text, session, memory_response)
         except Exception as e:
@@ -327,7 +300,6 @@ class SMSChannel(BaseChannel):
         """
         conversation_data = ConversationResponse.model_validate(event_data)
         conv_id = conversation_data.id
-        # Check if conversation is closed
         if conversation_data.status == "CLOSED":
             self.logger.debug(
                 "Conversation closed, cleaning up",
@@ -339,61 +311,4 @@ class SMSChannel(BaseChannel):
                 "Conversation updated",
                 conversation_id=conv_id,
                 status=conversation_data.status,
-            )
-
-    async def _send_response_via_maestro(self, conversation_id: str, response: str) -> None:
-        """
-        Send SMS response via Maestro Communications API. This is only for demo purpose.
-
-        TODO: Remove this before going production.
-
-        Args:
-            conversation_id: Conversation ID to send response to
-            response: Message content to send
-        """
-        session = self._conversations[conversation_id]
-
-        # Build recipient from author_info in session
-        if not session.author_info:
-            self.logger.error(
-                "Cannot send response: no author_info",
-                conversation_id=conversation_id,
-            )
-            return
-
-        recipient = CommunicationParticipant(
-            address=session.author_info.address,
-            channel="SMS",
-            participantId=session.author_info.participant_id,
-        )
-        recipients = [recipient]
-
-        # Create author using AI_AGENT type and configured Twilio phone number
-        # Note: We don't need to find an actual AI_AGENT participant,
-        # we can create the author directly
-        author = CommunicationParticipant(
-            address=self.tac.config.twilio_phone_number,
-            channel="SMS",
-            participantId=None,  # No participant ID needed for AI agent
-        )
-        content = CommunicationContent(type="TEXT", text=response)
-        comm_request = CommunicationRequest(author=author, content=content, recipients=recipients)
-
-        # Send communication via Maestro
-        try:
-            self.logger.debug(
-                "Sending communication via Maestro",
-                conversation_id=conversation_id,
-            )
-            await self.tac.maestro_client.create_communication(conversation_id, comm_request)
-            self.logger.info(
-                "Sent response via Maestro",
-                conversation_id=conversation_id,
-            )
-        except Exception as e:
-            self.logger.error(
-                "Failed to send communication",
-                conversation_id=conversation_id,
-                error=str(e),
-                exc_info=True,
             )
