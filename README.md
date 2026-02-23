@@ -160,50 +160,6 @@ That's it! The server automatically:
 
 For manual control over FastAPI configuration, see [`examples/channels/voice.py`](examples/channels/voice.py).
 
-### Conversation Intelligence Webhook Processing
-
-TAC can process Conversation Intelligence (CI) operator result webhooks to automatically create observations and summaries in Memory:
-
-```python
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
-from tac import TAC, TACConfig
-
-app = FastAPI()
-
-# 1. Configure TAC with memory and CI config enabled
-# Set these in your .env file:
-#   TWILIO_TAC_CI_CONFIGURATION_ID=your_ci_configuration_id
-#   TWILIO_TAC_CI_OBSERVATION_OPERATOR_SID=LY...
-#   TWILIO_TAC_CI_SUMMARY_OPERATOR_SID=LY...
-tac = TAC(config=TACConfig.from_env())
-
-# 2. Handle CI webhook events using tac.process_cintel_event()
-# The CI processor is automatically initialized when both twilio_memory_config
-# and conversation_intelligence_config are provided
-@app.post("/ci-webhook")
-async def ci_webhook_handler(request: Request):
-    payload = await request.json()
-    result = await tac.process_cintel_event(payload)
-
-    if result.success:
-        if result.skipped:
-            print(f"Skipped: {result.skip_reason}")
-        else:
-            print(f"Created {result.created_count} {result.event_type}(s)")
-    else:
-        print(f"Error: {result.error}")
-
-    return JSONResponse(content=result.model_dump())
-```
-
-The processor automatically:
-- Filters by configuration ID and operator SIDs matching the provided config
-- Extracts profile IDs from event participants
-- Creates **observations** for operators matching `observation_operator_sid`
-- Creates **conversation summaries** for operators matching `summary_operator_sid`
-- Handles multiple output formats (JSON, CLASSIFICATION, EXTRACTION, TEXT, GENERATION)
-
 ## Configuration
 
 TAC can be configured using environment variables (recommended) or programmatically.
