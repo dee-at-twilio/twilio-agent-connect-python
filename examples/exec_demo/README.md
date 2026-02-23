@@ -97,10 +97,14 @@ The server will start on `http://0.0.0.0:8000` with:
 
 2. Your ngrok URL will be `https://{your-ngrok-domain}`
 
-3. Configure Twilio Conversations API Webhook:
-   - Go to Twilio Console → Conversations → Configuration
-   - Set "Post-Event Webhook URL" to: `https://{your-ngrok-domain}/sms`
-   - Enable webhook events: `onMessageAdded`, `onConversationAdded`, `onConversationRemoved`
+3. Set up Conversation Configuration
+  1. In the [Twilio Console](https://1console.twilio.com/), navigate to **Conversations (new) > Conversation Configurations**.
+  2. Select your Conversation Service created during the setup wizard.
+  3. In the **Overview** tab, click the **Edit** button.
+  4. Set **Webhook > Callback method** to: `https://your-domain.ngrok.app/webhook`.
+     - Replace `your-domain` with your actual ngrok domain from the previous section (either the random domain like `abc123xyz` or your static domain).
+  5. Select **`POST`** as the HTTP method.
+  6. Click **Save changes**.
 
 4. Send an SMS to your Twilio phone number to interact with the agent
 
@@ -139,21 +143,21 @@ elif context.channel == "voice":
 TAC automatically retrieves customer context:
 
 ```python
-async def handle_memory_ready(
+async def handle_message(
+    user_message: str,
     context: ConversationSession,
-    memory_response: MemoryRetrievalResponse,
-    user_message: str
+    memory_response: TACMemoryResponse,
 ):
     # Memory response contains:
-    # - observations: User preferences, past interactions
-    # - summaries: Conversation summaries
-    # - sessions: Historical conversation sessions
+    # - observations: User preferences, past interactions (empty if Memory not configured)
+    # - summaries: Conversation summaries (empty if Memory not configured)
+    # - communications: Conversation history (unified format with ALL fields from both APIs)
+    # - has_memory_features: Boolean indicating if full Memory features are available
 
     llm_response = await llm_service.process_message(
         user_message=user_message,
         memory_response=memory_response,
-        profile_id=context.profile_id,
-        conversation_history=conversation_messages[conv_id]
+        context=context,
     )
 ```
 

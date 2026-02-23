@@ -1,15 +1,15 @@
 import asyncio
 import json
-import logging
+from collections.abc import AsyncGenerator
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any, Optional
+from typing import Any, Optional, Union
 
-import uvicorn
-from fastapi import FastAPI, Form, Request, Response, WebSocket, WebSocketDisconnect
-from fastapi.datastructures import FormData
+from pydantic import BaseModel
+from twilio.twiml.voice_response import VoiceResponse
 
 from tac.channels.base import BaseChannel
 from tac.channels.websocket_manager import WebSocketManager
+from tac.channels.websocket_protocol import WebSocketDisconnectError, WebSocketProtocol
 from tac.core.tac import TAC
 from tac.models.conversation import (
     CommunicationContent,
@@ -23,17 +23,9 @@ from tac.models.voice import (
     InterruptMessage,
     PromptMessage,
     SetupMessage,
-    VoiceServerConfig,
+    TwiMLOptions,
 )
-
-if TYPE_CHECKING:
-    from tac.channels.session_manager import SessionManager
-
-#
-# TODO See https://www.twilio.com/docs/voice/conversationrelay/websocket-messages
-# for WebSocket reconnection logic
-
-TASK_CANCELLATION_TIMEOUT = 5.0
+from tac.session import SessionManager, SessionState
 
 
 class VoiceChannel(BaseChannel):
@@ -42,13 +34,53 @@ class VoiceChannel(BaseChannel):
 
     Inherits conversation lifecycle management from BaseChannel and provides
     voice-specific metadata extraction.
+
+    This channel is framework-agnostic: it accepts any WebSocket implementation
+    satisfying WebSocketProtocol. For a batteries-included FastAPI server, use
+    tac.server.TACServer.
+
+    Provides two approaches for TwiML generation:
+
+    1. **High-level** (handle_incoming_call): Automatically creates conversations,
+       adds participants, and generates TwiML with standard TAC parameters
+       (conversationId, profileId, customerParticipantId, aiAgentParticipantId).
+       You can also pass additional custom parameters that get merged with the
+       standard ones. **Recommended for most use cases.**
+
+    2. **Low-level** (generate_twiml): Generate TwiML with complete control over
+       all parameters. Bypasses automatic conversation/participant creation.
+       Use ONLY when you manage conversations outside of TAC or need a completely
+       custom flow.
+
+    Examples:
+        High-level approach (automatic TAC setup + custom params):
+            >>> twiml = await voice_channel.handle_incoming_call(
+            ...     to_number="+15551234567",
+            ...     from_number="+15559876543",
+            ...     options={
+            ...         "websocket_url": "wss://example.com/ws",
+            ...         "custom_parameters": {"session_type": "support", "language": "es"},
+            ...         "welcome_greeting": "Hello!",
+            ...     },
+            ... )
+
+        Low-level approach (manual conversation management):
+            >>> twiml = voice_channel.generate_twiml(
+            ...     {
+            ...         "websocket_url": "wss://example.com/ws",
+            ...         "custom_parameters": {
+            ...             "conversationId": "CH123",
+            ...             "session_id": "custom_session_123",
+            ...         },
+            ...         "welcome_greeting": "¡Hola!",
+            ...     }
+            ... )
     """
 
     def __init__(
         self,
         tac: TAC,
-        session_manager: Optional["SessionManager"] = None,
-        server_config: Optional[VoiceServerConfig] = None,
+        session_manager: Optional[SessionManager] = None,
         auto_retrieve_memory: bool = True,
     ):
         """
@@ -61,49 +93,63 @@ class VoiceChannel(BaseChannel):
                 encapsulates the stream_generator for LLM responses
                 If provided, enables task cancellation on interrupts
                 and new prompts.
-            server_config: Optional server configuration. If provided, enables the simplified
-                         start() method to automatically create and run a FastAPI server.
             auto_retrieve_memory: If True (default), automatically retrieve memory
                 before invoking the on_message_ready callback. Set to False to
                 disable automatic memory retrieval (e.g., for latency-sensitive
                 voice applications).
         """
         super().__init__(tac, auto_retrieve_memory=auto_retrieve_memory)
-
-        # Optional session manager for task tracking, cancellation, and streaming
         self.session_manager = session_manager
-
-        # WebSocket manager for multi-connection support
         self._websocket_manager = WebSocketManager()
-        self._server_config = server_config
 
     async def handle_incoming_call(
         self,
-        websocket_url: str,
         to_number: str,
         from_number: str,
+        options: Union[TwiMLOptions, dict[str, Any]],
         call_sid: Optional[str] = None,
-        action_url: Optional[str] = None,
-        welcome_greeting: str = "Hello! How can I assist you today?",
     ) -> str:
         """
         Generate TwiML response for incoming voice calls.
 
-        This method creates a new conversation and returns TwiML that connects
-        the call to a ConversationRelay WebSocket endpoint.
+        This method creates a new conversation, adds participants, and returns TwiML
+        that connects the call to a ConversationRelay WebSocket endpoint with standard
+        TAC parameters (conversationId, profileId, customerParticipantId,
+        aiAgentParticipantId) plus any custom parameters from options.
 
         Args:
-            websocket_url: WebSocket URL for ConversationRelay (e.g., 'wss://example.ngrok.io/ws')
             to_number: Twilio phone number that was called (e.g., '+15551234567')
             from_number: Caller's phone number (e.g., '+15559876543')
+            options: TwiML generation options (TwiMLOptions or dict) containing:
+                - websocket_url (required): WebSocket URL for ConversationRelay
+                - custom_parameters (optional): Additional custom parameters
+                - welcome_greeting (optional): Initial greeting message
+                - action_url (optional): URL for call completion webhook
             call_sid: Optional Twilio Call SID to associate with participants
-            action_url: Optional URL for Twilio to request when the call ends.
-            welcome_greeting: Initial greeting message for the caller.
-                            Defaults to "Hello! How can I assist you today?"
 
         Returns:
             TwiML XML string for call connection
+
+        Example:
+            >>> twiml = await voice_channel.handle_incoming_call(
+            ...     to_number="+15551234567",
+            ...     from_number="+15559876543",
+            ...     options={
+            ...         "websocket_url": "wss://example.com/ws",
+            ...         "custom_parameters": {"session_id": "sess_123"},
+            ...         "welcome_greeting": "Hello!",
+            ...         "action_url": "https://example.com/callback",
+            ...     },
+            ... )
         """
+        # Handle dict input (convert to TwiMLOptions)
+        if isinstance(options, dict):
+            options = TwiMLOptions(**options)
+
+        # Set default welcome greeting if not provided
+        if options.welcome_greeting is None:
+            options.welcome_greeting = "Hello! How can I assist you today?"
+
         # Create a new conversation for each call
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         conversation_name = f"tac-voice-{from_number}-{timestamp}"
@@ -134,44 +180,138 @@ class VoiceChannel(BaseChannel):
             ai_agent_participant_response.id if ai_agent_participant_response else ""
         )
 
-        twiml = f"""<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-    <Connect action="{action_url}">
-        <ConversationRelay url="{websocket_url}" welcomeGreeting="{welcome_greeting}">
-            <Parameter name="conversationId" value="{conversation_id}" />
-            <Parameter name="profileId" value="{profile_id}" />
-            <Parameter name="customerParticipantId" value="{customer_participant_id}" />
-            <Parameter name="aiAgentParticipantId" value="{ai_agent_participant_id}" />
-        </ConversationRelay>
-    </Connect>
-</Response>"""
-
-        return twiml
-
-    async def handle_handoff(self, request: Request) -> Response:
-        """
-        Generic handler for handoff webhook. Delegates to registered TAC handoff callback.
-        Args:
-            request: FastAPI Request object for the webhook.
-        Returns:
-            FastAPI Response for Twilio (or as returned by the callback).
-        """
-        self.logger.info("Handling handoff webhook (delegated)")
-        request_data: FormData = await request.form()
-        cb = getattr(self.tac, "_handoff_callback", None)
-        if cb is not None:
-            result = await cb(request_data)
-            # Explicitly cast to Response for mypy
-            from fastapi import Response as FastAPIResponse
-
-            if not isinstance(result, FastAPIResponse):
-                raise TypeError("Handoff callback did not return a FastAPI Response")
-            return result
-        return Response(
-            content="No handoff handler registered", media_type="text/plain", status_code=501
+        self.logger.debug(
+            f"[Voice Channel] Added participants - "
+            f"customer_id={customer_participant_id}, ai_agent_id={ai_agent_participant_id}, "
+            f"profile_id={profile_id}"
         )
 
-    async def handle_conversation_relay_callback(self, request: Request) -> Response:
+        # Build standard TAC custom parameters
+        tac_params: dict[str, Any] = {
+            "conversationId": conversation_id,
+            "profileId": profile_id,
+            "customerParticipantId": customer_participant_id,
+            "aiAgentParticipantId": ai_agent_participant_id,
+        }
+
+        # Merge with any custom parameters from options
+        if options.custom_parameters:
+            # Handle both Pydantic model and dict
+            user_params = (
+                options.custom_parameters.model_dump(by_alias=True, exclude_none=True)
+                if isinstance(options.custom_parameters, BaseModel)
+                else options.custom_parameters
+            )
+            tac_params.update(user_params)
+
+        # Use generate_twiml for consistent TwiML generation
+        return self.generate_twiml(
+            TwiMLOptions(
+                websocket_url=options.websocket_url,
+                custom_parameters=tac_params,
+                welcome_greeting=options.welcome_greeting,
+                action_url=options.action_url,
+            )
+        )
+
+    def generate_twiml(
+        self,
+        options: Union[TwiMLOptions, dict[str, Any]],
+    ) -> str:
+        """
+        Generate TwiML XML for ConversationRelay with custom parameters.
+
+        This is a low-level method for generating TwiML with arbitrary custom
+        parameters. For automatic conversation creation and participant management,
+        use handle_incoming_call() instead.
+
+        Args:
+            options: TwiML generation options (TwiMLOptions model or dict with:
+                - websocket_url (required): WebSocket URL for ConversationRelay
+                - custom_parameters (optional): Dict of custom parameters
+                - welcome_greeting (optional): Initial greeting message
+                - action_url (optional): URL for call end webhook
+
+        Returns:
+            TwiML XML string ready to return to Twilio
+
+        Example:
+            >>> twiml = voice_channel.generate_twiml(
+            ...     {
+            ...         "websocket_url": "wss://example.com/voice",
+            ...         "custom_parameters": {
+            ...             "conversation_id": "CH123",
+            ...             "custom_field": "custom_value",
+            ...         },
+            ...         "welcome_greeting": "Hello!",
+            ...     }
+            ... )
+        """
+        # Handle dict input (convert to TwiMLOptions)
+        if isinstance(options, dict):
+            options = TwiMLOptions(**options)
+
+        websocket_url = options.websocket_url
+        custom_parameters = options.custom_parameters
+        welcome_greeting = options.welcome_greeting
+        action_url = options.action_url
+
+        # Create VoiceResponse
+        response = VoiceResponse()
+
+        # Create Connect verb with optional action
+        connect_kwargs: dict[str, str] = {}
+        if action_url:
+            connect_kwargs["action"] = action_url
+        connect = response.connect(**connect_kwargs)
+
+        # Build ConversationRelay kwargs
+        relay_kwargs: dict[str, str] = {"url": websocket_url}
+        if welcome_greeting:
+            relay_kwargs["welcome_greeting"] = welcome_greeting
+
+        # Create ConversationRelay
+        relay = connect.conversation_relay(**relay_kwargs)
+
+        # Add custom parameters
+        if custom_parameters:
+            # Handle both Pydantic model and dict
+            params_dict: dict[str, Any] = (
+                custom_parameters.model_dump(by_alias=True, exclude_none=True)
+                if isinstance(custom_parameters, BaseModel)
+                else custom_parameters
+            )
+
+            # Add each parameter as a child element
+            for name, value in params_dict.items():
+                if value is not None:
+                    relay.parameter(name=name, value=str(value))
+
+        return str(response)
+
+    async def handle_handoff(self, form_data: dict[str, str]) -> str:
+        """
+        Generic handler for handoff webhook. Delegates to registered TAC handoff callback.
+
+        Args:
+            form_data: Dict of form data from the request.
+
+        Returns:
+            TwiML/content string from the handoff callback.
+
+        Raises:
+            ValueError: If no handoff handler is registered.
+        """
+        self.logger.info("Handling handoff webhook (delegated)")
+        cb = self.tac._handoff_callback
+        if cb is None:
+            raise ValueError("No handoff handler registered")
+        return await cb(form_data)
+
+    async def handle_conversation_relay_callback(
+        self,
+        payload_dict: dict[str, str],
+    ) -> Optional[str]:
         """
         Handle ConversationRelay callback webhook from Twilio.
 
@@ -179,68 +319,69 @@ class VoiceChannel(BaseChannel):
         session ends, and closes associated conversations if the call status is "completed".
 
         Args:
-            request: FastAPI Request object containing form data with:
-                - CallSid: Twilio Call SID
-                - CallStatus: Call status (e.g., "completed", "in-progress")
-                - SessionStatus: ConversationRelay session status
-                - SessionDuration: Duration of the session in seconds
-                - HandoffData: Optional JSON string with handoff information
+            payload_dict: Raw form data dict from the webhook request.
+                Validated internally into ConversationRelayCallbackPayload.
 
         Returns:
-            FastAPI Response acknowledging the callback
-        """
-        # TODO: Need to integrate handoff logic to this function as well. Will do it later.
-        try:
-            # Parse form data into dict
-            form_data = await request.form()
-            payload_dict = {key: str(value) for key, value in form_data.items()}
+            Content string for handoff responses, or None for simple acknowledgment.
 
-            # Parse into Pydantic model
-            payload = ConversationRelayCallbackPayload(**payload_dict)
+        Raises:
+            ValidationError: If the payload dict fails validation.
+            ValueError: If handoff is triggered but no handler is registered.
+        """
+        payload = ConversationRelayCallbackPayload(**payload_dict)
+
+        self.logger.info(
+            f"[ConversationRelay Callback] CallSid: {payload.call_sid}, "
+            f"Status: {payload.call_status}"
+        )
+
+        if payload.call_status == "in-progress" and payload.handoff_data:
+            return await self.handle_handoff(payload_dict)
+
+        # If call is completed, close associated conversations
+        if payload.call_status == "completed":
+            conversations = await self.tac.maestro_client.list_conversations(
+                channel_id=payload.call_sid, status=["ACTIVE", "INACTIVE"]
+            )
 
             self.logger.debug(
-                f"[ConversationRelay Callback] CallSid: {payload.call_sid}, "
-                f"Status: {payload.call_status}"
+                f"\n{'=' * 80}\nCALL ENDED | Closing {len(conversations)} conversation(s)",
+                call_sid=payload.call_sid,
             )
 
-            if payload.call_status == "in-progress" and payload.handoff_data:
-                return await self.handle_handoff(request)
+            # Close each conversation
+            for conversation in conversations:
+                try:
+                    # Only handle conversations from our configuration
+                    if conversation.configuration_id != self.tac.config.conversation_service_sid:
+                        continue
 
-            # If call is completed, close associated conversations
-            if payload.call_status == "completed":
-                # Get all conversations associated with this call
-                conversations = await self.tac.maestro_client.list_conversations(
-                    channel_id=payload.call_sid
-                )
+                    await self.tac.maestro_client.update_conversation(
+                        conversation_id=conversation.id, status="CLOSED"
+                    )
 
-                self.logger.info(
-                    f"\n{'=' * 80}\n📞 CALL ENDED | Closing {len(conversations)} conversation(s)",
-                    call_sid=payload.call_sid,
-                )
+                    # Clean up local session if it exists and is a voice channel
+                    if (
+                        conversation.id in self._conversations
+                        and self._conversations[conversation.id].channel == "voice"
+                    ):
+                        await self._end_conversation(conversation.id)
 
-                # Close each conversation
-                for conversation in conversations:
-                    try:
-                        await self.tac.maestro_client.update_conversation(
-                            conversation_id=conversation.id, status="CLOSED"
-                        )
-                        self.logger.debug(
-                            f"[ConversationRelay Callback] Closed conversation: {conversation.id}"
-                        )
-                    except Exception as e:
-                        self.logger.error(
-                            f"Failed to close conversation {conversation.id}: {e}",
-                            exc_info=True,
-                        )
+                    self.logger.debug(
+                        "Closed conversation",
+                        conversation_id=conversation.id,
+                        call_sid=payload.call_sid,
+                    )
+                except Exception as e:
+                    self.logger.error(
+                        f"Failed to close conversation {conversation.id}: {e}",
+                        exc_info=True,
+                    )
 
-            return Response(content="OK", media_type="text/plain", status_code=200)
-        except Exception as e:
-            self.logger.error(f"Error handling ConversationRelay callback: {e}", exc_info=True)
-            return Response(
-                content="Internal Server Error", media_type="text/plain", status_code=500
-            )
+        return None
 
-    async def handle_websocket(self, websocket: WebSocket) -> None:
+    async def handle_websocket(self, websocket: WebSocketProtocol) -> None:
         """
         Handle voice streaming WebSocket connection lifecycle.
 
@@ -251,67 +392,42 @@ class VoiceChannel(BaseChannel):
         - Cleans up on disconnect
 
         Args:
-            websocket: FastAPI WebSocket instance
+            websocket: Any WebSocket implementation satisfying WebSocketProtocol
         """
         await websocket.accept()
         self.logger.debug("WebSocket connection established")
 
-        conv_id = None
+        conv_id: Optional[str] = None
         session_state = None
         handler_task = None
 
         try:
             # First message should be 'setup'
             data = await websocket.receive_json()
-            if self.logger.isEnabledFor(logging.DEBUG):
-                self.logger.debug(f"Received WebSocket data: {data}")
-
             if data.get("type") == "setup":
                 setup_msg = SetupMessage(**data)
-
-                # Extract conversation ID from setup message
-                if (
-                    not setup_msg.custom_parameters
-                    or not setup_msg.custom_parameters.conversation_id
-                ):
-                    self.logger.error(
-                        "conversationId is required in custom_parameters but was not provided"
-                    )
-                    await websocket.close()
-                    return
-
                 conv_id = setup_msg.custom_parameters.conversation_id
 
                 # Store WebSocket in manager BEFORE calling _handle_setup
                 self._websocket_manager.add_websocket(conv_id, websocket)
-                self.logger.debug("Registered WebSocket", conversation_id=conv_id)
 
                 # Handle setup to initialize conversation
-                await self._handle_setup(setup_msg)
-                session_state = None  # Initialize as None
+                self._handle_setup(setup_msg)
 
                 # Get or create session state if session manager is available
-                if self.session_manager is not None and conv_id:
-                    try:
-                        session_state = self.session_manager.get_or_create_session(conv_id)
-                        if self.logger.isEnabledFor(logging.DEBUG):
-                            self.logger.info(
-                                f"Session state SUCCESSFULLY created for {conv_id}: {session_state}"
-                            )
-                    except Exception as e:
-                        self.logger.error(f"Error creating session state: {e}", exc_info=True)
+                if self.session_manager is not None:
+                    session_state = self.session_manager.get_or_create_session(conv_id)
+
+                # Create dedicated task to handle all subsequent messages
+                handler_task = asyncio.create_task(
+                    self._message_handler(websocket, conv_id, session_state)
+                )
+                await handler_task
             else:
                 self.logger.warning("First message was not 'setup'. Closing connection.")
                 await websocket.close()
                 return
-
-            # Create dedicated task to handle all subsequent messages
-            handler_task = asyncio.create_task(
-                self._message_handler(websocket, conv_id, session_state)
-            )
-            await handler_task
-
-        except WebSocketDisconnect:
+        except WebSocketDisconnectError:
             self.logger.info("WebSocket connection closed", conversation_id=conv_id)
         except Exception as e:
             self.logger.error(f"WebSocket error: {str(e)}")
@@ -331,9 +447,9 @@ class VoiceChannel(BaseChannel):
 
     async def _message_handler(
         self,
-        websocket: WebSocket,
-        conv_id: Optional[str],
-        session_state: Any,
+        websocket: WebSocketProtocol,
+        conv_id: str,
+        session_state: Optional[SessionState],
     ) -> None:
         """
         Handle all incoming messages for a conversation session.
@@ -346,22 +462,15 @@ class VoiceChannel(BaseChannel):
         try:
             while True:
                 data = await websocket.receive_json()
-                self.logger.debug(f"Received WebSocket data: {data}")
                 msg_type = data.get("type")
 
                 if msg_type == "prompt":
                     await self._handle_prompt_async(conv_id, data, session_state)
                 elif msg_type == "interrupt":
                     await self._handle_interrupt_async(conv_id, data, session_state)
-                elif msg_type == "setup":
-                    self.logger.info(
-                        f"Ignoring subsequent setup message for conversation {conv_id}"
-                    )
                 else:
-                    # ignore unknown message types
-                    self.logger.debug(f"Unknown message type received: {msg_type}")
-
-        except WebSocketDisconnect:
+                    self.logger.debug(f"Skip message type received: {msg_type}")
+        except WebSocketDisconnectError:
             self.logger.debug(
                 f"WebSocket disconnected during message handling for conversation {conv_id}"
             )
@@ -372,9 +481,9 @@ class VoiceChannel(BaseChannel):
 
     async def _handle_prompt_async(
         self,
-        conv_id: Optional[str],
+        conv_id: str,
         data: dict[str, Any],
-        session_state: Any,
+        session_state: Optional[SessionState],
     ) -> None:
         """
         Handle prompt message asynchronously with task tracking.
@@ -390,48 +499,24 @@ class VoiceChannel(BaseChannel):
                 prompt_msg = PromptMessage(**data)
                 conv_id = prompt_msg.conversation_id or conv_id
 
-                if not conv_id:
-                    self.logger.error(
-                        "No active conversation ID for prompt message; "
-                        "ensure setup message is processed first"
-                    )
-                    return
-
                 # Cancel previous stream task if session manager is enabled
                 if session_state:
-                    if session_state.stream_task and not session_state.stream_task.done():
-                        if self.logger.isEnabledFor(logging.DEBUG):
-                            self.logger.debug(
-                                "Cancelling previous stream task", conversation_id=conv_id
-                            )
-                        session_state.stream_task.cancel()
-                        try:
-                            await asyncio.wait_for(
-                                session_state.stream_task, timeout=TASK_CANCELLATION_TIMEOUT
-                            )
-                        except asyncio.CancelledError:
-                            pass
-                        except asyncio.TimeoutError:
-                            self.logger.error(
-                                f"Task cancellation timed out for {conv_id}. "
-                                f"The stream generator is not handling cancellation properly."
-                            )
+                    await session_state.cancel_stream_task()
 
-                    # Create new streaming task
+                    # Create new task using unified flow (memory retrieval + callback)
                     session_state.stream_task = asyncio.create_task(
-                        self._process_prompt(conv_id, prompt_msg)
+                        self._handle_prompt(conv_id, prompt_msg)
                     )
                 else:
-                    # No session manager - await directly
                     await self._handle_prompt(conv_id, prompt_msg)
         except Exception as e:
             self.logger.error(f"Failed to handle prompt: {str(e)}")
 
     async def _handle_interrupt_async(
         self,
-        conv_id: Optional[str],
+        conv_id: str,
         data: dict[str, Any],
-        session_state: Any,
+        session_state: Optional[SessionState],
     ) -> None:
         """
         Handle interrupt message asynchronously with task cancellation.
@@ -445,24 +530,9 @@ class VoiceChannel(BaseChannel):
             interrupt_msg = InterruptMessage(**data)
             conv_id = interrupt_msg.conversation_id or conv_id
 
-            if not conv_id:
-                self.logger.error(
-                    "No active conversation ID for interrupt message; "
-                    "ensure setup message is processed first"
-                )
-                return
-
             # Cancel in-flight stream task if session manager is enabled
             if session_state:
-                if session_state.stream_task and not session_state.stream_task.done():
-                    session_state.stream_task.cancel()
-                    self.logger.info(
-                        "Canceled streaming task due to interrupt", conversation_id=conv_id
-                    )
-                    try:
-                        await session_state.stream_task
-                    except asyncio.CancelledError:
-                        pass
+                await session_state.cancel_stream_task()
 
                 # Send acknowledgment to Twilio after cancelling
                 websocket = self._websocket_manager.get_websocket(conv_id)
@@ -471,141 +541,123 @@ class VoiceChannel(BaseChannel):
                         await websocket.send_text(
                             json.dumps({"type": "text", "token": "", "last": True})
                         )
-                    except (WebSocketDisconnect, RuntimeError):
-                        self.logger.info(
+                    except (WebSocketDisconnectError, RuntimeError):
+                        self.logger.debug(
                             f"WebSocket closed before sending interrupt acknowledgment "
                             f"for {conv_id}."
                         )
 
             # Call the interrupt handler
             self._handle_interrupt(conv_id, interrupt_msg)
-
         except Exception as e:
             self.logger.error(f"Failed to handle interrupt: {str(e)}")
-
-    async def _process_prompt(self, conv_id: str, message: PromptMessage) -> None:
-        """
-        Process prompt asynchronously with streaming if session_manager is available.
-
-        Args:
-            conv_id: Conversation ID
-            message: Parsed PromptMessage
-        """
-        if self.session_manager:
-            # Use session manager's streaming capability
-            await self._stream_and_send_response(conv_id, message)
-        else:
-            # No session manager - await handler directly
-            await self._handle_prompt(conv_id, message)
-
-    async def _stream_and_send_response(self, conv_id: str, message: PromptMessage) -> None:
-        """
-        Stream LLM response using session_manager and send to websocket.
-
-        Args:
-            conv_id: Conversation ID
-            message: Parsed PromptMessage containing user's speech
-        """
-        # Get WebSocket from manager
-        websocket = self._websocket_manager.get_websocket(conv_id)
-        if not websocket:
-            self.logger.error("No websocket for conversation", conversation_id=conv_id)
-            return
-
-        if not self.session_manager:
-            self.logger.error("No session_manager available", conversation_id=conv_id)
-            return
-
-        prompt = message.voice_prompt or ""
-
-        try:
-            json_template = {"type": "text", "token": "", "last": False}
-            closed = False
-
-            # Stream response chunks from session manager
-            async for chunk in self.session_manager.stream_response(prompt, conv_id):
-                # Handle different chunk types (plain text or dict with metadata)
-                if isinstance(chunk, dict):
-                    if "output" in chunk:
-                        json_template["token"] = chunk["output"]
-                    else:
-                        json_template["token"] = str(chunk)
-                else:
-                    json_template["token"] = chunk
-
-                try:
-                    await websocket.send_text(json.dumps(json_template))
-                except (WebSocketDisconnect, RuntimeError):
-                    self.logger.info("WebSocket closed during streaming", conversation_id=conv_id)
-                    closed = True
-                    break
-
-            # Send final message marker
-            if not closed:
-                try:
-                    await websocket.send_text(
-                        json.dumps({"type": "text", "token": "", "last": True})
-                    )
-                except (WebSocketDisconnect, RuntimeError):
-                    self.logger.info(
-                        "WebSocket closed before sending final marker", conversation_id=conv_id
-                    )
-
-        except asyncio.CancelledError:
-            self.logger.info("Streaming cancelled", conversation_id=conv_id)
-            raise
-        except Exception as e:
-            self.logger.error(
-                f"Error during streaming: {e}", conversation_id=conv_id, exc_info=True
-            )
-            error_msg = json.dumps(
-                {"type": "text", "token": "Sorry, an error occurred.", "last": True}
-            )
-            try:
-                await websocket.send_text(error_msg)
-            except (WebSocketDisconnect, RuntimeError):
-                self.logger.info(
-                    "WebSocket closed before sending error message", conversation_id=conv_id
-                )
-        finally:
-            self.logger.info("Finished streaming response", conversation_id=conv_id)
 
     # todo: voice does not support webhooks yet
     async def process_webhook(self, webhook_data: dict[str, Any]) -> None:
         pass
 
     async def send_response(
-        self, conversation_id: str, response: str, role: Optional[str] = None
+        self,
+        conversation_id: str,
+        response: Union[str, AsyncGenerator[Union[str, dict[str, Any]], None]],
+        role: Optional[str] = None,
     ) -> None:
         """
         Send voice response through the websocket connection for this conversation.
 
+        Supports both simple string responses and streaming async generators.
+
         Args:
             conversation_id: Conversation ID
-            response: Response text to send
+            response: Response text (string) or async generator for streaming
             role: Optional message role (not used in this implementation, but kept
                   for API consistency with BaseChannel interface)
         """
+        # Validate response type before processing
+        if not isinstance(response, (str, AsyncGenerator)):
+            raise TypeError("Voice channel requires string or async generator for response")
+
         # Get WebSocket from manager
         websocket = self._websocket_manager.get_websocket(conversation_id)
         if not websocket:
             self.logger.error("No websocket connection", conversation_id=conversation_id)
             return
 
-        try:
-            await websocket.send_text(json.dumps({"type": "text", "token": response, "last": True}))
+        full_response = ""
 
+        try:
+            # Check if response is an async generator (streaming)
+            if isinstance(response, AsyncGenerator):
+                # Streaming response
+                json_template = {"type": "text", "token": "", "last": False}
+                closed = False
+                response_gen: AsyncGenerator[Union[str, dict[str, Any]], None] = response
+
+                try:
+                    async for chunk in response_gen:
+                        # Handle different chunk types (plain text or dict with metadata)
+                        if isinstance(chunk, dict):
+                            if "output" in chunk:
+                                token = chunk["output"]
+                            else:
+                                token = str(chunk)
+                        else:
+                            token = chunk
+
+                        full_response += token
+                        json_template["token"] = token
+
+                        try:
+                            await websocket.send_text(json.dumps(json_template))
+                        except (WebSocketDisconnectError, RuntimeError):
+                            self.logger.info(
+                                "WebSocket closed during streaming",
+                                conversation_id=conversation_id,
+                            )
+                            closed = True
+                            break
+
+                    # Send final message marker
+                    if not closed:
+                        try:
+                            await websocket.send_text(
+                                json.dumps({"type": "text", "token": "", "last": True})
+                            )
+                        except (WebSocketDisconnectError, RuntimeError):
+                            self.logger.info(
+                                "WebSocket closed before sending final marker",
+                                conversation_id=conversation_id,
+                            )
+                except asyncio.CancelledError:
+                    # Let Python's async generator cleanup handle closing the generator
+                    raise
+            else:
+                # Simple string response
+                full_response = response
+                await websocket.send_text(
+                    json.dumps({"type": "text", "token": response, "last": True})
+                )
+
+            # If active hydration is enabled, send agent response to Maestro
+            # Check all required fields are available before creating communication
             if (
                 self.tac.config.enable_voice_active_hydration
                 and conversation_id in self._conversations
             ):
                 session = self._conversations[conversation_id]
 
-                if session.author_info and session.ai_agent_info:
+                if (
+                    session.author_info
+                    and session.ai_agent_info
+                    and session.ai_agent_info.address
+                    and session.ai_agent_info.participant_id
+                    and session.author_info.address
+                    and session.author_info.participant_id
+                ):
                     # Agent is author, customer is recipient
                     await self._create_communication(
                         conversation_id=conversation_id,
-                        message_content=response,
+                        message_content=full_response,
                         author_address=session.ai_agent_info.address,
                         recipient_address=session.author_info.address,
                         author_participant_id=session.ai_agent_info.participant_id,
@@ -613,18 +665,28 @@ class VoiceChannel(BaseChannel):
                     )
                 else:
                     self.logger.warning(
-                        "[Active Hydration] Missing author or AI agent info",
+                        "[Active Hydration] Skipping communication - missing required fields",
                         conversation_id=conversation_id,
                     )
-        except (WebSocketDisconnect, RuntimeError):
+
+        except asyncio.CancelledError:
+            # Re-raise to propagate cancellation up the call stack.
+            # Note: Partial responses from interrupted streams are NOT saved to Maestro.
+            # This is intentional - incomplete responses shouldn't be part of conversation history.
+            raise
+        except (WebSocketDisconnectError, RuntimeError):
             self.logger.info(
                 "WebSocket closed before sending response", conversation_id=conversation_id
+            )
+        except Exception as e:
+            self.logger.error(
+                f"Error sending response: {e}", conversation_id=conversation_id, exc_info=True
             )
 
     def get_channel_name(self) -> str:
         return "voice"
 
-    def get_websocket(self, conversation_id: str) -> Optional[WebSocket]:
+    def get_websocket(self, conversation_id: str) -> Optional[WebSocketProtocol]:
         """
         Get the WebSocket connection for a specific conversation.
 
@@ -636,39 +698,25 @@ class VoiceChannel(BaseChannel):
         """
         return self._websocket_manager.get_websocket(conversation_id)
 
-    async def _handle_setup(self, message: SetupMessage) -> None:
+    def _handle_setup(self, message: SetupMessage) -> None:
         """
         Handle WebSocket setup message.
 
         Args:
             message: Parsed SetupMessage containing call metadata
         """
-        # Validate conversation ID is present in custom parameters
-        if not message.custom_parameters or not message.custom_parameters.conversation_id:
-            self.logger.error(
-                "conversationId is required in custom_parameters but was not provided"
-            )
-            return
-
-        # Use the conversation ID from custom parameters as the canonical conversation ID
         conversation_id = message.custom_parameters.conversation_id
+        profile_id = message.custom_parameters.profile_id
 
-        # Extract profile ID from custom parameters if available
-        profile_id = None
-        if message.custom_parameters.profile_id:
-            profile_id = message.custom_parameters.profile_id
-
-        await self._start_conversation(conversation_id, profile_id)
+        self._start_conversation(conversation_id, profile_id)
 
         # If active hydration is enabled, populate author_info and ai_agent_info
         if self.tac.config.enable_voice_active_hydration:
-            # Save customer info if from_number is available
             if message.from_number:
                 self._conversations[conversation_id].author_info = AuthorInfo(
                     address=message.from_number,
                     participant_id=message.custom_parameters.customer_participant_id,
                 )
-            # Save AI agent info if to_number is available
             if message.to_number:
                 self._conversations[conversation_id].ai_agent_info = AuthorInfo(
                     address=message.to_number,
@@ -686,7 +734,8 @@ class VoiceChannel(BaseChannel):
         if conv_id not in self._conversations:
             self.logger.error(
                 f"Received prompt for unknown conversation {conv_id}. "
-                "Conversation should be initialized in setup message first."
+                "Conversation should be initialized in setup message first.",
+                conversation_id=conv_id,
             )
             return
 
@@ -694,20 +743,30 @@ class VoiceChannel(BaseChannel):
         session = self._conversations[conv_id]
 
         # If active hydration is enabled, send user message to Maestro
-        if (
-            self.tac.config.enable_voice_active_hydration
-            and session.author_info
-            and session.ai_agent_info
-        ):
-            # Customer is author, agent is recipient
-            await self._create_communication(
-                conversation_id=conv_id,
-                message_content=message_body,
-                author_address=session.author_info.address,
-                recipient_address=session.ai_agent_info.address,
-                author_participant_id=session.author_info.participant_id,
-                recipient_participant_id=session.ai_agent_info.participant_id,
-            )
+        # Check all required fields are available before creating communication
+        if self.tac.config.enable_voice_active_hydration:
+            if (
+                session.author_info
+                and session.ai_agent_info
+                and session.author_info.address
+                and session.author_info.participant_id
+                and session.ai_agent_info.address
+                and session.ai_agent_info.participant_id
+            ):
+                # Customer is author, agent is recipient
+                await self._create_communication(
+                    conversation_id=conv_id,
+                    message_content=message_body,
+                    author_address=session.author_info.address,
+                    recipient_address=session.ai_agent_info.address,
+                    author_participant_id=session.author_info.participant_id,
+                    recipient_participant_id=session.ai_agent_info.participant_id,
+                )
+            else:
+                self.logger.warning(
+                    "[Active Hydration] Skipping communication - missing required fields",
+                    conversation_id=conv_id,
+                )
 
         # Retrieve memory if auto_retrieve_memory is enabled and Twilio Memory is configured
         memory_response = await self._retrieve_memory_if_enabled(session, message_body, conv_id)
@@ -735,11 +794,6 @@ class VoiceChannel(BaseChannel):
             conv_id: Conversation ID
             message: Parsed InterruptMessage with interruption details
         """
-        self.logger.info(
-            f"INTERRUPT | User interrupted (after {message.duration_until_interrupt_ms}ms)",
-            conversation_id=conv_id,
-        )
-
         # Trigger interrupt callback if conversation exists
         if conv_id in self._conversations:
             session = self._conversations[conv_id]
@@ -759,30 +813,15 @@ class VoiceChannel(BaseChannel):
         # Remove WebSocket from manager
         if self._websocket_manager.has_websocket(conv_id):
             self._websocket_manager.remove_websocket(conv_id)
-            self.logger.debug("Removed WebSocket", conversation_id=conv_id)
 
         # Cancel any running stream task and cleanup session if session manager is enabled
-        if self.session_manager and self.session_manager.has_session(conv_id):
-            sessions_before = len(self.session_manager)
-            self.logger.info(
-                f"Cleaning up conversation {conv_id} - sessions before: {sessions_before}"
-            )
-
+        if self.session_manager is not None and self.session_manager.has_session(conv_id):
             session_state = self.session_manager.get_or_create_session(conv_id)
-            if session_state.stream_task and not session_state.stream_task.done():
-                session_state.stream_task.cancel()
-                self.logger.info("Cancelled stream_task", conversation_id=conv_id)
-
+            await session_state.cancel_stream_task()
             self.session_manager.remove_session(conv_id)
-            sessions_after = len(self.session_manager)
-            self.logger.info(
-                f"Cleaned up conversation {conv_id} - sessions after: {sessions_after}"
-            )
 
         # Clean up conversation state from BaseChannel
-        if conv_id in self._conversations:
-            del self._conversations[conv_id]
-            self.logger.debug("Ended conversation", conversation_id=conv_id)
+        await self._end_conversation(conv_id)
 
     async def _create_communication(
         self,
@@ -790,31 +829,34 @@ class VoiceChannel(BaseChannel):
         message_content: str,
         author_address: str,
         recipient_address: str,
-        author_participant_id: Optional[str] = None,
-        recipient_participant_id: Optional[str] = None,
+        author_participant_id: str,
+        recipient_participant_id: str,
     ) -> None:
         """
         Add communication to Maestro for active hydration.
+
+        This method creates a communication record in Maestro using the provided participant IDs.
+        Callers must ensure participant IDs are available before invoking this method.
 
         Args:
             conversation_id: Conversation ID
             message_content: Message content
             author_address: Author's address (phone number)
             recipient_address: Recipient's address (phone number)
-            author_participant_id: Optional author's participant ID
-            recipient_participant_id: Optional recipient's participant ID
+            author_participant_id: Author's participant ID (required by Maestro API)
+            recipient_participant_id: Recipient's participant ID (required by Maestro API)
         """
         try:
             communication_request = CommunicationRequest(
                 author=CommunicationParticipant(
-                    address=author_address, channel="VOICE", participantId=author_participant_id
+                    address=author_address, channel="VOICE", participant_id=author_participant_id
                 ),
                 content=CommunicationContent(type="TEXT", text=message_content),
                 recipients=[
                     CommunicationParticipant(
                         address=recipient_address,
                         channel="VOICE",
-                        participantId=recipient_participant_id,
+                        participant_id=recipient_participant_id,
                     )
                 ],
             )
@@ -822,82 +864,9 @@ class VoiceChannel(BaseChannel):
             await self.tac.maestro_client.create_communication(
                 conversation_id, communication_request
             )
-            self.logger.debug(
-                "[Active Hydration] Added communication to conversation",
-                conversation_id=conversation_id,
-            )
         except Exception:
             self.logger.error(
                 "[Active Hydration] Failed to add communication",
                 conversation_id=conversation_id,
                 exc_info=True,
             )
-
-    def start(self) -> None:
-        """
-        Start the built-in FastAPI server with TwiML and WebSocket endpoints.
-
-        This method is only available when server_config is provided during initialization.
-        It automatically creates a FastAPI app with:
-        - POST /twiml endpoint for handling incoming calls
-        - WebSocket /ws endpoint for ConversationRelay connections
-        - POST /conversation-relay-callback endpoint for handling call completion
-
-        Raises:
-            ValueError: If server_config was not provided during initialization
-            ImportError: If FastAPI or uvicorn are not installed
-        """
-        if not self._server_config:
-            raise ValueError(
-                "Cannot start server: server_config was not provided during initialization. "
-                "Either provide VoiceServerConfig to VoiceChannel.__init__() or manually "
-                "create your FastAPI app and routes."
-            )
-        # Store config in local variable for type checking
-        config = self._server_config
-
-        # Create FastAPI app
-        app = FastAPI(title="TAC Voice Server")
-
-        # Register TwiML endpoint
-        @app.post("/twiml")
-        async def post_twiml(
-            From: str = Form(...),  # noqa: N803
-            To: str = Form(...),  # noqa: N803
-            CallSid: str = Form(...),  # noqa: N803
-        ) -> Response:
-            """Generate TwiML for incoming voice calls."""
-            websocket_url = f"wss://{config.public_domain}/ws"
-            callback_url = f"https://{config.public_domain}/conversation-relay-callback"
-
-            twiml = await self.handle_incoming_call(
-                websocket_url=websocket_url,
-                to_number=To,
-                from_number=From,
-                call_sid=CallSid,
-                action_url=callback_url,
-                welcome_greeting=config.welcome_greeting,
-            )
-            return Response(content=twiml, media_type="application/xml")
-
-        # Register WebSocket endpoint
-        @app.websocket("/ws")
-        async def websocket_endpoint(websocket: WebSocket) -> None:
-            """Handle voice WebSocket connections for real-time streaming."""
-            await self.handle_websocket(websocket)
-
-        # Register ConversationRelay callback endpoint
-        @app.post("/conversation-relay-callback")
-        async def conversation_relay_callback(request: Request) -> Response:
-            """Handle ConversationRelay callback webhook from Twilio."""
-            return await self.handle_conversation_relay_callback(request)
-
-        # Start the server
-        self.logger.info(f"Starting TAC Voice Server on {config.host}:{config.port}")
-
-        uvicorn.run(
-            app,
-            host=config.host,
-            port=config.port,
-            log_level="info",
-        )

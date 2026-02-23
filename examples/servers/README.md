@@ -1,12 +1,12 @@
 # TAC Server Examples
 
-Simplified server implementations using TAC's built-in server configuration.
+Simplified server implementations using TAC's built-in `TACServer`.
 
 > **Prerequisites:** Complete the [Quick Start setup](../README.md#quick-start) in the main examples README before running these servers.
 
 ## Overview
 
-The servers in this directory demonstrate the simplified approach to building TAC applications using built-in server configuration. Instead of manually creating FastAPI apps and routes, you can use TAC's server configuration objects to automatically handle endpoint setup.
+The servers in this directory demonstrate the simplified approach to building TAC applications using `TACServer`. Instead of manually creating FastAPI apps and routes, `TACServer` automatically handles endpoint setup for voice, SMS, and CI webhooks.
 
 **When to Use:**
 - You want a quick way to get started with minimal boilerplate
@@ -22,7 +22,7 @@ The servers in this directory demonstrate the simplified approach to building TA
 
 ## `voice.py` - Simplified Voice Server
 
-Voice server using built-in `VoiceServerConfig` for automatic FastAPI app and endpoint setup.
+Voice server using `TACServer` for automatic FastAPI app and endpoint setup.
 
 **Additional Environment Variables:**
 ```bash
@@ -34,10 +34,12 @@ TWILIO_TAC_OPENAI_API_KEY=sk-xxxxx...  # For OpenAI LLM integration
 - ✅ Automatic FastAPI app creation
 - ✅ Automatic TwiML endpoint (`POST /twiml`)
 - ✅ Automatic WebSocket endpoint (`WS /ws`)
+- ✅ Automatic ConversationRelay callback endpoint (`POST /conversation-relay-callback`)
 - ✅ Automatic conversation and participant creation
 - ✅ OpenAI integration for intelligent responses
 - ✅ Memory retrieval and context management
 - ✅ Conversation history management
+- ✅ Supports both streaming and non-streaming responses
 
 **Usage:**
 ```bash
@@ -57,7 +59,7 @@ uv run python examples/servers/voice.py
 ```
 
 **How It Works:**
-1. VoiceServerConfig automatically creates FastAPI app with required endpoints
+1. `TACServer` creates a FastAPI app with required endpoints
 2. Twilio phone call arrives, webhook requests TwiML from `/twiml`
 3. Server creates conversation and participant, generates TwiML with WebSocket URL
 4. Voice channel establishes WebSocket connection via `/ws`
@@ -68,33 +70,58 @@ uv run python examples/servers/voice.py
 
 **Key Code Pattern:**
 ```python
-from tac import TAC, TACConfig, VoiceServerConfig
+from tac import TAC, TACConfig
 from tac.channels.voice import VoiceChannel
+from tac.server import TACServer
 
 # Initialize TAC
-tac = TAC(config=TACConfig(...))
+tac = TAC(config=TACConfig.from_env())
 
-# Register callback
+# Register callback for non-streaming responses
 async def handle_message_ready(user_message, context, memory_response):
-    # Generate response with OpenAI
-    response = await openai_client.chat.completions.create(...)
-    await voice_channel.send_response(context.conversation_id, response)
+    response = await openai_client.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": user_message}]
+    )
+    content = response.choices[0].message.content
+    await voice_channel.send_response(context.conversation_id, content)
 
 tac.on_message_ready(handle_message_ready)
 
-# Initialize channel with server configuration
-voice_channel = VoiceChannel(
-    tac=tac,
-    server_config=VoiceServerConfig(
-        public_domain=os.environ["TWILIO_TAC_VOICE_PUBLIC_DOMAIN"],
-        host="0.0.0.0",
-        port=8000,
-        welcome_greeting="Hello! How can I assist you today?",
-    ),
-)
+# Initialize channel and start server
+voice_channel = VoiceChannel(tac=tac)
 
-# That's it! Just call start() and everything is handled automatically
-voice_channel.start()
+server = TACServer(tac=tac, voice_channel=voice_channel)
+server.start()
+```
+
+**Streaming Pattern with Interrupt Handling:**
+
+```python
+from tac.session import ThreadSafeSessionManager
+
+# Register callback for streaming responses
+async def handle_message_ready(user_message, context, memory_response):
+    async def stream_response():
+        stream = await openai_client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": user_message}],
+            stream=True,
+        )
+        async for chunk in stream:
+            if chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
+
+    await voice_channel.send_response(context.conversation_id, stream_response())
+
+tac.on_message_ready(handle_message_ready)
+
+# For interrupt handling, add session manager
+session_manager = ThreadSafeSessionManager()
+voice_channel = VoiceChannel(tac=tac, session_manager=session_manager)
+
+server = TACServer(tac=tac, voice_channel=voice_channel)
+server.start()
 ```
 
 **Comparison with Manual Approach:**
@@ -107,14 +134,20 @@ voice_channel.start()
 | Boilerplate | Minimal | More control |
 | Customization | Limited | Full control |
 
-**VoiceServerConfig Options:**
-- `public_domain` (required): Your public domain for WebSocket URL (e.g., `example.ngrok.io`)
-- `host` (default: `"0.0.0.0"`): Host to bind the server to
-- `port` (default: `8000`): Port to bind the server to
+**TACServerConfig Options (via env vars or constructor):**
+- `TWILIO_TAC_VOICE_PUBLIC_DOMAIN` / `public_domain`: Your public domain for WebSocket URL (required for voice)
+- `TWILIO_TAC_SERVER_HOST` / `host` (default: `"0.0.0.0"`): Host to bind the server to
+- `TWILIO_TAC_SERVER_PORT` / `port` (default: `8000`): Port to bind the server to
 - `welcome_greeting` (default: `"Hello! How can I assist you today?"`): Initial greeting message
+- `sms_webhook_path` (default: `"/webhook"`): Path for SMS webhook endpoint
+- `twiml_path` (default: `"/twiml"`): Path for TwiML generation endpoint
+- `websocket_path` (default: `"/ws"`): Path for voice WebSocket endpoint
+- `conversation_relay_callback_path` (default: `"/conversation-relay-callback"`): Path for callback endpoint
+- `cintel_webhook_path` (default: `None`): Path for Conversation Intelligence webhook endpoint
 
 **For Advanced Features:**
 
 If you need escalation, custom endpoints, or more control over the FastAPI app, see the manual approach in `examples/channels/`:
 - `examples/channels/voice.py` - Manual voice server setup
+- `examples/channels/voice_streaming.py` - Detailed streaming example with session management
 - `examples/channels/voice_escalation.py` - Voice server with Flex escalation

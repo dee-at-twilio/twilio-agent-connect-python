@@ -1,10 +1,80 @@
 """Pydantic models for Twilio Maestro Conversation API."""
 
-from typing import Any, Literal, Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
 from tac.models.pagination import PaginationMeta
+
+
+class StatusTimeouts(BaseModel):
+    """Timeout settings for channel status transitions."""
+
+    inactive: Optional[int] = Field(None, ge=1, description="Inactivity timeout in minutes")
+    closed: int = Field(..., ge=1, description="Close timeout in minutes")
+
+    model_config = {"populate_by_name": True}
+
+
+class CaptureRule(BaseModel):
+    """Capture rule with from/to addresses and optional metadata."""
+
+    from_address: str = Field(
+        ...,
+        alias="from",
+        description=(
+            "From address (phone number, email, etc.). "
+            "Use '*' for wildcard to match any from address"
+        ),
+    )
+    to_address: str = Field(
+        ...,
+        alias="to",
+        description=(
+            "To address (phone number, email, etc.). Use '*' for wildcard to match any to address"
+        ),
+    )
+    metadata: Optional[dict[str, str]] = Field(
+        None,
+        description=(
+            "Additional matching criteria for the capture rule. "
+            "For voice calls, can include 'callType' (PSTN, SIP, etc.)"
+        ),
+    )
+
+    model_config = {"populate_by_name": True}
+
+
+class ChannelSettings(BaseModel):
+    """Configuration settings for a specific channel type."""
+
+    status_timeouts: Optional[StatusTimeouts] = Field(
+        None,
+        alias="statusTimeouts",
+        description="Timeout settings for channel status transitions",
+    )
+    capture_rules: Optional[list[CaptureRule]] = Field(
+        None,
+        alias="captureRules",
+        description=(
+            "Array of capture rules with from/to addresses and optional metadata. "
+            "Use '*' for wildcard matching in either direction"
+        ),
+    )
+
+    model_config = {"populate_by_name": True}
+
+
+class StatusCallback(BaseModel):
+    """Webhook configuration for status callbacks."""
+
+    url: str = Field(..., description="Destination URL for webhooks")
+    method: Optional[Literal["POST", "GET", "PUT", "DELETE", "PATCH"]] = Field(
+        default="POST",
+        description="HTTP method used to invoke the webhook URL",
+    )
+
+    model_config = {"populate_by_name": True}
 
 
 class ParticipantAddress(BaseModel):
@@ -26,34 +96,49 @@ class ParticipantAddress(BaseModel):
 class ConversationConfiguration(BaseModel):
     """Configuration settings for a conversation response."""
 
-    unique_name: Optional[str] = Field(
+    display_name: Optional[str] = Field(
         None,
-        alias="uniqueName",
-        description="A unique, URL-safe identifier for the Configuration",
+        alias="displayName",
+        max_length=32,
+        pattern=r"^[a-zA-Z0-9-_ ]+$",
+        description="A human-readable name for the configuration. Limited to 32 characters.",
     )
-    friendly_name: Optional[str] = Field(
+    description: Optional[str] = Field(
         None,
-        alias="friendlyName",
-        description="Human-readable description for the configuration",
+        description=(
+            "Human-readable description for the configuration. "
+            "Allows spaces and special characters, typically limited to a paragraph of text. "
+            "This serves as a descriptive field rather than just a name."
+        ),
     )
-    conversation_grouping_type: Optional[str] = Field(
+    conversation_grouping_type: Optional[
+        Literal["GROUP_BY_PARTICIPANT_ADDRESSES", "GROUP_BY_PARTICIPANT_ADDRESSES_AND_CHANNEL_TYPE"]
+    ] = Field(
         None,
         alias="conversationGroupingType",
-        description="Type of Conversation grouping strategy",
+        description=(
+            "Type of Conversation grouping strategy:\n"
+            "- GROUP_BY_PARTICIPANT_ADDRESSES: Groups communications by participant addresses "
+            "across all channels. A customer using +15551234567 will be in the same conversation "
+            "whether they contact via SMS, WhatsApp, or RCS.\n"
+            "- GROUP_BY_PARTICIPANT_ADDRESSES_AND_CHANNEL_TYPE: Groups communications by both "
+            "participant addresses AND channel. A customer using +15551234567 via SMS will be in "
+            "a different conversation than the same customer via WhatsApp."
+        ),
     )
     memory_store_id: Optional[str] = Field(
         None,
         alias="memoryStoreId",
         description="Memory Store ID for Profile Resolution",
     )
-    channel_settings: Optional[dict[str, Any]] = Field(
+    channel_settings: Optional[dict[str, ChannelSettings]] = Field(
         None,
         alias="channelSettings",
         description=(
             "Channel-specific configuration settings including timeout settings and capture rules"
         ),
     )
-    status_callbacks: Optional[list[dict[str, Any]]] = Field(
+    status_callbacks: Optional[list[StatusCallback]] = Field(
         None,
         alias="statusCallbacks",
         description=(
@@ -100,7 +185,9 @@ class ConversationResponse(BaseModel):
     id: str = Field(..., description="Conversation ID")
     account_id: str = Field(..., alias="accountId", description="Twilio Account SID")
 
-    status: Optional[str] = Field(None, description="Conversation status")
+    status: Optional[Literal["ACTIVE", "INACTIVE", "CLOSED"]] = Field(
+        None, description="Conversation status"
+    )
     name: Optional[str] = Field(None, description="Conversation name")
     configuration_id: Optional[str] = Field(
         None, alias="configurationId", description="Configuration used to create this conversation"
@@ -161,16 +248,16 @@ class CommunicationParticipant(BaseModel):
     address: str = Field(
         ...,
         max_length=254,
-        description="Address of the participant (e.g., phone number, email address)",
+        description="Address of the participant formatted according to channel type",
         json_schema_extra={"example": "+12025551234"},
     )
     channel: Literal["VOICE", "SMS", "RCS", "EMAIL", "WHATSAPP", "CHAT", "API", "SYSTEM"] = Field(
-        ..., description="The channel for the communication"
+        ..., description="Channel type for the participant address"
     )
-    participant_id: Optional[str] = Field(
-        default=None,
+    participant_id: str = Field(
+        ...,
         alias="participantId",
-        description="Participant identifier (optional)",
+        description="Participant ID associated with this address",
         json_schema_extra={"example": "comms_participant_00000000000000000000000000"},
     )
     delivery_status: Optional[
@@ -178,25 +265,71 @@ class CommunicationParticipant(BaseModel):
     ] = Field(
         default=None,
         alias="deliveryStatus",
-        description="Delivery status of the Communication to this recipient",
+        description="Delivery status of the Communication to this recipient (recipients only)",
+    )
+
+    model_config = {"populate_by_name": True}
+
+
+class TranscriptionWord(BaseModel):
+    """Word-level transcription data with timing information."""
+
+    text: str = Field(..., description="The transcribed word")
+    start_time: Optional[str] = Field(
+        default=None,
+        alias="startTime",
+        description="Start timestamp of this word",
+        json_schema_extra={"example": "2025-01-15T10:15:30.123Z"},
+    )
+    end_time: Optional[str] = Field(
+        default=None,
+        alias="endTime",
+        description="End timestamp of this word",
+        json_schema_extra={"example": "2025-01-15T10:15:30.456Z"},
+    )
+
+    model_config = {"populate_by_name": True}
+
+
+class Transcription(BaseModel):
+    """Transcription metadata for communication content."""
+
+    channel: Optional[int] = Field(
+        default=None,
+        description="Audio channel identifier (0 for inbound, 1 for outbound)",
+        json_schema_extra={"example": 0},
+    )
+    confidence: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Overall confidence score for the transcription (0.0-1.0)",
+        json_schema_extra={"example": 0.95},
+    )
+    engine: Optional[str] = Field(
+        default=None,
+        description="Transcription engine used",
+        json_schema_extra={"example": "google"},
+    )
+    words: Optional[list[TranscriptionWord]] = Field(
+        default=None, description="Word-level transcription data with timing information"
     )
 
     model_config = {"populate_by_name": True}
 
 
 class CommunicationContent(BaseModel):
-    """Content of a communication."""
+    """Content of a communication (ContentText or ContentTranscription)."""
 
-    type: Literal["TEXT", "TRANSCRIPTION"] = Field("TEXT", description="Content type")
-    text: Optional[str] = Field(
-        default=None,
+    type: Literal["TEXT", "TRANSCRIPTION"] = Field(..., description="Content type discriminator")
+    text: str = Field(
+        ...,
         max_length=8388608,
-        description="Primary text content (optional)",
+        description="Message text content",
         json_schema_extra={"example": "Hello, I need help with my account"},
     )
-    transcription: Optional[dict[str, Any]] = Field(
-        default=None,
-        description="Transcription metadata (for TRANSCRIPTION type)",
+    transcription: Optional[Transcription] = Field(
+        default=None, description="Transcription metadata (only present when type=TRANSCRIPTION)"
     )
 
     model_config = {"populate_by_name": True}
@@ -210,31 +343,31 @@ class Communication(BaseModel):
         description="Unique communication identifier",
         json_schema_extra={"example": "comms_communication_00000000000000000000000000"},
     )
-    conversation_id: Optional[str] = Field(
-        None, alias="conversationId", description="Conversation ID"
-    )
-    account_id: Optional[str] = Field(None, alias="accountId", description="Account ID")
+    conversation_id: str = Field(..., alias="conversationId", description="Conversation ID")
+    account_id: str = Field(..., alias="accountId", description="Account ID")
     author: CommunicationParticipant = Field(..., description="Author of the communication")
-    content: CommunicationContent = Field(..., description="Content of the communication")
+    content: CommunicationContent = Field(
+        ..., description="The content of the Communication using type field for discrimination"
+    )
     recipients: list[CommunicationParticipant] = Field(..., description="Communication recipients")
     channel_id: Optional[str] = Field(
         default=None,
         alias="channelId",
-        description="Channel-specific ID (optional)",
+        description="Channel-specific reference ID",
         json_schema_extra={"example": "SM00000000000000000000000000000000"},
     )
-    created_at: str = Field(
-        ...,
+    created_at: Optional[str] = Field(
+        default=None,
         alias="createdAt",
         max_length=30,
-        description="When communication was created",
+        description="Timestamp when this Communication was created",
         json_schema_extra={"example": "2025-01-15T10:15:30Z"},
     )
     updated_at: Optional[str] = Field(
         default=None,
         alias="updatedAt",
         max_length=30,
-        description="When communication was last updated",
+        description="Timestamp when this Communication was last updated",
         json_schema_extra={"example": "2025-01-15T10:20:30Z"},
     )
 

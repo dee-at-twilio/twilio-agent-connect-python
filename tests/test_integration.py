@@ -9,6 +9,7 @@ from tac import TAC, TACConfig
 from tac.channels.sms import SMSChannel
 from tac.models.memory import MemoryRetrievalMeta, MemoryRetrievalResponse
 from tac.models.session import ConversationSession
+from tac.models.tac import TACMemoryResponse
 
 
 def create_conversation_created_webhook(conversation_id: str, timestamp: str) -> dict[str, Any]:
@@ -100,6 +101,7 @@ def create_conversation_updated_webhook(
         "data": {
             "id": conversation_id,
             "accountId": "ACtest123",
+            "configurationId": "IStest123",
             "serviceId": "IStest123",
             "status": status,
             "name": "Test Conversation",
@@ -182,7 +184,7 @@ class TestTACIntegration:
             def message_ready_callback(
                 user_message: str,
                 context: ConversationSession,
-                memory_response: Optional[MemoryRetrievalResponse] = None,
+                memory_response: Optional[TACMemoryResponse] = None,
             ):
                 nonlocal callback_invoked, received_context, received_memories
                 callback_invoked = True
@@ -190,13 +192,6 @@ class TestTACIntegration:
                 received_memories = memory_response
 
             tac.on_message_ready(message_ready_callback)
-
-            # Simulate conversation.created webhook
-            conversation_created = create_conversation_created_webhook(
-                "CH123456", "2025-11-18T00:00:00.000Z"
-            )
-
-            await channel.process_webhook(conversation_created)
 
             # Simulate participant.added webhook (CUSTOMER with profile)
             participant_added = create_participant_added_webhook(
@@ -232,7 +227,10 @@ class TestTACIntegration:
             assert received_context.conversation_id == "CH123456"
             assert received_context.profile_id == "profile_test_123"
             assert received_context.channel == "sms"
-            assert received_memories == empty_response
+
+            # Verify memory response is wrapped in TACMemoryResponse
+            assert isinstance(received_memories, TACMemoryResponse)
+            assert received_memories.raw_data == empty_response
             assert len(received_memories.observations) == 0
             assert len(received_memories.summaries) == 0
 
@@ -248,7 +246,7 @@ class TestTACIntegration:
             def message_ready_callback(
                 user_message: str,
                 context: ConversationSession,
-                memory_response: Optional[MemoryRetrievalResponse] = None,
+                memory_response: Optional[TACMemoryResponse] = None,
             ):
                 nonlocal callback_invoked
                 callback_invoked = True
@@ -297,7 +295,7 @@ class TestTACIntegration:
             def message_ready_callback(
                 user_message: str,
                 context: ConversationSession,
-                memory_response: Optional[MemoryRetrievalResponse] = None,
+                memory_response: Optional[TACMemoryResponse] = None,
             ):
                 nonlocal callback_invoked
                 callback_invoked = True
@@ -348,9 +346,11 @@ class TestTACIntegration:
             tac = TAC(get_test_config())
             channel = SMSChannel(tac, auto_retrieve_memory=False)
 
-            # Start conversation
+            # Start conversation via participant added
             await channel.process_webhook(
-                create_conversation_created_webhook("CH222", "2025-11-18T00:00:00.000Z")
+                create_participant_added_webhook(
+                    "CH222", "PA222", "PR222", "2025-11-18T00:00:00.000Z"
+                )
             )
 
             assert "CH222" in channel._conversations
@@ -383,7 +383,7 @@ class TestTACIntegration:
             def message_ready_callback(
                 user_message: str,
                 context: ConversationSession,
-                memory_response: Optional[MemoryRetrievalResponse] = None,
+                memory_response: Optional[TACMemoryResponse] = None,
             ):
                 nonlocal callback_count
                 callback_count += 1
@@ -391,11 +391,15 @@ class TestTACIntegration:
 
             tac.on_message_ready(message_ready_callback)
 
-            # Start multiple conversations
+            # Start multiple conversations via participant added
             for i in range(3):
                 conv_id = f"CH{i:06d}"
+                participant_id = f"PA{i:06d}"
+                profile_id = f"PR{i:06d}"
                 await channel.process_webhook(
-                    create_conversation_created_webhook(conv_id, f"2025-11-18T00:00:{i:02d}.000Z")
+                    create_participant_added_webhook(
+                        conv_id, participant_id, profile_id, f"2025-11-18T00:00:{i:02d}.000Z"
+                    )
                 )
 
             # Send messages to each conversation
@@ -435,7 +439,7 @@ class TestTACIntegration:
             def message_ready_callback(
                 user_message: str,
                 context: ConversationSession,
-                memory_response: Optional[MemoryRetrievalResponse] = None,
+                memory_response: Optional[TACMemoryResponse] = None,
             ):
                 nonlocal callback_invoked, received_context
                 callback_invoked = True
@@ -481,7 +485,7 @@ class TestTACIntegration:
             def message_ready_callback(
                 user_message: str,
                 context: ConversationSession,
-                memory_response: Optional[MemoryRetrievalResponse] = None,
+                memory_response: Optional[TACMemoryResponse] = None,
             ):
                 nonlocal callback_invoked
                 callback_invoked = True

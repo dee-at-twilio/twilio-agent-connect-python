@@ -1,38 +1,27 @@
 """Pydantic models for Twilio ConversationRelay Voice WebSocket messages."""
 
-from typing import Literal, Optional, Union
+from typing import Any, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
 
-class VoiceServerConfig(BaseModel):
-    """
-    Configuration for the built-in Voice WebSocket server.
-
-    When provided to VoiceChannel, enables the simplified start() approach
-    that automatically sets up FastAPI endpoints for TwiML and WebSocket handling.
-    """
-
-    host: str = Field(default="0.0.0.0", description="Host to bind the server to")
-    port: int = Field(default=8000, description="Port to bind the server to")
-    public_domain: str = Field(
-        ..., description="Public domain for WebSocket URL (e.g., 'example.ngrok.io')"
-    )
-    welcome_greeting: str = Field(
-        default="Hello! How can I assist you today?",
-        description="Initial greeting message for callers",
-    )
-
-
 class CustomParameters(BaseModel):
-    """Custom parameters passed in ConversationRelay setup."""
+    """
+    Custom parameters for ConversationRelay TwiML.
 
-    conversation_id: Optional[str] = Field(None, alias="conversationId")
+    Supports well-known TAC parameters plus arbitrary custom fields.
+    conversation_id is required, all other fields are optional.
+    """
+
+    conversation_id: str = Field(..., alias="conversationId")
     profile_id: Optional[str] = Field(None, alias="profileId")
     customer_participant_id: Optional[str] = Field(None, alias="customerParticipantId")
     ai_agent_participant_id: Optional[str] = Field(None, alias="aiAgentParticipantId")
 
-    model_config = {"populate_by_name": True}
+    model_config = {
+        "populate_by_name": True,
+        "extra": "allow",  # Accept arbitrary additional fields
+    }
 
 
 class SetupMessage(BaseModel):
@@ -54,7 +43,7 @@ class SetupMessage(BaseModel):
     call_type: Optional[str] = Field(None, alias="callType", description="Call type (e.g., PSTN)")
     call_status: Optional[str] = Field(None, alias="callStatus", description="Call status")
     account_sid: Optional[str] = Field(None, alias="accountSid")
-    custom_parameters: Optional[CustomParameters] = Field(None, alias="customParameters")
+    custom_parameters: CustomParameters = Field(..., alias="customParameters")
 
     model_config = {"populate_by_name": True}
 
@@ -139,6 +128,26 @@ class ConversationRelayCallbackPayload(BaseModel):
         None,
         alias="HandoffData",
         description="JSON string containing handoff information",
+    )
+
+    model_config = {"populate_by_name": True}
+
+
+class TwiMLOptions(BaseModel):
+    """Options for generating ConversationRelay TwiML."""
+
+    websocket_url: str = Field(..., description="WebSocket URL for ConversationRelay")
+    custom_parameters: Optional[Union[CustomParameters, dict[str, Any]]] = Field(
+        None,
+        description="Custom parameters to pass to ConversationRelay",
+    )
+    welcome_greeting: Optional[str] = Field(
+        None,
+        description="Initial greeting message for caller",
+    )
+    action_url: Optional[str] = Field(
+        None,
+        description="URL for Twilio to request when call ends",
     )
 
     model_config = {"populate_by_name": True}

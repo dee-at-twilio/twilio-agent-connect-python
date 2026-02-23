@@ -53,8 +53,11 @@ class TestProfileLookupInMemoryRetrieval:
         # Retrieve memory
         result = await tac.retrieve_memory(session, query="test query")
 
-        # Verify memory was retrieved without lookup
-        assert result == mock_memory_response
+        # Verify memory was retrieved without lookup - result is wrapped in TACMemoryResponse
+        from tac.models.tac import TACMemoryResponse
+
+        assert isinstance(result, TACMemoryResponse)
+        assert result.raw_data == mock_memory_response
         tac.memora_client.retrieve_memory.assert_called_once_with(
             profile_id="mem_profile_existing",
             conversation_id="conv_test_123",
@@ -112,7 +115,11 @@ class TestProfileLookupInMemoryRetrieval:
             query="test query",
         )
 
-        assert result == mock_memory_response
+        # Result is wrapped in TACMemoryResponse
+        from tac.models.tac import TACMemoryResponse
+
+        assert isinstance(result, TACMemoryResponse)
+        assert result.raw_data == mock_memory_response
 
     @pytest.mark.asyncio
     async def test_retrieve_memory_lookup_uses_first_profile(self) -> None:
@@ -156,9 +163,40 @@ class TestProfileLookupInMemoryRetrieval:
 
     @pytest.mark.asyncio
     async def test_retrieve_memory_no_author_info_error(self) -> None:
-        """Test error when profile_id and author_info are both missing."""
+        """Test retrieve_memory falls back to Maestro without profile_id or author_info."""
         config = get_test_config_with_memory()
         tac = TAC(config)
+
+        # Mock Maestro fallback (since profile_id is unavailable)
+        from tac.models.conversation import (
+            Communication,
+            CommunicationContent,
+            CommunicationParticipant,
+        )
+
+        mock_communications = [
+            Communication(
+                id="CM123",
+                conversationId="conv_test_123",
+                accountId="AC123",
+                author=CommunicationParticipant(
+                    address="+1234567890",
+                    channel="SMS",
+                    participantId="MB123",
+                ),
+                content=CommunicationContent(type="TEXT", text="Hello"),
+                recipients=[
+                    CommunicationParticipant(
+                        address="+1234567890",
+                        channel="SMS",
+                        participantId="MB456",
+                    )
+                ],
+                createdAt="2025-01-01T00:00:00.000Z",
+                updatedAt="2025-01-01T00:00:00.000Z",
+            )
+        ]
+        tac.maestro_client.list_communications = AsyncMock(return_value=mock_communications)
 
         # Create conversation session WITHOUT profile_id and WITHOUT author_info
         session = ConversationSession(
@@ -168,18 +206,50 @@ class TestProfileLookupInMemoryRetrieval:
             author_info=None,  # No author info
         )
 
-        # Attempt to retrieve memory should raise ValueError
-        with pytest.raises(ValueError) as exc_info:
-            await tac.retrieve_memory(session)
+        # Should complete without raising exception (falls back to Maestro)
+        result = await tac.retrieve_memory(session)
 
-        assert "profile_id is required for memory retrieval" in str(exc_info.value)
-        assert "author_info.address is not available" in str(exc_info.value)
+        # Should return valid response from Maestro fallback
+        assert result is not None
+        assert len(result.communications) > 0
+        assert session.profile_id is None  # No profile lookup performed
 
     @pytest.mark.asyncio
     async def test_retrieve_memory_no_address_error(self) -> None:
-        """Test error when author_info exists but address is missing."""
+        """Test retrieve_memory falls back to Maestro when address is missing."""
         config = get_test_config_with_memory()
         tac = TAC(config)
+
+        # Mock Maestro fallback (since profile_id is unavailable)
+        from tac.models.conversation import (
+            Communication,
+            CommunicationContent,
+            CommunicationParticipant,
+        )
+
+        mock_communications = [
+            Communication(
+                id="CM123",
+                conversationId="conv_test_123",
+                accountId="AC123",
+                author=CommunicationParticipant(
+                    address="+1234567890",
+                    channel="SMS",
+                    participantId="MB123",
+                ),
+                content=CommunicationContent(type="TEXT", text="Hello"),
+                recipients=[
+                    CommunicationParticipant(
+                        address="+1234567890",
+                        channel="SMS",
+                        participantId="MB456",
+                    )
+                ],
+                createdAt="2025-01-01T00:00:00.000Z",
+                updatedAt="2025-01-01T00:00:00.000Z",
+            )
+        ]
+        tac.maestro_client.list_communications = AsyncMock(return_value=mock_communications)
 
         # Create conversation session WITHOUT profile_id and WITHOUT address
         session = ConversationSession(
@@ -192,16 +262,17 @@ class TestProfileLookupInMemoryRetrieval:
             ),
         )
 
-        # Attempt to retrieve memory should raise ValueError
-        with pytest.raises(ValueError) as exc_info:
-            await tac.retrieve_memory(session)
+        # Should complete without raising exception (falls back to Maestro)
+        result = await tac.retrieve_memory(session)
 
-        assert "profile_id is required for memory retrieval" in str(exc_info.value)
-        assert "author_info.address is not available" in str(exc_info.value)
+        # Should return valid response from Maestro fallback
+        assert result is not None
+        assert len(result.communications) > 0
+        assert session.profile_id is None  # No profile lookup performed
 
     @pytest.mark.asyncio
     async def test_retrieve_memory_no_profiles_found_error(self) -> None:
-        """Test error when profile lookup returns no profiles."""
+        """Test retrieve_memory falls back to Maestro when profile lookup returns no profiles."""
         config = get_test_config_with_memory()
         tac = TAC(config)
 
@@ -212,6 +283,37 @@ class TestProfileLookupInMemoryRetrieval:
         )
         tac.memora_client.lookup_profile = AsyncMock(return_value=mock_lookup_response)
 
+        # Mock Maestro fallback (since profile lookup returned empty)
+        from tac.models.conversation import (
+            Communication,
+            CommunicationContent,
+            CommunicationParticipant,
+        )
+
+        mock_communications = [
+            Communication(
+                id="CM123",
+                conversationId="conv_test_123",
+                accountId="AC123",
+                author=CommunicationParticipant(
+                    address="+13175556789",
+                    channel="SMS",
+                    participantId="MB123",
+                ),
+                content=CommunicationContent(type="TEXT", text="Hello"),
+                recipients=[
+                    CommunicationParticipant(
+                        address="+13175556789",
+                        channel="SMS",
+                        participantId="MB456",
+                    )
+                ],
+                createdAt="2025-01-01T00:00:00.000Z",
+                updatedAt="2025-01-01T00:00:00.000Z",
+            )
+        ]
+        tac.maestro_client.list_communications = AsyncMock(return_value=mock_communications)
+
         # Create conversation session WITHOUT profile_id
         session = ConversationSession(
             conversation_id="conv_test_123",
@@ -220,16 +322,17 @@ class TestProfileLookupInMemoryRetrieval:
             author_info=AuthorInfo(address="+13175556789"),
         )
 
-        # Attempt to retrieve memory should raise ValueError
-        with pytest.raises(ValueError) as exc_info:
-            await tac.retrieve_memory(session)
+        # Should complete without raising exception (falls back to Maestro)
+        result = await tac.retrieve_memory(session)
 
-        assert "No profile found for phone number +13175556789" in str(exc_info.value)
-        assert "Profile lookup returned no results" in str(exc_info.value)
+        # Should return valid response from Maestro fallback
+        assert result is not None
+        assert len(result.communications) > 0
+        assert session.profile_id is None  # Profile lookup found nothing
 
     @pytest.mark.asyncio
     async def test_retrieve_memory_lookup_api_error(self) -> None:
-        """Test error handling when profile lookup API fails."""
+        """Test that retrieve_memory falls back to Maestro when profile lookup API fails."""
         config = get_test_config_with_memory()
         tac = TAC(config)
 
@@ -238,6 +341,37 @@ class TestProfileLookupInMemoryRetrieval:
             side_effect=Exception("Profile lookup API error")
         )
 
+        # Mock Maestro fallback (since profile lookup failed)
+        from tac.models.conversation import (
+            Communication,
+            CommunicationContent,
+            CommunicationParticipant,
+        )
+
+        mock_communications = [
+            Communication(
+                id="CM123",
+                conversationId="conv_test_123",
+                accountId="AC123",
+                author=CommunicationParticipant(
+                    address="+13175556789",
+                    channel="SMS",
+                    participantId="MB123",
+                ),
+                content=CommunicationContent(type="TEXT", text="Hello"),
+                recipients=[
+                    CommunicationParticipant(
+                        address="+13175556789",
+                        channel="SMS",
+                        participantId="MB456",
+                    )
+                ],
+                createdAt="2025-01-01T00:00:00.000Z",
+                updatedAt="2025-01-01T00:00:00.000Z",
+            )
+        ]
+        tac.maestro_client.list_communications = AsyncMock(return_value=mock_communications)
+
         # Create conversation session WITHOUT profile_id
         session = ConversationSession(
             conversation_id="conv_test_123",
@@ -246,9 +380,13 @@ class TestProfileLookupInMemoryRetrieval:
             author_info=AuthorInfo(address="+13175556789"),
         )
 
-        # Attempt to retrieve memory should raise the exception
-        with pytest.raises(Exception, match="Profile lookup API error"):
-            await tac.retrieve_memory(session)
+        # Should complete without raising exception (falls back to Maestro)
+        result = await tac.retrieve_memory(session)
+
+        # Should return valid response from Maestro fallback
+        assert result is not None
+        assert len(result.communications) > 0
+        assert session.profile_id is None  # Profile lookup failed
 
     @pytest.mark.asyncio
     async def test_retrieve_memory_lookup_modifies_session(self) -> None:

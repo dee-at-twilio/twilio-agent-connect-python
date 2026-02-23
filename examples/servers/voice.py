@@ -3,13 +3,14 @@
 Simplified Voice Server Example with SessionManager for Interrupt Handling
 
 This example demonstrates:
-- VoiceChannel with built-in server (VoiceServerConfig)
-- ThreadSafeSessionManager for proper interrupt handling
+- TACServer for automatic FastAPI endpoint setup
+- VoiceChannel with ThreadSafeSessionManager for proper interrupt handling
 - OpenAI streaming integration
 - Memory retrieval and context management
 - LLM service for clean separation of concerns
 
 For a basic example without SessionManager, see examples/channels/voice.py.
+For a manual FastAPI example with custom endpoints, see examples/channels/voice_escalation.py.
 """
 
 import asyncio
@@ -28,11 +29,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from llm_service import LLMService  # type: ignore[import-not-found]
 
-from tac import TAC, TACConfig, VoiceServerConfig, get_logger
-from tac.channels.session_manager import ThreadSafeSessionManager
+from tac import TAC, TACConfig, get_logger
 from tac.channels.voice import VoiceChannel
-from tac.models.memory import MemoryRetrievalResponse
 from tac.models.session import ConversationSession
+from tac.models.tac import TACMemoryResponse
+from tac.server import TACServer
+from tac.session import ThreadSafeSessionManager
 from tac.tools.knowledge import KnowledgeToolConfig, create_knowledge_tool
 
 # Initialize logger
@@ -47,61 +49,35 @@ voice_channel: Optional[VoiceChannel] = None
 llm_service: Optional[LLMService] = None
 
 
-async def stream_generator(prompt: str, conv_id: str) -> AsyncGenerator[str, None]:
-    """
-    Stream generator for SessionManager.
-
-    This function is called by SessionManager to stream LLM responses.
-    It yields chunks that can be cancelled mid-stream when interrupts occur.
-
-    Note: When using SessionManager, this replaces the message_ready callback
-    as the entry point for processing voice messages.
-    """
-    # Get conversation context from voice channel
-    if not voice_channel:
-        logger.error("Voice channel not initialized")
-        yield "I'm sorry, something went wrong."
-        return
-
-    context = voice_channel._conversations.get(conv_id)
-    if not context:
-        logger.warning(f"No session found for conversation {conv_id}")
-        # Create minimal context
-        from tac.models.session import ConversationSession
-
-        context = ConversationSession(
-            conversation_id=conv_id,
-            profile_id=None,
-            channel="voice",
-            profile=None,
-            author_info=None,
-            ai_agent_info=None,
-        )
-
-    # Stream response from LLM service
-    if llm_service:
-        async for chunk in llm_service.stream_response(prompt, conv_id, context):
-            yield chunk
-    else:
-        logger.error("LLM service not initialized")
-        yield "I'm sorry, something went wrong."
-
-
 async def handle_message_ready(
     user_message: str,
     context: ConversationSession,
-    memory_response: Optional[MemoryRetrievalResponse],
+    memory_response: Optional[TACMemoryResponse],
 ) -> None:
     """
     Callback invoked when a message is ready to be processed.
 
-    Note: When using SessionManager with voice channel, this callback is NOT triggered.
-    Message processing happens in stream_generator() instead. This callback is kept
-    for compatibility but won't be called for voice messages when SessionManager is used.
+    This callback is always triggered for voice messages. With SessionManager,
+    streaming tasks can be automatically cancelled when interrupts occur.
     """
-    logger.debug(
-        f"[CALLBACK] Message ready callback (not used with SessionManager): {user_message[:50]}"
-    )
+    logger.debug(f"[CALLBACK] Processing message: {user_message[:50]}")
+
+    # Create inline async generator for streaming
+    async def stream_response() -> AsyncGenerator[str, None]:
+        if llm_service:
+            async for chunk in llm_service.stream_response(
+                user_message, context.conversation_id, context
+            ):
+                yield chunk
+        else:
+            logger.error("LLM service not initialized")
+            yield "I'm sorry, something went wrong."
+
+    # Send streaming response to voice channel
+    if voice_channel:
+        await voice_channel.send_response(context.conversation_id, stream_response())
+    else:
+        logger.error("Voice channel not initialized")
 
 
 if __name__ == "__main__":
@@ -135,25 +111,20 @@ if __name__ == "__main__":
     llm_service = LLMService(tac=tac, system_prompt=system_prompt, tools=tools)
     logger.info(f"[SETUP] LLM service initialized with {len(tools)} tool(s)")
 
-    # Create SessionManager for interrupt handling and streaming
-    session_manager = ThreadSafeSessionManager(stream_generator=stream_generator)
-    logger.info("[SETUP] SessionManager created with streaming support")
+    # Create SessionManager for task tracking and cancellation support
+    session_manager = ThreadSafeSessionManager()
+    logger.info("[SETUP] SessionManager created")
 
-    # Register callback for message ready (not used with SessionManager for voice)
+    # Register callback for message ready; with SessionManager, streaming tasks are cancellable
     tac.on_message_ready(handle_message_ready)
 
-    # Initialize channel with server configuration and session manager
+    # Initialize channel with session manager
     voice_channel = VoiceChannel(
         tac=tac,
         session_manager=session_manager,
-        server_config=VoiceServerConfig(
-            public_domain=os.environ["TWILIO_TAC_VOICE_PUBLIC_DOMAIN"],
-            host="0.0.0.0",
-            port=8000,
-        ),
     )
     logger.info("[SETUP] Voice channel initialized with SessionManager for interrupt handling")
 
-    # That's it! Just call start() and everything is handled automatically
-    logger.info("Starting voice server with interrupt handling...")
-    voice_channel.start()
+    # Create and start TACServer
+    server = TACServer(tac=tac, voice_channel=voice_channel)
+    server.start()

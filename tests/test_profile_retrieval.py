@@ -15,6 +15,7 @@ from tac.models.memory import (
     ProfileResponse,
 )
 from tac.models.session import ConversationSession
+from tac.models.tac import TACMemoryResponse
 
 
 def create_participant_added_webhook(
@@ -224,7 +225,7 @@ class TestProfileInSMSChannel:
         with patch("tac.channels.sms.Client"):
             config = get_test_config_with_trait_groups(trait_groups=["Contact"])
             tac = TAC(config)
-            channel = SMSChannel(tac, auto_retrieve_memory=False)
+            channel = SMSChannel(tac, auto_retrieve_memory=True)  # Enable auto retrieval
 
             # Track callback data
             received_context = None
@@ -232,7 +233,7 @@ class TestProfileInSMSChannel:
             def message_ready_callback(
                 user_message: str,
                 context: ConversationSession,
-                memory_response: Optional[MemoryRetrievalResponse] = None,
+                memory_response: Optional[TACMemoryResponse] = None,
             ) -> None:
                 nonlocal received_context
                 received_context = context
@@ -260,17 +261,23 @@ class TestProfileInSMSChannel:
             )
             tac.memora_client.retrieve_memory = AsyncMock(return_value=empty_memory)
 
-            # Process participant.added first (triggers profile fetch)
+            # Process participant.added first (stores profile_id)
             await channel.process_webhook(participant_webhook)
 
-            # Verify profile was fetched on participant.added
-            tac.memora_client.get_profile.assert_called_with(
+            # Verify profile_id was stored but profile NOT fetched yet (lazy)
+            assert "CH123456" in channel._conversations
+            session = channel._conversations["CH123456"]
+            assert session.profile_id == "profile_test_123"
+            assert session.profile is None  # Profile not fetched until message
+
+            # Process message (triggers memory retrieval which fetches profile)
+            await channel.process_webhook(message_webhook)
+
+            # Verify profile was fetched during message processing
+            tac.memora_client.get_profile.assert_called_once_with(
                 profile_id="profile_test_123",
                 trait_groups=["Contact"],
             )
-
-            # Process message
-            await channel.process_webhook(message_webhook)
 
             # Verify profile is in context
             assert received_context is not None
@@ -280,7 +287,7 @@ class TestProfileInSMSChannel:
 
     @pytest.mark.asyncio
     async def test_sms_profile_fetched_on_conversation_start(self) -> None:
-        """Test that profile is fetched when conversation starts."""
+        """Test that profile_id is stored but profile fetch is deferred (lazy)."""
         with patch("tac.channels.sms.Client") as mock_client_class:
             # Mock participant creation
             mock_client = MagicMock()
@@ -296,7 +303,7 @@ class TestProfileInSMSChannel:
 
             mock_profile = get_mock_profile_response()
 
-            # Simulate participant.added webhook (this is when profile is fetched)
+            # Simulate participant.added webhook (stores profile_id only)
             participant_added = create_participant_added_webhook(
                 "CH123456", "MB123", "profile_test_123", "2025-11-18T00:00:00.000Z"
             )
@@ -304,25 +311,22 @@ class TestProfileInSMSChannel:
             tac.memora_client.get_profile = AsyncMock(return_value=mock_profile)
             await channel.process_webhook(participant_added)
 
-            # Verify profile was fetched when participant was added
-            tac.memora_client.get_profile.assert_called_once_with(
-                profile_id="profile_test_123",
-                trait_groups=["Contact"],
-            )
+            # Verify profile was NOT fetched (lazy behavior)
+            tac.memora_client.get_profile.assert_not_called()
 
-            # Verify conversation was created with profile
+            # Verify conversation was created with profile_id but no profile yet
             assert "CH123456" in channel._conversations
             session = channel._conversations["CH123456"]
-            assert session.profile is not None
-            assert session.profile.id == "profile_test_123"
+            assert session.profile_id == "profile_test_123"
+            assert session.profile is None  # Profile not fetched until needed
 
     @pytest.mark.asyncio
     async def test_sms_profile_fetched_for_each_message(self) -> None:
-        """Test that profile is fetched fresh for each SMS message."""
+        """Test that profile is fetched once and then cached."""
         with patch("tac.channels.sms.Client"):
             config = get_test_config_with_trait_groups()
             tac = TAC(config)
-            channel = SMSChannel(tac, auto_retrieve_memory=False)
+            channel = SMSChannel(tac, auto_retrieve_memory=True)  # Enable auto retrieval
 
             mock_profile = get_mock_profile_response()
 
@@ -345,35 +349,37 @@ class TestProfileInSMSChannel:
             )
             tac.memora_client.retrieve_memory = AsyncMock(return_value=empty_memory)
 
-            # Process participant.added (first profile fetch)
+            # Process participant.added (profile NOT fetched, lazy behavior)
             await channel.process_webhook(participant_webhook)
             first_call_count = tac.memora_client.get_profile.call_count
+            assert first_call_count == 0  # No fetch on participant.added
 
-            # Process first message (second profile fetch)
+            # Process first message (profile fetched during retrieve_memory)
             await channel.process_webhook(message_webhook_1)
             second_call_count = tac.memora_client.get_profile.call_count
+            assert second_call_count == 1  # First fetch
 
             # Simulate second message
             message_webhook_2 = create_communication_created_webhook(
                 "CH123456", "MB123", "Second message", "2025-11-18T00:00:02.000Z"
             )
 
-            # Process second message (third profile fetch)
+            # Process second message (profile NOT fetched again, cached)
             await channel.process_webhook(message_webhook_2)
             third_call_count = tac.memora_client.get_profile.call_count
 
-            # Verify profile was fetched multiple times
-            # (once on participant.added, once per message)
+            # Verify profile was fetched only once (then cached)
             assert second_call_count > first_call_count
-            assert third_call_count > second_call_count
+            assert third_call_count == second_call_count  # No additional fetch, cached
+            assert third_call_count == 1  # Only one fetch total (then cached)
 
     @pytest.mark.asyncio
     async def test_sms_profile_updates_session(self) -> None:
-        """Test that profile updates the session for each message."""
+        """Test that profile is cached and persists across messages."""
         with patch("tac.channels.sms.Client"):
             config = get_test_config_with_trait_groups()
             tac = TAC(config)
-            channel = SMSChannel(tac, auto_retrieve_memory=False)
+            channel = SMSChannel(tac, auto_retrieve_memory=True)  # Enable auto retrieval
 
             mock_profile_v1 = ProfileResponse(
                 id="profile_test_123",
@@ -393,8 +399,13 @@ class TestProfileInSMSChannel:
             )
 
             # First message
-            message_webhook = create_communication_created_webhook(
+            message_webhook_1 = create_communication_created_webhook(
                 "CH123456", "MB123", "Hello", "2025-11-18T00:00:01.000Z"
+            )
+
+            # Second message
+            message_webhook_2 = create_communication_created_webhook(
+                "CH123456", "MB123", "Hi again", "2025-11-18T00:00:02.000Z"
             )
 
             empty_memory = MemoryRetrievalResponse(
@@ -405,19 +416,25 @@ class TestProfileInSMSChannel:
             )
             tac.memora_client.retrieve_memory = AsyncMock(return_value=empty_memory)
 
-            # Process participant.added with first profile version
-            tac.memora_client.get_profile = AsyncMock(return_value=mock_profile_v1)
+            # Process participant.added (no profile fetch, lazy behavior)
             await channel.process_webhook(participant_webhook)
+            session = channel._conversations["CH123456"]
+            assert session.profile is None  # Profile not fetched yet
+
+            # Process first message with profile v1
+            tac.memora_client.get_profile = AsyncMock(return_value=mock_profile_v1)
+            await channel.process_webhook(message_webhook_1)
             session = channel._conversations["CH123456"]
             assert session.profile is not None
             assert session.profile.traits["Contact"]["firstName"] == "John"
 
-            # Process message with updated profile
+            # Process second message - profile remains cached (v1), not fetched again
             tac.memora_client.get_profile = AsyncMock(return_value=mock_profile_v2)
-            await channel.process_webhook(message_webhook)
+            await channel.process_webhook(message_webhook_2)
             session = channel._conversations["CH123456"]
             assert session.profile is not None
-            assert session.profile.traits["Contact"]["firstName"] == "Jane"
+            # Profile is cached, so it remains "John" (not updated to "Jane")
+            assert session.profile.traits["Contact"]["firstName"] == "John"
 
 
 class TestProfileInConversationSession:
