@@ -2,7 +2,7 @@
 """
 Simple Voice Channel Example for Twilio Agent Connect
 
-This example demonstrates basic VoiceChannel integration with FastAPI for handling
+This example demonstrates basic VoiceChannel integration using TACServer for handling
 voice calls without escalation features. For an example with Flex escalation support,
 see voice_escalation.py.
 
@@ -18,10 +18,7 @@ import sys
 from typing import Optional
 
 import openai
-import uvicorn
 from dotenv import load_dotenv
-from fastapi import FastAPI, Form, Request, WebSocket
-from fastapi.responses import Response
 from openai.types.chat import (
     ChatCompletionAssistantMessageParam,
     ChatCompletionMessageParam,
@@ -37,8 +34,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from tac import TAC, TACConfig, get_logger
 from tac.channels.voice import VoiceChannel
-from tac.models.memory import MemoryRetrievalResponse
 from tac.models.session import ConversationSession
+from tac.models.tac import TACMemoryResponse
+from tac.server import TACServer
 
 # Initialize logger
 logger = get_logger(__name__)
@@ -56,7 +54,7 @@ conversation_messages: dict[str, list[ChatCompletionMessageParam]] = {}
 async def handle_message_ready(
     user_message: str,
     context: ConversationSession,
-    memory_response: Optional[MemoryRetrievalResponse],
+    memory_response: Optional[TACMemoryResponse],
 ) -> None:
     """
     Callback invoked when a message is ready to be processed.
@@ -72,7 +70,7 @@ async def handle_message_ready(
         logger.info(
             f"Retrieved memories: {len(memory_response.observations)} observations, "
             f"{len(memory_response.summaries)} summaries, "
-            f"{len(memory_response.communications or [])} communications"
+            f"{len(memory_response.communications)} communications"
         )
     else:
         logger.info("No memory response available")
@@ -155,39 +153,6 @@ if __name__ == "__main__":
     # Initialize channel
     voice_channel = VoiceChannel(tac=tac)
 
-    # Create FastAPI app
-    app = FastAPI(title="TAC Voice Server")
-
-    @app.post("/twiml")
-    async def post_twiml(
-        From: str = Form(...), To: str = Form(...), CallSid: str = Form(...)
-    ) -> Response:
-        """Generate TwiML for incoming voice calls."""
-        public_domain = os.environ.get("TWILIO_TAC_VOICE_PUBLIC_DOMAIN")
-        websocket_url = f"wss://{public_domain}/ws"
-        callback_url = f"https://{public_domain}/conversation-relay-callback"
-
-        twiml = await voice_channel.handle_incoming_call(
-            websocket_url=websocket_url,
-            to_number=To,
-            from_number=From,
-            call_sid=CallSid,
-            action_url=callback_url,
-            welcome_greeting="Hello! How can I assist you today?",
-        )
-        return Response(content=twiml, media_type="application/xml")
-
-    @app.websocket("/ws")
-    async def websocket_endpoint(websocket: WebSocket) -> None:
-        """Handle voice WebSocket connections for real-time streaming."""
-        await voice_channel.handle_websocket(websocket)
-
-    @app.post("/conversation-relay-callback")
-    async def conversation_relay_callback(request: Request) -> Response:
-        """Handle ConversationRelay callback webhook from Twilio."""
-        return await voice_channel.handle_conversation_relay_callback(request)
-
-    # Start the server
-    logger.info("Starting TAC Voice Server on 0.0.0.0:8000")
-
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+    # Create and start TACServer
+    server = TACServer(tac=tac, voice_channel=voice_channel)
+    server.start()

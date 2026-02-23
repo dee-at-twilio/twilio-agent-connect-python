@@ -142,8 +142,6 @@ class MemoryClient:
         if trait_groups:
             params["traitGroups"] = ",".join(trait_groups)
 
-        self.logger.debug(f"Fetching profile {profile_id} from {url} with params: {params}")
-
         try:
             async with self._get_client() as client:
                 response = await client.get(url, params=params)
@@ -203,10 +201,6 @@ class MemoryClient:
 
         request_data = ProfileLookupRequest(id_type=id_type, value=value)
         request_payload = request_data.model_dump(by_alias=True, exclude_none=True)
-
-        self.logger.debug(
-            f"Looking up profile with {id_type}={value} from {url} with payload: {request_payload}"
-        )
 
         try:
             async with self._get_client() as client:

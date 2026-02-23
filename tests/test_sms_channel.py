@@ -10,6 +10,7 @@ from tac import TAC
 from tac.channels.sms import SMSChannel
 from tac.models.memory import MemoryRetrievalMeta, MemoryRetrievalResponse
 from tac.models.session import ConversationSession
+from tac.models.tac import TACMemoryResponse
 
 
 def create_conversation_created_webhook(conversation_id: str, timestamp: str) -> dict[str, Any]:
@@ -101,6 +102,7 @@ def create_conversation_updated_webhook(
         "data": {
             "id": conversation_id,
             "accountId": "ACtest123",
+            "configurationId": "IStest123",
             "serviceId": "IStest123",
             "status": status,
             "name": "Test Conversation",
@@ -150,17 +152,11 @@ class TestSMSChannel:
 
     @pytest.mark.asyncio
     async def test_process_conversation_started(self) -> None:
-        """Test processing conversation.created and participant.added events."""
+        """Test processing participant.added event to start conversation."""
         tac = TAC(get_test_config())
         channel = SMSChannel(tac, auto_retrieve_memory=False)
 
-        # Process conversation.created
-        conversation_webhook = create_conversation_created_webhook(
-            "CH123456", "2025-11-18T00:00:00.000Z"
-        )
-        await channel.process_webhook(conversation_webhook)
-
-        # Process participant.added
+        # Process participant.added (creates conversation session)
         participant_webhook = create_participant_added_webhook(
             "CH123456", "MB123", "profile_test_123", "2025-11-18T00:00:01.000Z"
         )
@@ -183,7 +179,7 @@ class TestSMSChannel:
         def message_callback(
             user_message: str,
             context: ConversationSession,
-            memory_response: Optional[MemoryRetrievalResponse],
+            memory_response: Optional[TACMemoryResponse],
         ) -> None:
             nonlocal captured_context, captured_memories
             captured_context = context
@@ -217,12 +213,7 @@ class TestSMSChannel:
         tac = TAC(get_test_config())
         channel = SMSChannel(tac)  # auto_retrieve_memory=True to test memory retrieval
 
-        # Start conversation first
-        conversation_webhook = create_conversation_created_webhook(
-            "CH123456", "2025-11-18T00:00:00.000Z"
-        )
-        await channel.process_webhook(conversation_webhook)
-
+        # Start conversation via participant added
         participant_webhook = create_participant_added_webhook(
             "CH123456", "MB123", "profile_test_123", "2025-11-18T00:00:01.000Z"
         )
@@ -268,8 +259,10 @@ class TestSMSChannel:
         tac = TAC(get_test_config())
         channel = SMSChannel(tac, auto_retrieve_memory=False)
 
-        # Start conversation
-        start_webhook = create_conversation_created_webhook("CH123456", "2025-11-18T00:00:00.000Z")
+        # Start conversation via participant added
+        start_webhook = create_participant_added_webhook(
+            "CH123456", "MB123", "profile_test_123", "2025-11-18T00:00:00.000Z"
+        )
         await channel.process_webhook(start_webhook)
 
         # End conversation (status changed to CLOSED)
@@ -302,11 +295,7 @@ class TestSMSChannel:
             }
         )
 
-        # Start conversation with profile_id
-        start_webhook = create_conversation_created_webhook("CH123456", "2025-11-18T00:00:00.000Z")
-        await channel.process_webhook(start_webhook)
-
-        # Add participant to set profile_id
+        # Start conversation with profile_id via participant added
         participant_webhook = create_participant_added_webhook(
             "CH123456", "PA_CUSTOMER", "profile_test_123", "2025-11-18T00:00:01.000Z"
         )
@@ -344,14 +333,14 @@ class TestSMSChannel:
         tac = TAC(get_test_config())
         channel = SMSChannel(tac, auto_retrieve_memory=False)
 
-        # Start first conversation
+        # Start first conversation via participant added
         await channel.process_webhook(
-            create_conversation_created_webhook("CH111", "2025-11-18T00:00:00.000Z")
+            create_participant_added_webhook("CH111", "PA111", "PR111", "2025-11-18T00:00:00.000Z")
         )
 
-        # Start second conversation
+        # Start second conversation via participant added
         await channel.process_webhook(
-            create_conversation_created_webhook("CH222", "2025-11-18T00:00:01.000Z")
+            create_participant_added_webhook("CH222", "PA222", "PR222", "2025-11-18T00:00:01.000Z")
         )
 
         # Verify both conversations started successfully
@@ -381,3 +370,98 @@ class TestSMSChannel:
 
         # Should not raise, just log debug message
         await channel.process_webhook(webhook_data)
+
+    @pytest.mark.asyncio
+    async def test_conversation_ended_callback_fires_on_close(self) -> None:
+        """Closing an SMS conversation triggers on_conversation_ended with correct data."""
+        tac = TAC(get_test_config())
+        channel = SMSChannel(tac, auto_retrieve_memory=False)
+        captured: list[ConversationSession] = []
+
+        def handler(ctx: ConversationSession) -> None:
+            captured.append(ctx)
+
+        tac.on_conversation_ended(handler)
+
+        # Start conversation via participant added
+        await channel.process_webhook(
+            create_participant_added_webhook(
+                "CH_CB1", "MB_CB1", "prof_cb1", "2025-11-18T00:00:01.000Z"
+            )
+        )
+
+        # Close conversation
+        await channel.process_webhook(
+            create_conversation_updated_webhook("CH_CB1", "CLOSED", "2025-11-18T00:10:00.000Z")
+        )
+
+        assert len(captured) == 1
+        assert captured[0].conversation_id == "CH_CB1"
+        assert captured[0].profile_id == "prof_cb1"
+        assert captured[0].channel == "sms"
+
+    @pytest.mark.asyncio
+    async def test_conversation_ended_callback_error_does_not_prevent_cleanup(self) -> None:
+        """If on_conversation_ended callback raises, the session is still cleaned up."""
+        tac = TAC(get_test_config())
+        channel = SMSChannel(tac, auto_retrieve_memory=False)
+
+        def bad_handler(ctx: ConversationSession) -> None:
+            raise RuntimeError("boom")
+
+        tac.on_conversation_ended(bad_handler)
+
+        await channel.process_webhook(
+            create_participant_added_webhook(
+                "CH_CB2", "MB_CB2", "prof_cb2", "2025-11-18T00:00:00.000Z"
+            )
+        )
+        await channel.process_webhook(
+            create_conversation_updated_webhook("CH_CB2", "CLOSED", "2025-11-18T00:10:00.000Z")
+        )
+
+        # Session should still be cleaned up despite the error
+        assert "CH_CB2" not in channel._conversations
+
+    @pytest.mark.asyncio
+    async def test_conversation_ended_async_callback(self) -> None:
+        """Async on_conversation_ended callback is awaited correctly."""
+        tac = TAC(get_test_config())
+        channel = SMSChannel(tac, auto_retrieve_memory=False)
+        captured: list[ConversationSession] = []
+
+        async def async_handler(ctx: ConversationSession) -> None:
+            captured.append(ctx)
+
+        tac.on_conversation_ended(async_handler)
+
+        await channel.process_webhook(
+            create_participant_added_webhook(
+                "CH_ASYNC1", "MB_ASYNC1", "prof_async1", "2025-11-18T00:00:00.000Z"
+            )
+        )
+        await channel.process_webhook(
+            create_conversation_updated_webhook("CH_ASYNC1", "CLOSED", "2025-11-18T00:10:00.000Z")
+        )
+
+        assert len(captured) == 1
+        assert captured[0].conversation_id == "CH_ASYNC1"
+        assert captured[0].channel == "sms"
+
+    @pytest.mark.asyncio
+    async def test_conversation_ended_no_callback_registered(self) -> None:
+        """Closing a conversation without a registered callback cleans up silently."""
+        tac = TAC(get_test_config())
+        channel = SMSChannel(tac, auto_retrieve_memory=False)
+
+        # No callback registered — should not raise
+        await channel.process_webhook(
+            create_participant_added_webhook(
+                "CH_NOCB", "MB_NOCB", "prof_nocb", "2025-11-18T00:00:00.000Z"
+            )
+        )
+        await channel.process_webhook(
+            create_conversation_updated_webhook("CH_NOCB", "CLOSED", "2025-11-18T00:10:00.000Z")
+        )
+
+        assert "CH_NOCB" not in channel._conversations

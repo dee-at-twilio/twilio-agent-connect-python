@@ -110,21 +110,10 @@ Ready-to-deploy examples with full control over FastAPI configuration:
 - **`sms.py`** - SMS channel webhook server with TAC integration
 - **`voice.py`** - Voice channel server with manual FastAPI and WebSocket setup
 - **`voice_escalation.py`** - Voice channel with Flex escalation for agent handoff to humans
-- **`voice_interrupts.py`** - Voice channel with custom streaming agent and interrupt handling (supports any LLM provider)
 
 Use these examples when you need custom middleware, authentication, or integration with existing apps.
 
 [→ View Channel Examples](channels/)
-
-### [tools/](tools/) - LLM Tool Integration
-
-Examples showing how to integrate TAC tools with popular LLM frameworks:
-
-- **`openai_chat_with_tools.py`** - OpenAI Chat Completions API + TAC tools
-- **`openai_agents_with_tools.py`** - OpenAI Agents SDK + TAC tools
-- **`messaging.py`** - Automated messaging with OpenAI Agents
-
-[→ View Tool Examples](tools/)
 
 ## What You'll Learn
 

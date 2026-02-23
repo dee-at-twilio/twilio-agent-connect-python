@@ -6,6 +6,7 @@ Example demonstrating SMSChannel with FastAPI server for webhook endpoint.
 """
 
 import asyncio
+import json
 import os
 import sys
 from typing import Optional
@@ -30,8 +31,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from tac import TAC, TACConfig, get_logger
 from tac.channels.sms import SMSChannel
-from tac.models.memory import MemoryRetrievalResponse
 from tac.models.session import ConversationSession
+from tac.models.tac import TACMemoryResponse
+from tac.server.webhook import validate_twilio_webhook
 
 # Initialize logger
 logger = get_logger(__name__)
@@ -48,7 +50,7 @@ conversation_messages: dict[str, list[ChatCompletionMessageParam]] = {}
 async def handle_message_ready(
     user_message: str,
     context: ConversationSession,
-    memory_response: Optional[MemoryRetrievalResponse],
+    memory_response: Optional[TACMemoryResponse],
 ) -> None:
     """
     Callback invoked when a message is ready to be processed.
@@ -62,7 +64,7 @@ async def handle_message_ready(
         logger.info(
             f"Retrieved memories: {len(memory_response.observations)} observations, "
             f"{len(memory_response.summaries)} summaries, "
-            f"{len(memory_response.communications or [])} communications"
+            f"{len(memory_response.communications)} communications"
         )
 
     # Initialize conversation history with system message
@@ -140,6 +142,19 @@ if __name__ == "__main__":
     # Register callback for message ready
     tac.on_message_ready(handle_message_ready)
 
+    # Register callback for conversation ended
+    def handle_conversation_ended(context: ConversationSession) -> None:
+        logger.info(
+            f"Conversation {context.conversation_id} ended on {context.channel}",
+            conversation_id=context.conversation_id,
+            profile_id=context.profile_id,
+        )
+        # Clean up local conversation history
+        if context.conversation_id in conversation_messages:
+            del conversation_messages[context.conversation_id]
+
+    tac.on_conversation_ended(handle_conversation_ended)
+
     # Initialize channel
     sms_channel = SMSChannel(tac)
 
@@ -155,8 +170,15 @@ if __name__ == "__main__":
         deduplication in case retries still occur.
         """
         try:
-            form_data = await request.json()
-            webhook_data = dict(form_data)
+            raw_body = await request.body()
+            body_str = raw_body.decode("utf-8")
+
+            # Validate Twilio webhook signature
+            if not validate_twilio_webhook(request, tac.config.twilio_auth_token, body_str):
+                logger.warning("Invalid Twilio webhook signature")
+                return JSONResponse(content={"error": "Invalid signature"}, status_code=403)
+
+            webhook_data = json.loads(body_str)
 
             # Extract idempotency token from headers for deduplication
             idempotency_token = request.headers.get("i-twilio-idempotency-token")

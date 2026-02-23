@@ -24,7 +24,6 @@ import openai
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI, Form, Request, WebSocket
-from fastapi.datastructures import FormData
 from fastapi.responses import Response
 from openai.types.chat import (
     ChatCompletionAssistantMessageParam,
@@ -44,8 +43,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from tac import TAC, TACConfig, get_logger
 from tac.channels.voice import VoiceChannel
-from tac.models.memory import MemoryRetrievalResponse
 from tac.models.session import ConversationSession
+from tac.models.tac import TACMemoryResponse
+from tac.server import FastAPIWebSocketAdapter
 
 # Initialize logger
 logger = get_logger(__name__)
@@ -63,12 +63,12 @@ system_prompt = (
 conversation_messages: dict[str, list[ChatCompletionMessageParam]] = {}
 
 
-async def flex_handoff_handler(request_data: FormData) -> Response:
+async def flex_handoff_handler(request_data: dict[str, str]) -> str:
     """
     Handler for Flex handoff requests.
 
     This function is called when the AI agent triggers a handoff to a human agent.
-    It processes the handoff logic and returns the appropriate response.
+    It processes the handoff logic and returns the TwiML response content.
     """
     return handle_flex_handoff_logic(
         request_data, flex_workflow_sid=os.environ.get("TWILIO_TAC_VOICE_HANDOFF_FLEX_WORKFLOW_SID")
@@ -78,7 +78,7 @@ async def flex_handoff_handler(request_data: FormData) -> Response:
 async def handle_message_ready(
     user_message: str,
     context: ConversationSession,
-    memory_response: Optional[MemoryRetrievalResponse],
+    memory_response: Optional[TACMemoryResponse],
 ) -> None:
     """
     Callback invoked when a message is ready to be processed.
@@ -94,7 +94,7 @@ async def handle_message_ready(
         logger.info(
             f"Retrieved memories: {len(memory_response.observations)} observations, "
             f"{len(memory_response.summaries)} summaries, "
-            f"{len(memory_response.communications or [])} communications"
+            f"{len(memory_response.communications)} communications"
         )
     else:
         logger.info("No memory response available")
@@ -215,22 +215,36 @@ if __name__ == "__main__":
         handoff_url = f"https://{public_domain}/handoff"
 
         twiml = await voice_channel.handle_incoming_call(
-            websocket_url=websocket_url,
             to_number=To,
             from_number=From,
-            action_url=handoff_url,
-            welcome_greeting="Hello! How can I assist you today?",
+            options={
+                "websocket_url": websocket_url,
+                "action_url": handoff_url,
+                "welcome_greeting": "Hello! How can I assist you today?",
+            },
         )
         return Response(content=twiml, media_type="application/xml")
 
     @app.websocket("/ws")
     async def websocket_endpoint(websocket: WebSocket) -> None:
         """Handle voice WebSocket connections for real-time streaming."""
-        await voice_channel.handle_websocket(websocket)
+        adapter = FastAPIWebSocketAdapter(websocket)
+        await voice_channel.handle_websocket(adapter)
 
     @app.post("/handoff")
     async def handoff(request: Request) -> Response:
-        return await voice_channel.handle_handoff(request)
+        form_data = await request.form()
+        form_dict = {key: str(value) for key, value in form_data.items()}
+        try:
+            result = await voice_channel.handle_handoff(form_dict)
+            return Response(content=result, media_type="text/xml")
+        except ValueError as e:
+            return Response(content=str(e), media_type="text/plain", status_code=400)
+        except Exception as e:
+            logger.error(f"Handoff error: {e}", exc_info=True)
+            return Response(
+                content="Internal Server Error", media_type="text/plain", status_code=500
+            )
 
     # Start the server
     logger.info("Starting TAC Voice Server on 0.0.0.0:8000")

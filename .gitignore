@@ -1,7 +1,12 @@
 # IDE
 .idea/
 .vscode/
-.claude/
+
+# Claude Code (allow specific skills only)
+.claude/*
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/sync-to-ts-sdk/
 
 # Python
 __pycache__/

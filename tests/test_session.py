@@ -4,7 +4,7 @@ import asyncio
 
 import pytest
 
-from tac.channels.session import SessionState
+from tac.session import SessionState
 
 # Mark all tests in this module as asyncio
 pytestmark = pytest.mark.asyncio

@@ -1,12 +1,13 @@
 """Base channel interface for TAC channels."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Optional
+from collections.abc import AsyncGenerator
+from typing import Any, Optional, Union
 
 from tac import TAC
 from tac.core.logging import get_logger
-from tac.models.memory import MemoryRetrievalResponse
 from tac.models.session import ConversationSession
+from tac.models.tac import TACMemoryResponse
 
 
 class BaseChannel(ABC):
@@ -32,7 +33,7 @@ class BaseChannel(ABC):
                 voice applications).
         """
         self.tac = tac
-        self.logger = get_logger(__name__)
+        self.logger = get_logger(self.__class__.__module__)
 
         # Auto-disable memory retrieval if memory is not configured
         if auto_retrieve_memory and not tac.is_twilio_memory_enabled():
@@ -67,14 +68,19 @@ class BaseChannel(ABC):
 
     @abstractmethod
     async def send_response(
-        self, conversation_id: str, response: str, role: Optional[str] = None
+        self,
+        conversation_id: str,
+        response: Union[str, AsyncGenerator[Union[str, dict[str, Any]], None]],
+        role: Optional[str] = None,
     ) -> None:
         """
         Send response back through the channel.
 
+        Supports both simple string responses and streaming via async generators.
+
         Args:
             conversation_id: Conversation ID to send response to
-            response: Message content to send
+            response: Message content (string) or async generator for streaming
             role: Optional message role (e.g., 'assistant', 'user', 'system')
         """
         pass
@@ -90,39 +96,33 @@ class BaseChannel(ABC):
         # TODO: Parse Channel Type based on webhook data
         pass
 
-    async def _start_conversation(
+    def _start_conversation(
         self,
         conv_id: str,
         profile_id: Optional[str] = None,
     ) -> None:
         """
-        Initialize new conversation session and fetch profile if available.
+        Initialize new conversation session with optional profile_id.
+
+        Profile data is fetched lazily during retrieve_memory() when needed.
 
         Args:
             conv_id: Conversation ID
             profile_id: Profile ID for the conversation (optional)
         """
         if conv_id in self._conversations:
-            self.logger.warning(
+            self.logger.debug(
                 "Conversation already exists, skipping initialization",
                 conversation_id=conv_id,
                 channel=self.get_channel_name(),
             )
             return
 
-        # Fetch profile if profile_id is provided
-        profile = None
-        if profile_id:
-            profile = await self.tac.fetch_profile(profile_id)
-
         # Store conversation session
         self._conversations[conv_id] = ConversationSession(
             conversation_id=conv_id,
             profile_id=profile_id,
             channel=self.get_channel_name(),
-            profile=profile,
-            author_info=None,
-            ai_agent_info=None,
         )
 
         self.logger.info(
@@ -131,30 +131,37 @@ class BaseChannel(ABC):
             profile_id=profile_id,
         )
 
-    def _end_conversation(self, conv_id: str) -> None:
+    async def _end_conversation(self, conv_id: str) -> None:
         """
         Clean up conversation session.
+
+        Pops the session from the conversation dict, then triggers the
+        on_conversation_ended callback with the removed session data.
 
         Args:
             conv_id: Conversation ID
         """
-        if conv_id in self._conversations:
-            del self._conversations[conv_id]
+        session = self._conversations.pop(conv_id, None)
+        if session is not None:
+            try:
+                await self.tac.trigger_conversation_ended(session)
+            except Exception as e:
+                self.logger.error(
+                    "Error in conversation ended callback",
+                    conversation_id=conv_id,
+                    error=str(e),
+                    exc_info=True,
+                )
+
             self.logger.debug(
                 "Ended conversation",
-                conversation_id=conv_id,
-                channel=self.get_channel_name(),
-            )
-        else:
-            self.logger.warning(
-                "Attempted to end unknown conversation",
                 conversation_id=conv_id,
                 channel=self.get_channel_name(),
             )
 
     async def _retrieve_memory_if_enabled(
         self, session: ConversationSession, query: Optional[str], conv_id: str
-    ) -> Optional[MemoryRetrievalResponse]:
+    ) -> Optional[TACMemoryResponse]:
         """
         Retrieve memory if auto_retrieve_memory is enabled and Twilio Memory is configured.
 
@@ -167,7 +174,7 @@ class BaseChannel(ABC):
             conv_id: Conversation ID for logging
 
         Returns:
-            MemoryRetrievalResponse if memory was retrieved, None otherwise
+            TACMemoryResponse wrapper if memory was retrieved, None otherwise
         """
         memory_response = None
         if self.auto_retrieve_memory and self.tac.is_twilio_memory_enabled():

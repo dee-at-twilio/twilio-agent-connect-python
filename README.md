@@ -32,8 +32,8 @@ We recommend using [uv](https://docs.astral.sh/uv/) for the best development exp
 uv init
 uv add git+https://github.com/twilio/twilio-agent-connect-python.git
 
-# Install with voice support (includes FastAPI and uvicorn)
-uv add git+https://github.com/twilio/twilio-agent-connect-python.git --extra voice
+# Install with server support (includes FastAPI and uvicorn for TACServer)
+uv add git+https://github.com/twilio/twilio-agent-connect-python.git --extra server
 ```
 
 ### pip/venv (Alternative)
@@ -45,8 +45,8 @@ python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install git+https://github.com/twilio/twilio-agent-connect-python.git
 
-# Install with voice support
-pip install "git+https://github.com/twilio/twilio-agent-connect-python.git[voice]"
+# Install with server support
+pip install "git+https://github.com/twilio/twilio-agent-connect-python.git[server]"
 ```
 
 ## Quick Examples
@@ -66,7 +66,7 @@ from typing import Optional
 from tac import TAC, TACConfig
 from tac.channels.sms import SMSChannel
 from tac.models.session import ConversationSession
-from tac.models.memory import MemoryRetrievalResponse
+from tac.models.tac import TACMemoryResponse
 
 # 1. Configure TAC - automatically loads from environment variables
 # Set these in your .env file:
@@ -85,7 +85,7 @@ tac = TAC(config=TACConfig.from_env())
 def handle_message_ready(
     user_message: str,
     context: ConversationSession,
-    memory_response: Optional[MemoryRetrievalResponse] = None
+    memory_response: Optional[TACMemoryResponse] = None
 ):
     """Called when message is received and memory is retrieved"""
     print(f"Conversation: {context.conversation_id}")
@@ -94,6 +94,7 @@ def handle_message_ready(
 
     if memory_response:
         print(f"Memories: {len(memory_response.observations)}")
+        print(f"Communications: {len(memory_response.communications)}")
 
     # Process message and call your LLM with user message
     # llm_response = your_llm.generate(user_message, memory_response)
@@ -112,16 +113,17 @@ def webhook():
     return {"status": "ok"}
 ```
 
-### Voice Channel with Simplified Server
+### Voice Channel with TACServer
 
-For the fastest way to get started with voice, use the built-in server configuration:
+For the fastest way to get started with voice, use `TACServer`:
 
 ```python
-import os
-from tac import TAC, TACConfig, VoiceServerConfig
+from typing import Optional
+from tac import TAC, TACConfig
 from tac.channels.voice import VoiceChannel
 from tac.models.session import ConversationSession
-from tac.models.memory import MemoryRetrievalResponse
+from tac.models.tac import TACMemoryResponse
+from tac.server import TACServer
 
 # 1. Configure TAC - automatically loads from environment variables
 tac = TAC(config=TACConfig.from_env())
@@ -130,7 +132,7 @@ tac = TAC(config=TACConfig.from_env())
 async def handle_message_ready(
     user_message: str,
     context: ConversationSession,
-    memory_response: Optional[MemoryRetrievalResponse] = None
+    memory_response: Optional[TACMemoryResponse] = None
 ):
     """Called when memory retrieval completes"""
     # Process memories and call your LLM
@@ -139,25 +141,20 @@ async def handle_message_ready(
 
 tac.on_message_ready(handle_message_ready)
 
-# 3. Initialize Voice channel with server configuration
-voice_channel = VoiceChannel(
-    tac=tac,
-    server_config=VoiceServerConfig(
-        public_domain=os.environ["TWILIO_TAC_VOICE_PUBLIC_DOMAIN"],  # Your ngrok domain
-        host="0.0.0.0",
-        port=8000,
-        welcome_greeting="Hello! How can I assist you today?",
-    ),
-)
+# 3. Initialize Voice channel and TACServer
+voice_channel = VoiceChannel(tac=tac)
 
-# 4. Start server (automatically creates FastAPI app with /twiml and /ws endpoints)
-voice_channel.start()
+server = TACServer(tac=tac, voice_channel=voice_channel)
+
+# 4. Start server (creates FastAPI app with /twiml, /ws, and callback endpoints)
+server.start()
 ```
 
 That's it! The server automatically:
 - Creates FastAPI app
 - Sets up POST /twiml endpoint for call handling
 - Sets up WebSocket /ws endpoint for ConversationRelay
+- Sets up POST /conversation-relay-callback endpoint
 - Creates conversations and participants
 - Handles all WebSocket protocol details
 
@@ -290,11 +287,11 @@ Check out the [examples](examples) directory for complete working examples:
 
 - **[`quickstart/`](examples/quickstart)**: Web-based setup wizard to create Memory and Maestro services and generate `.env` file
 - **[`exec_demo/`](examples/exec_demo)**: Complete multi-channel demo with SMS and Voice support, OpenAI Agents integration, and custom business tools
-- **[`servers/voice.py`](examples/servers/voice.py)**: **Recommended starting point** - Simplified voice server with automatic setup using VoiceServerConfig
+- **[`servers/voice.py`](examples/servers/voice.py)**: **Recommended starting point** - Simplified voice server with automatic setup using TACServer
 - **[`channels/sms.py`](examples/channels/sms.py)**: SMS webhook server with FastAPI and TAC integration
 - **[`channels/voice.py`](examples/channels/voice.py)**: Voice server with manual FastAPI, TwiML generation, and WebSocket handling
 - **[`channels/voice_escalation.py`](examples/channels/voice_escalation.py)**: Voice server with Flex escalation for agent handoff to humans
-- **[`tools/`](examples/tools)**: LLM tool integration examples with OpenAI Chat Completions and Agents SDK
+- **[`channels/voice_streaming.py`](examples/channels/voice_streaming.py)**: Voice streaming with interrupt support using ThreadSafeSessionManager
 
 ---
 

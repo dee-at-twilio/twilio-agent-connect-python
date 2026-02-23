@@ -285,8 +285,6 @@ async def create_knowledge_search_tool(tac: TAC) -> Optional[Any]:
         return None
 
     try:
-        logger.info(f"[INIT] Creating knowledge tool for KB: {knowledge_base_id[:20]}...")
-
         # Create TAC knowledge tool with custom name and description (no fetch needed)
         tac_tool = await create_knowledge_tool(
             knowledge_client=tac.knowledge_client,
@@ -316,9 +314,7 @@ async def create_knowledge_search_tool(tac: TAC) -> Optional[Any]:
             Returns:
                 List of search results with content, knowledge_id, and score
             """
-            logger.debug(f"[TOOL:KNOWLEDGE] Searching with query: '{query}'")
             results = await tac_tool.implementation(query=query)
-            logger.debug(f"[TOOL:KNOWLEDGE] Found {len(results)} result(s): {results}")
             return results
 
         return search_promotions

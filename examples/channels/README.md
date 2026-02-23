@@ -138,7 +138,7 @@ uvicorn.run(app, host="0.0.0.0", port=8000)
 
 ## `voice.py` - Simple Voice Channel Server
 
-Basic voice server with FastAPI, TwiML generation, and WebSocket handling for Twilio Voice. This is the recommended starting point for voice integration without escalation features.
+Basic voice server using `TACServer` for automatic endpoint setup. This is the recommended starting point for voice integration without escalation features.
 
 **Additional Environment Variables:**
 ```bash
@@ -147,9 +147,8 @@ TWILIO_TAC_OPENAI_API_KEY=sk-xxxxx...  # For OpenAI LLM integration
 ```
 
 **Features:**
-- ✅ FastAPI server with `/twiml` and `/ws` endpoints
-- ✅ TwiML generation for incoming voice calls
-- ✅ WebSocket connection management via `VoiceChannel.handle_websocket()`
+- ✅ TACServer for automatic endpoint setup (TwiML, WebSocket, callback)
+- ✅ OpenAI integration for conversational responses
 - ✅ Memory retrieval and LLM integration (OpenAI)
 - ✅ Proper message role handling (`role="assistant"`) for LLM context
 - ✅ Conversation lifecycle management
@@ -173,7 +172,7 @@ uv run python examples/channels/voice.py
 
 **How It Works:**
 1. Twilio phone call arrives, webhook requests TwiML
-2. `/twiml` endpoint generates TwiML with WebSocket URL
+2. TACServer generates TwiML with WebSocket URL
 3. Voice channel establishes WebSocket connection via `/ws`
 4. TAC retrieves memories (observations, summaries, sessions)
 5. `handle_message_ready` callback invoked with user message, context, and optional memory_response
@@ -182,47 +181,127 @@ uv run python examples/channels/voice.py
 
 **Key Code Pattern:**
 ```python
-from fastapi import FastAPI, Form, WebSocket
+from tac import TAC, TACConfig
 from tac.channels.voice import VoiceChannel
+from tac.server import TACServer
 
-# Initialize TAC and channel
-tac = TAC(config)
-voice_channel = VoiceChannel(tac)
+tac = TAC(config=TACConfig.from_env())
+voice_channel = VoiceChannel(tac=tac)
 
-# Register callback
 async def handle_message_ready(user_message, context, memory_response=None):
-    # Generate response with OpenAI
     response = await openai_client.chat.completions.create(...)
     await voice_channel.send_response(context.conversation_id, response)
 
 tac.on_message_ready(handle_message_ready)
 
-# Create FastAPI app
-app = FastAPI(title="TAC Voice Server")
-
-@app.post("/twiml")
-async def post_twiml(From: str = Form(...)):
-    websocket_url = f"wss://{public_domain}/ws"
-    twiml = voice_channel.handle_incoming_call(
-        websocket_url=websocket_url,
-        called_phone_number=From,
-        welcome_greeting="Hello! How can I assist you today?"
-    )
-    return Response(content=twiml, media_type="application/xml")
-
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    await voice_channel.handle_websocket(websocket)
-
-# Start server
-uvicorn.run(app, host="0.0.0.0", port=8000)
+server = TACServer(tac=tac, voice_channel=voice_channel)
+server.start()
 ```
 
 ---
 
-## `voice_escalation.py` - Voice Channel with Flex Escalation
+## `voice_streaming.py` - Voice Channel with Streaming & Interrupt Handling
 
-Advanced voice server demonstrating agent handoff to Twilio Flex for human escalation. Use this example when you need to transfer calls from AI agents to human agents.
+Advanced voice server demonstrating streaming responses with interrupt support using `TACServer` and session management. This example shows how to stream LLM responses in real-time and handle user interruptions gracefully.
+
+**Additional Environment Variables:**
+```bash
+TWILIO_TAC_VOICE_PUBLIC_DOMAIN={your-ngrok-domain}  # Your ngrok or public domain
+TWILIO_TAC_OPENAI_API_KEY=sk-xxxxx...  # For OpenAI LLM integration
+```
+
+**Features:**
+- ✅ All features from `voice.py` (TwiML, WebSocket, memory, LLM)
+- ✅ Streaming responses with async generators for real-time delivery
+- ✅ Interrupt handling - automatically cancels in-flight LLM requests when users interrupt
+- ✅ Session management with `ThreadSafeSessionManager` for task tracking and cancellation
+- ✅ Inline async generator pattern for clean streaming logic
+
+**Usage:**
+```bash
+# 1. Add TWILIO_TAC_VOICE_PUBLIC_DOMAIN to your .env file
+TWILIO_TAC_VOICE_PUBLIC_DOMAIN={your-ngrok-domain}
+
+# 2. Start ngrok tunnel (in separate terminal)
+ngrok http 8000 --domain={your-ngrok-domain}
+
+# 3. Run voice streaming server
+uv run python examples/channels/voice_streaming.py
+
+# 4. Configure Twilio phone number webhook to point to:
+#    https://{your-ngrok-domain}/twiml
+
+# 5. Call your Twilio number and try interrupting the agent while it's speaking
+```
+
+**How It Works:**
+1. User speaks → TAC retrieves memories → `on_message_ready` callback invoked
+2. Callback creates async generator for streaming response
+3. LLM generates response chunks in real-time
+4. TAC streams chunks to user via WebSocket
+5. **On interrupt:** Current streaming task is cancelled, new task starts with latest message
+
+**Key Code Pattern:**
+```python
+from tac import TAC, TACConfig
+from tac.channels.voice import VoiceChannel
+from tac.server import TACServer
+from tac.session import ThreadSafeSessionManager
+
+# 1. Setup TAC
+tac = TAC(config=TACConfig.from_env())
+
+# 2. Initialize session manager for interrupt handling
+session_manager = ThreadSafeSessionManager()
+
+# 3. Initialize voice channel with session manager
+voice_channel = VoiceChannel(tac=tac, session_manager=session_manager)
+
+# 4. Register callback with inline async generator
+async def handle_message_ready(user_message, context, memory_response):
+    conv_id = context.conversation_id
+
+    # Manage conversation history
+    if conv_id not in conversation_messages:
+        conversation_messages[conv_id] = [{"role": "system", "content": system_prompt}]
+    conversation_messages[conv_id].append({"role": "user", "content": user_message})
+
+    # Create inline async generator for streaming
+    async def stream_response():
+        stream = await openai_client.chat.completions.create(
+            model="gpt-4o",
+            messages=conversation_messages[conv_id],
+            stream=True,
+        )
+
+        full_response = ""
+        async for chunk in stream:
+            if chunk.choices[0].delta.content:
+                full_response += chunk.choices[0].delta.content
+                yield chunk.choices[0].delta.content
+
+        conversation_messages[conv_id].append({"role": "assistant", "content": full_response})
+
+    await voice_channel.send_response(conv_id, stream_response())
+
+tac.on_message_ready(handle_message_ready)
+
+# 5. Create and start server
+server = TACServer(tac=tac, voice_channel=voice_channel)
+server.start()
+```
+
+**When to Use:**
+- You need real-time streaming responses for voice interactions
+- Your LLM generates long responses that benefit from streaming
+- You want to support user interruptions during agent responses
+- You need task cancellation to avoid wasted LLM tokens on interrupted responses
+
+---
+
+## `voice_escalation.py` - Voice Channel with Flex Escalation (Manual FastAPI)
+
+Advanced voice server demonstrating agent handoff to Twilio Flex for human escalation. This example uses manual FastAPI setup (instead of TACServer) because it requires a custom `/handoff` endpoint. Use this as a reference for building custom server configurations.
 
 **Additional Environment Variables:**
 ```bash
@@ -295,152 +374,3 @@ async def handoff(request: Request):
 - Your application integrates with Twilio Flex
 - Conversations require human intervention for complex cases
 - You want intelligent escalation based on user requests
-
----
-
-## `voice_interrupts.py` - Voice Channel with Custom Streaming Agent
-
-Advanced voice server demonstrating custom agent streaming with session management for handling interrupts and canceling in-flight LLM requests. This example shows how to integrate **any AI agent framework** with TAC's voice channel using a platform-agnostic streaming pattern.
-
-**Additional Environment Variables:**
-```bash
-TWILIO_TAC_VOICE_PUBLIC_DOMAIN={your-ngrok-domain}  # Your ngrok or public domain
-WEBSOCKET_PORT=8080  # Port for WebSocket server
-TWILIO_TAC_OPENAI_API_KEY=sk-xxxxx...  # For this example (can be any LLM)
-```
-
-**Features:**
-- ✅ Platform-agnostic streaming agent integration
-- ✅ Session management for interrupt handling
-- ✅ Automatic cancellation of in-flight LLM tasks when user interrupts
-- ✅ Custom conversation history management
-- ✅ Works with any LLM provider (OpenAI, Anthropic, local models, etc.)
-- ✅ Real-time streaming response delivery via WebSocket
-
-**Usage:**
-```bash
-# 1. Add configuration to .env
-TWILIO_TAC_VOICE_PUBLIC_DOMAIN={your-ngrok-domain}
-WEBSOCKET_PORT=8080
-
-# 2. Start ngrok tunnel
-ngrok http 8080 --domain={your-ngrok-domain}
-
-# 3. Run voice server with streaming
-uv run python examples/channels/voice_interrupts.py
-
-# 4. Configure Twilio phone number webhook to:
-#    https://{your-ngrok-domain}/twiml
-```
-
-**How It Works:**
-
-The key to this example is the `stream_generator` function - a platform-agnostic async generator that yields response chunks:
-
-```python
-async def stream_openai_response(prompt: str, session_id: str) -> AsyncGenerator[str, None]:
-    """
-    Platform-agnostic streaming function.
-    
-    Args:
-        prompt: User's message (e.g., transcribed speech from voice channel)
-        session_id: Conversation/session identifier for context tracking
-        
-    Yields:
-        Text chunks to be sent to the user
-    """
-    # 1. Manage your conversation history however you want
-    if session_id not in conversation_messages:
-        conversation_messages[session_id] = [{"role": "system", "content": system_prompt}]
-    
-    conversation_messages[session_id].append({"role": "user", "content": prompt})
-    
-    # 2. Stream from ANY LLM provider - OpenAI, Anthropic, local models, etc.
-    client = openai.AsyncOpenAI()  # Could be any async streaming client
-    stream = await client.chat.completions.create(
-        model="gpt-4o",
-        messages=conversation_messages[session_id],
-        stream=True,
-    )
-    
-    # 3. Yield chunks - TAC handles WebSocket delivery and cancellation
-    full_response = ""
-    async for chunk in stream:
-        if chunk.choices[0].delta.content:
-            content = chunk.choices[0].delta.content
-            full_response += content
-            yield content  # ← Framework sends this to WebSocket
-    
-    # 4. Save assistant response to your history
-    conversation_messages[session_id].append({"role": "assistant", "content": full_response})
-```
-
-**Session Manager Setup:**
-
-The `ThreadSafeSessionManager` wraps your streaming function and handles task lifecycle:
-
-```python
-from tac.channels.session_manager import ThreadSafeSessionManager
-from tac.channels.voice import VoiceChannel
-
-# Initialize with your custom streaming function
-session_manager = ThreadSafeSessionManager(stream_generator=stream_openai_response)
-
-# Pass to VoiceChannel - enables interrupt handling
-voice_channel = VoiceChannel(tac=tac, session_manager=session_manager)
-```
-
-**What Happens During Interrupts:**
-
-1. User speaks → New prompt arrives
-2. Session manager **cancels** the current streaming task (stops LLM generation)
-3. New streaming task starts immediately with the latest prompt
-4. Previous incomplete response is discarded
-5. User gets responsive experience without waiting for old response to finish
-
-**Adapting for Your Agent:**
-
-This pattern works with **any async streaming source**:
-
-```python
-# Anthropic example
-async def stream_anthropic_response(prompt: str, session_id: str):
-    client = anthropic.AsyncAnthropic()
-    async with client.messages.stream(
-        model="claude-3-5-sonnet-20241022",
-        messages=[{"role": "user", "content": prompt}],
-    ) as stream:
-        async for text in stream.text_stream:
-            yield text
-
-# Local model example (e.g., Ollama)
-async def stream_local_model(prompt: str, session_id: str):
-    async with aiohttp.ClientSession() as session:
-        async with session.post('http://localhost:11434/api/generate',
-            json={"model": "llama2", "prompt": prompt, "stream": True}
-        ) as resp:
-            async for line in resp.content:
-                data = json.loads(line)
-                if 'response' in data:
-                    yield data['response']
-
-# Use with session manager
-session_manager = ThreadSafeSessionManager(stream_generator=stream_local_model)
-```
-
-**Key Benefits:**
-
-- **No vendor lock-in** - Use any LLM provider or custom agent
-- **Full control** - Manage your own context, history, and prompting strategy
-- **Interrupt handling** - Framework handles task cancellation automatically
-- **Minimal overhead** - Just implement one async generator function
-- **Production ready** - Thread-safe session management included
-
-**When to Use:**
-
-- You want full control over your agent's streaming logic
-- You're using a custom LLM or agent framework
-- You need responsive voice interactions with interrupt support
-- You want to manage conversation history your own way
-- You're building a multi-turn conversational voice agent
-

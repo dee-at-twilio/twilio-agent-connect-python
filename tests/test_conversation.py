@@ -27,7 +27,7 @@ class TestConversationModels:
             "id": "CH123456",
             "account_id": "AC123456",
             "configuration_id": "IS123456",
-            "status": "active",
+            "status": "ACTIVE",
             "name": "Test Conversation",
             "created_at": "2025-01-01T00:00:00Z",
             "updated_at": "2025-01-01T01:00:00Z",
@@ -39,7 +39,7 @@ class TestConversationModels:
         assert conversation.id == "CH123456"
         assert conversation.account_id == "AC123456"
         assert conversation.configuration_id == "IS123456"
-        assert conversation.status == "active"
+        assert conversation.status == "ACTIVE"
         assert conversation.name == "Test Conversation"
         assert conversation.created_at == "2025-01-01T00:00:00Z"
         assert conversation.updated_at == "2025-01-01T01:00:00Z"
@@ -177,7 +177,7 @@ class TestConversationModels:
                 "channel": "SMS",
                 "participantId": "comms_participant_01k1etx3jbfx88476ccja0889c",
             },
-            "content": {"text": "Hello World!"},
+            "content": {"type": "TEXT", "text": "Hello World!"},
             "recipients": [
                 {
                     "address": "+12025551234",
@@ -238,7 +238,7 @@ class TestConversationModels:
                 "channel": "SMS",
                 "participantId": "comms_participant_01k1etx3jbfx88476ccja0889c",
             },
-            "content": {"text": "Hello World!"},
+            "content": {"type": "TEXT", "text": "Hello World!"},
             "channelId": "SM123456",
             "recipients": [
                 {
@@ -291,7 +291,7 @@ class TestConversationClient:
             "id": "CH123456",
             "accountId": "AC123456",
             "configurationId": "IS123456",
-            "status": "active",
+            "status": "ACTIVE",
         }
         mock_response.raise_for_status = Mock()
 
@@ -329,7 +329,7 @@ class TestConversationClient:
             "accountId": "AC123456",
             "configurationId": "IS123456",
             "name": "Customer Support",
-            "status": "active",
+            "status": "ACTIVE",
         }
         mock_response.raise_for_status = Mock()
 

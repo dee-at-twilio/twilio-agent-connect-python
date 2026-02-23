@@ -22,6 +22,9 @@ from tac.models.intelligence import (
 )
 from tac.models.knowledge import Knowledge, KnowledgeBase, KnowledgeChunkResult
 from tac.models.memory import (
+    MemoryCommunication,
+    MemoryCommunicationContent,
+    MemoryParticipant,
     MemoryRetrievalRequest,
     MemoryRetrievalResponse,
     ObservationInfo,
@@ -30,7 +33,13 @@ from tac.models.memory import (
 )
 from tac.models.pagination import PaginationMeta
 from tac.models.session import AuthorInfo, ConversationSession
-from tac.models.voice import VoiceServerConfig
+from tac.models.tac import (
+    TACCommunication,
+    TACCommunicationAuthor,
+    TACCommunicationContent,
+    TACMemoryResponse,
+)
+from tac.models.voice import TwiMLOptions
 
 __all__ = [
     "AuthorInfo",
@@ -47,6 +56,9 @@ __all__ = [
     "Knowledge",
     "KnowledgeBase",
     "KnowledgeChunkResult",
+    "MemoryCommunication",
+    "MemoryCommunicationContent",
+    "MemoryParticipant",
     "MemoryRetrievalRequest",
     "MemoryRetrievalResponse",
     "ObservationInfo",
@@ -59,6 +71,10 @@ __all__ = [
     "ParticipantResponse",
     "ProfileResponse",
     "SummaryInfo",
+    "TACCommunication",
+    "TACCommunicationAuthor",
+    "TACCommunicationContent",
+    "TACMemoryResponse",
     "TriggerDetails",
-    "VoiceServerConfig",
+    "TwiMLOptions",
 ]

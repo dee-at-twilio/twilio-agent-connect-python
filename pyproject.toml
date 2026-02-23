@@ -41,15 +41,17 @@ dev = [
     # Example dependencies
     "openai>=2.0.0",
     "openai-agents>=0.6.0",
-    # Voice dependencies
+    # Server dependencies (FastAPI, uvicorn, python-multipart for Form parsing)
     "fastapi>=0.115.0,<1",
     "uvicorn[standard]>=0.32.0,<1",
+    "python-multipart>=0.0.12",
     # Bedrock dependencies
     "boto3>=1.34.0,<2",
 ]
-voice = [
+server = [
     "fastapi>=0.115.0,<1",
     "uvicorn[standard]>=0.32.0,<1",
+    "python-multipart>=0.0.12",
 ]
 bedrock = [
     "boto3>=1.34.0,<2",

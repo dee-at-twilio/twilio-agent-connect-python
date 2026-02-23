@@ -1,8 +1,4 @@
-"""Processor for Conversation Intelligence webhook events.
-
-Logic ported from:
-https://github.com/twilio-internal/memora-domain/blob/main/services/common/cintel-events-processor/internal/transformer/transformer.go
-"""
+"""Processor for Conversation Intelligence webhook events."""
 
 import json
 from typing import Any, Optional

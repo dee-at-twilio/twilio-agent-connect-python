@@ -1,8 +1,6 @@
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field
-
-from tac.models.conversation import Communication
 
 
 class MemoryRetrievalRequest(BaseModel):
@@ -58,6 +56,98 @@ class MemoryRetrievalRequest(BaseModel):
         le=100,
         description="Maximum number of communication memories to return",
         json_schema_extra={"example": 10},
+    )
+
+    model_config = {"populate_by_name": True}
+
+
+class MemoryParticipant(BaseModel):
+    """Participant in a Memory communication (author or recipient)."""
+
+    id: str = Field(
+        ...,
+        description="Participant identifier",
+        json_schema_extra={"example": "conv_participant_00000000000000000000000000"},
+    )
+    name: str = Field(
+        ...,
+        max_length=256,
+        description="Participant display name",
+    )
+    address: str = Field(
+        ...,
+        max_length=254,
+        description="Address of the Participant (e.g., phone number, email address)",
+        json_schema_extra={"example": "+12025551234"},
+    )
+    channel: Literal["VOICE", "SMS", "RCS", "EMAIL", "WHATSAPP", "CHAT", "API", "SYSTEM"] = Field(
+        ..., description="The channel on which the message originated"
+    )
+    type: Optional[Literal["HUMAN_AGENT", "CUSTOMER", "AI_AGENT"]] = Field(
+        default=None,
+        description="Type of Participant in the Conversation",
+    )
+    profile_id: Optional[str] = Field(
+        default=None,
+        alias="profileId",
+        description="The canonical profile ID",
+        json_schema_extra={"example": "mem_profile_00000000000000000000000000"},
+    )
+    delivery_status: Optional[
+        Literal["INITIATED", "IN_PROGRESS", "DELIVERED", "COMPLETED", "FAILED"]
+    ] = Field(
+        default=None,
+        alias="deliveryStatus",
+        description="Delivery status of the Communication to this recipient (only for recipients)",
+    )
+
+    model_config = {"populate_by_name": True}
+
+
+class MemoryCommunicationContent(BaseModel):
+    """Content of a Memory communication."""
+
+    text: Optional[str] = Field(
+        default=None,
+        max_length=8388608,
+        description="Primary text content (optional)",
+        json_schema_extra={"example": "Hello, I need help with my account"},
+    )
+
+    model_config = {"populate_by_name": True}
+
+
+class MemoryCommunication(BaseModel):
+    """A communication from Memory API (historical conversation data)."""
+
+    id: str = Field(
+        ...,
+        description="Unique communication identifier",
+        json_schema_extra={"example": "conv_communication_00000000000000000000000000"},
+    )
+    author: MemoryParticipant = Field(..., description="Author of the communication")
+    content: MemoryCommunicationContent = Field(..., description="Content of the communication")
+    recipients: list[MemoryParticipant] = Field(
+        ..., max_length=100, description="Communication recipients"
+    )
+    channel_id: Optional[str] = Field(
+        default=None,
+        alias="channelId",
+        max_length=256,
+        description="Channel-specific ID (optional)",
+        json_schema_extra={"example": "SM00000000000000000000000000000000"},
+    )
+    created_at: str = Field(
+        ...,
+        alias="createdAt",
+        description="When communication was created",
+        json_schema_extra={"example": "2025-01-15T10:15:30Z"},
+    )
+    updated_at: Optional[str] = Field(
+        default=None,
+        alias="updatedAt",
+        description="When communication was last updated",
+        json_schema_extra={"example": "2025-01-15T10:20:30Z"},
     )
 
     model_config = {"populate_by_name": True}
@@ -216,7 +306,7 @@ class MemoryRetrievalMeta(BaseModel):
 
 
 class MemoryRetrievalResponse(BaseModel):
-    """Response from the memory retrieval API."""
+    """Response from the Memory API /Recall endpoint."""
 
     observations: list[ObservationInfo] = Field(
         default=[], max_length=100, description="Array of observation memories"
@@ -226,8 +316,8 @@ class MemoryRetrievalResponse(BaseModel):
         max_length=100,
         description="Array of summary memories from end of conversations",
     )
-    communications: Optional[list[Communication]] = Field(
-        default=[], max_length=100, description="Array of communication memories"
+    communications: Optional[list[MemoryCommunication]] = Field(
+        default=[], max_length=100, description="Array of communication memories from Memory API"
     )
     meta: MemoryRetrievalMeta = Field(
         default_factory=MemoryRetrievalMeta, description="Metadata about the retrieval operation"

@@ -24,8 +24,7 @@ import uvicorn
 # Dashboard imports
 from dashboard.event_handler import get_event_queue, setup_dashboard_logging
 from dotenv import load_dotenv
-from fastapi import FastAPI, Form, Request, WebSocket
-from fastapi.datastructures import FormData
+from fastapi import FastAPI, Request, WebSocket
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from llm_service import create_llm_service
@@ -39,8 +38,10 @@ from tac import TAC, TACConfig
 from tac.channels import SMSChannel
 from tac.channels.voice import VoiceChannel
 from tac.core.logging import get_logger, setup_logging
-from tac.models.memory import MemoryRetrievalResponse
 from tac.models.session import ConversationSession
+from tac.models.tac import TACMemoryResponse
+from tac.server import FastAPIWebSocketAdapter
+from tac.server.webhook import validate_twilio_webhook
 from tac.util.flex import handle_flex_handoff_logic
 
 load_dotenv()
@@ -97,12 +98,12 @@ app = FastAPI(
 conversation_messages: dict[str, list[ChatCompletionMessageParam]] = {}
 
 
-async def flex_handoff_handler(request_data: FormData) -> Response:
+async def flex_handoff_handler(request_data: dict[str, str]) -> str:
     """
     Handler for Flex handoff requests.
 
     This function is called when the AI agent triggers a handoff to a human agent.
-    It processes the handoff logic and returns the appropriate response.
+    It processes the handoff logic and returns the TwiML response content.
     """
     return handle_flex_handoff_logic(
         request_data, flex_workflow_sid=os.environ.get("TWILIO_TAC_VOICE_HANDOFF_FLEX_WORKFLOW_SID")
@@ -113,7 +114,7 @@ async def flex_handoff_handler(request_data: FormData) -> Response:
 async def handle_message_ready(
     user_message: str,
     context: ConversationSession,
-    memory_response: Optional[MemoryRetrievalResponse],
+    memory_response: Optional[TACMemoryResponse],
 ) -> None:
     """
     Callback invoked when a message is ready to be processed.
@@ -147,6 +148,8 @@ async def handle_message_ready(
                 memory_items.append(f"{len(memory_response.observations)} observations")
             if memory_response.summaries:
                 memory_items.append(f"{len(memory_response.summaries)} summaries")
+            if memory_response.communications:
+                memory_items.append(f"{len(memory_response.communications)} communications")
             memory_summary = ", ".join(memory_items) if memory_items else "context"
             logger.info(
                 f"MEMORY | Retrieved {memory_summary}",
@@ -255,8 +258,15 @@ async def webhook_handler(request: Request) -> JSONResponse:
     deduplication in case retries still occur.
     """
     try:
-        form_data = await request.json()
-        webhook_data = dict(form_data)
+        raw_body = await request.body()
+        body_str = raw_body.decode("utf-8")
+
+        # Validate Twilio webhook signature
+        if not validate_twilio_webhook(request, tac.config.twilio_auth_token, body_str):
+            logger.warning("Invalid Twilio webhook signature")
+            return JSONResponse(content={"error": "Invalid signature"}, status_code=403)
+
+        webhook_data = json.loads(body_str)
 
         # Extract idempotency token from headers for deduplication
         idempotency_token = request.headers.get("i-twilio-idempotency-token")
@@ -274,12 +284,36 @@ async def webhook_handler(request: Request) -> JSONResponse:
 
 
 @app.post("/twiml")
-async def post_twiml(
-    from_number: str = Form(..., alias="From"),
-    to_number: str = Form(..., alias="To"),
-    call_sid: str = Form(..., alias="CallSid"),
-) -> Response:
+async def post_twiml(request: Request) -> Response:
     """Generate TwiML for Twilio voice calls."""
+    form_data = await request.form()
+    form_dict = {key: str(value) for key, value in form_data.items()}
+
+    # Validate Twilio webhook signature
+    if not validate_twilio_webhook(request, tac.config.twilio_auth_token, form_dict):
+        logger.warning("Invalid Twilio webhook signature for /twiml")
+        return Response(content="Invalid signature", status_code=403)
+
+    from_number_raw = form_dict.get("From")
+    to_number_raw = form_dict.get("To")
+    call_sid_raw = form_dict.get("CallSid")
+
+    if not from_number_raw or not to_number_raw or not call_sid_raw:
+        logger.warning(
+            "Missing required Twilio form fields for /twiml",
+            from_number=from_number_raw,
+            to_number=to_number_raw,
+            call_sid=call_sid_raw,
+        )
+        return Response(
+            content="Missing required Twilio fields (From, To, CallSid)",
+            status_code=400,
+        )
+
+    from_number = str(from_number_raw)
+    to_number = str(to_number_raw)
+    call_sid = str(call_sid_raw)
+
     logger.info(
         f"\n{'=' * 80}\nINCOMING CALL | {from_number} → {to_number}",
         call_sid=call_sid,
@@ -293,11 +327,13 @@ async def post_twiml(
     # Generate TwiML with conversation and participant setup
     # From contains the caller's phone number, To contains the Twilio number
     twiml = await voice_channel.handle_incoming_call(
-        websocket_url=websocket_url,
         to_number=to_number,
         from_number=from_number,
+        options={
+            "websocket_url": websocket_url,
+            "action_url": callback_url,
+        },
         call_sid=call_sid,
-        action_url=callback_url,
     )
 
     logger.info("CALL SETUP | TwiML generated, connecting WebSocket...", call_sid=call_sid)
@@ -308,14 +344,30 @@ async def post_twiml(
 async def websocket_endpoint(websocket: WebSocket) -> None:
     """Handle voice streaming WebSocket connection."""
     logger.info("WEBSOCKET | Connected - streaming ready")
-    await voice_channel.handle_websocket(websocket)
+    adapter = FastAPIWebSocketAdapter(websocket)
+    await voice_channel.handle_websocket(adapter)
     logger.info("WEBSOCKET | Disconnected")
 
 
 @app.post("/conversation-relay-callback")
 async def conversation_relay_callback(request: Request) -> Response:
     """Handle ConversationRelay callback webhook from Twilio."""
-    return await voice_channel.handle_conversation_relay_callback(request)
+    form_data = await request.form()
+    form_dict = {key: str(value) for key, value in form_data.items()}
+
+    # Validate Twilio webhook signature
+    if not validate_twilio_webhook(request, tac.config.twilio_auth_token, form_dict):
+        logger.warning("Invalid Twilio webhook signature for /conversation-relay-callback")
+        return Response(content="Invalid signature", status_code=403)
+
+    try:
+        result = await voice_channel.handle_conversation_relay_callback(form_dict)
+        if result is not None:
+            return Response(content=result, media_type="text/xml")
+        return Response(content="OK", media_type="text/plain")
+    except Exception as e:
+        logger.error(f"Error handling callback: {e}", exc_info=True)
+        return Response(content=str(e), media_type="text/plain", status_code=400)
 
 
 # Dashboard routes

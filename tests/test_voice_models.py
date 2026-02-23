@@ -27,9 +27,9 @@ class TestCustomParameters:
 
     def test_optional_fields(self) -> None:
         """Test CustomParameters with optional fields."""
-        params = CustomParameters()
+        params = CustomParameters(conversation_id="CONV123")
 
-        assert params.conversation_id is None
+        assert params.conversation_id == "CONV123"
         assert params.profile_id is None
 
 
@@ -43,12 +43,14 @@ class TestSetupMessage:
             sessionId="SESSION123",
             callSid="CALL456",
             accountSid="AC789",
+            customParameters={"conversationId": "CONV123"},
         )
 
         assert msg.type == "setup"
         assert msg.session_id == "SESSION123"
         assert msg.call_sid == "CALL456"
         assert msg.account_sid == "AC789"
+        assert msg.custom_parameters.conversation_id == "CONV123"
 
     def test_setup_with_custom_parameters(self) -> None:
         """Test setup message with custom parameters."""
@@ -75,6 +77,7 @@ class TestSetupMessage:
             callType="PSTN",
             callStatus="in-progress",
             accountSid="AC123",
+            customParameters={"conversationId": "CONV123"},
         )
 
         assert msg.from_number == "+15551234567"
@@ -87,17 +90,18 @@ class TestSetupMessage:
 
     def test_setup_type_literal(self) -> None:
         """Test setup message type must be 'setup'."""
-        msg = SetupMessage(type="setup")
+        msg = SetupMessage(type="setup", customParameters={"conversationId": "CONV123"})
         assert msg.type == "setup"
 
     def test_setup_minimal(self) -> None:
-        """Test setup message with minimal fields."""
-        msg = SetupMessage(type="setup")
+        """Test setup message with minimal required fields."""
+        msg = SetupMessage(type="setup", customParameters={"conversationId": "CONV123"})
 
         assert msg.type == "setup"
+        assert msg.custom_parameters.conversation_id == "CONV123"
         assert msg.session_id is None
         assert msg.call_sid is None
-        assert msg.custom_parameters is None
+        assert msg.custom_parameters.profile_id is None
 
 
 class TestPromptMessage:
@@ -193,6 +197,7 @@ class TestVoiceMessageAliases:
             "from": "+15551234567",
             "to": "+15559876543",
             "accountSid": "AC123",
+            "customParameters": {"conversationId": "CONV123"},
         }
         msg = SetupMessage(**data)
 

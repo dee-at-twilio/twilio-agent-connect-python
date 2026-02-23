@@ -7,7 +7,7 @@ enabling proper response routing in multi-connection scenarios.
 
 from typing import Optional
 
-from fastapi import WebSocket
+from tac.channels.websocket_protocol import WebSocketProtocol
 
 
 class WebSocketManager:
@@ -36,19 +36,19 @@ class WebSocketManager:
 
     def __init__(self) -> None:
         """Initialize WebSocket manager."""
-        self._websockets: dict[str, WebSocket] = {}
+        self._websockets: dict[str, WebSocketProtocol] = {}
 
-    def add_websocket(self, conversation_id: str, websocket: WebSocket) -> None:
+    def add_websocket(self, conversation_id: str, websocket: WebSocketProtocol) -> None:
         """
         Store WebSocket connection for a conversation.
 
         Args:
             conversation_id: Unique conversation identifier
-            websocket: FastAPI WebSocket connection
+            websocket: WebSocket connection satisfying WebSocketProtocol
         """
         self._websockets[conversation_id] = websocket
 
-    def get_websocket(self, conversation_id: str) -> Optional[WebSocket]:
+    def get_websocket(self, conversation_id: str) -> Optional[WebSocketProtocol]:
         """
         Retrieve WebSocket connection for a conversation.
 

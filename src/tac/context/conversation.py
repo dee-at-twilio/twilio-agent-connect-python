@@ -77,8 +77,7 @@ class ConversationClient:
         # Build query parameters
         params: dict[str, Any] = {}
         if status:
-            # Join status list as comma-separated string
-            params["status"] = ",".join(status)
+            params["status"] = status
         if channel_id:
             params["channelId"] = channel_id
         if page_size:
