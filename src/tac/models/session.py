@@ -46,3 +46,52 @@ class ConversationSession(BaseModel):
     )
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    def build_profile_prompt(self, trait_groups: Optional[list[str]] = None) -> Optional[str]:
+        """
+        Build customer profile prompt section for LLM context.
+
+        Args:
+            trait_groups: Optional list of trait group names to include.
+                         If None, no filtering is applied.
+
+        Returns:
+            LLM prompt section with profile data, or None if no profile data
+            is available or no traits match the filter.
+
+        Example:
+            >>> section = context.build_profile_prompt(["Contact", "Preferences"])
+            >>> print(section)
+            ## Customer Profile
+            Information about this customer:
+            - Contact: {"name": "John Doe", "email": "john@example.com"}
+            - Preferences: {"language": "en", "timezone": "PST"}
+        """
+        if not self.profile or not self.profile.traits:
+            return None
+
+        # Apply trait group filtering if specified
+        if trait_groups is not None:
+            filtered_traits = {
+                key: value
+                for key, value in self.profile.traits.items()
+                if key in trait_groups and value is not None
+            }
+        else:
+            # No filtering - include all traits
+            filtered_traits = {
+                key: value for key, value in self.profile.traits.items() if value is not None
+            }
+
+        if not filtered_traits:
+            return None
+
+        lines = [
+            "## Customer Profile",
+            "Information about this customer:",
+        ]
+
+        for key, value in filtered_traits.items():
+            lines.append(f"- {key}: {value}")
+
+        return "\n".join(lines)

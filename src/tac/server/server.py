@@ -191,4 +191,5 @@ class TACServer:
             host=self.config.host,
             port=self.config.port,
             log_level="info",
+            access_log=False,  # Disable verbose HTTP request logs
         )

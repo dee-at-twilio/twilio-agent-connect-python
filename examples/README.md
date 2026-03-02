@@ -60,6 +60,9 @@ This directory contains examples demonstrating how to use the Twilio Agent Conne
    # Or start SMS webhook server
    uv run python examples/channels/sms.py
 
+   # Or try OpenAI adapter with automatic memory injection
+   uv run python examples/adapters/openai_sdk.py
+
    # Or try a tool integration example
    uv run python examples/tools/openai_chat_with_tools.py
    ```
@@ -114,6 +117,19 @@ Ready-to-deploy examples with full control over FastAPI configuration:
 Use these examples when you need custom middleware, authentication, or integration with existing apps.
 
 [→ View Channel Examples](channels/)
+
+### [adapters/](adapters/) - LLM SDK Adapters
+
+Examples showing automatic memory injection with popular LLM SDKs:
+
+- **`openai_sdk.py`** - OpenAI SDK adapter with automatic memory injection using `with_tac_memory()`
+  - Supports sync (`OpenAI`) and async (`AsyncOpenAI`) clients
+  - Supports streaming with `stream()` method
+  - Type-safe with proper IDE inference
+
+Adapters wrap LLM clients to automatically inject Twilio memory context without mutating the original client. Safe for global clients and concurrent conversations.
+
+[→ View Adapter Examples](adapters/)
 
 ## What You'll Learn
 

@@ -200,6 +200,96 @@ class TACMemoryResponse:
         """
         return self._data
 
+    def build_memory_prompts(self) -> list[str]:
+        """
+        Build all memory prompt sections (observations, summaries, communications) for LLM context.
+
+        Returns:
+            List of LLM prompt sections. Each element is a complete section
+            (e.g., observations section, summaries section). Returns empty list
+            if no memory data is available.
+
+        Example:
+            >>> sections = memory_response.build_memory_prompts()
+            >>> for section in sections:
+            ...     print(section)
+            ...     print()
+            ## Key Observations
+            Important notes about the customer from previous interactions:
+            - Customer prefers email communication
+            - Previously reported billing issue (resolved)
+
+            ## Past Conversation Summaries
+            Summaries of previous conversations with this customer:
+            - Discussed product features and pricing on 2024-01-15
+        """
+        sections = []
+
+        # Build observations prompt section
+        observations_section = self._build_observations_prompt()
+        if observations_section:
+            sections.append(observations_section)
+
+        # Build summaries prompt section
+        summaries_section = self._build_summaries_prompt()
+        if summaries_section:
+            sections.append(summaries_section)
+
+        # Build communications prompt section
+        communications_section = self._build_communications_prompt()
+        if communications_section:
+            sections.append(communications_section)
+
+        return sections
+
+    def _build_observations_prompt(self) -> Optional[str]:
+        """Build observations LLM prompt section."""
+        if not self.observations:
+            return None
+
+        lines = [
+            "## Key Observations",
+            "Important notes about the customer from previous interactions:",
+        ]
+
+        for obs in self.observations:
+            lines.append(f"- {obs.content}")
+
+        return "\n".join(lines)
+
+    def _build_summaries_prompt(self) -> Optional[str]:
+        """Build summaries LLM prompt section."""
+        if not self.summaries:
+            return None
+
+        lines = [
+            "## Past Conversation Summaries",
+            "Summaries of previous conversations with this customer:",
+        ]
+
+        for summary in self.summaries:
+            lines.append(f"- {summary.content}")
+
+        return "\n".join(lines)
+
+    def _build_communications_prompt(self) -> Optional[str]:
+        """Build communications LLM prompt section."""
+        if not self.communications:
+            return None
+
+        lines = [
+            "## Recent Message History",
+            "Recent messages exchanged with this customer:",
+        ]
+
+        for comm in self.communications:
+            # Determine role - defaults to "Assistant" for None or non-CUSTOMER authors
+            role = "User" if comm.author and comm.author.type == "CUSTOMER" else "Assistant"
+            content = comm.content.text or ""
+            lines.append(f"{role}: {content}")
+
+        return "\n".join(lines)
+
     def _convert_communication(
         self, comm: Union[MemoryCommunication, Communication]
     ) -> TACCommunication:
