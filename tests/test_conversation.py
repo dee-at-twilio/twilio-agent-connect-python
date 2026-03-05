@@ -272,15 +272,15 @@ class TestConversationClient:
         """Test ConversationClient initialization."""
         client = ConversationClient(
             base_url="https://maestro.twilio.com",
-            account_sid="AC123456",
-            auth_token="test_token",
+            api_key="SK123456",
+            api_token="test_token",
             service_id="IS123456",
         )
 
         assert client.base_url == "https://maestro.twilio.com"
         assert client.service_id == "IS123456"
-        assert client.account_sid == "AC123456"
-        assert client.auth_token == "test_token"
+        assert client.api_key == "SK123456"
+        assert client.api_token == "test_token"
 
     @pytest.mark.asyncio
     @patch("httpx.AsyncClient")
@@ -301,8 +301,8 @@ class TestConversationClient:
 
         client = ConversationClient(
             base_url="https://maestro.twilio.com",
-            account_sid="AC123456",
-            auth_token="test_token",
+            api_key="SK123456",
+            api_token="test_token",
             service_id="IS123456",
         )
 
@@ -339,8 +339,8 @@ class TestConversationClient:
 
         client = ConversationClient(
             base_url="https://maestro.twilio.com",
-            account_sid="AC123456",
-            auth_token="test_token",
+            api_key="SK123456",
+            api_token="test_token",
             service_id="IS123456",
         )
 
@@ -367,8 +367,8 @@ class TestConversationClient:
 
         client = ConversationClient(
             base_url="https://maestro.twilio.com",
-            account_sid="AC123456",
-            auth_token="test_token",
+            api_key="SK123456",
+            api_token="test_token",
             service_id="IS123456",
         )
 
@@ -399,8 +399,8 @@ class TestConversationClient:
 
         client = ConversationClient(
             base_url="https://maestro.twilio.com",
-            account_sid="AC123456",
-            auth_token="test_token",
+            api_key="SK123456",
+            api_token="test_token",
             service_id="IS123456",
         )
 
@@ -445,8 +445,8 @@ class TestConversationClient:
 
         client = ConversationClient(
             base_url="https://maestro.twilio.com",
-            account_sid="AC123456",
-            auth_token="test_token",
+            api_key="SK123456",
+            api_token="test_token",
             service_id="IS123456",
         )
 
@@ -471,8 +471,8 @@ class TestConversationClient:
 
         client = ConversationClient(
             base_url="https://maestro.twilio.com",
-            account_sid="AC123456",
-            auth_token="test_token",
+            api_key="SK123456",
+            api_token="test_token",
             service_id="IS123456",
         )
 
@@ -486,15 +486,15 @@ class TestConversationClient:
         # Credentials are stored as instance variables and passed to httpx.AsyncClient
         client = ConversationClient(
             base_url="https://maestro.twilio.com",
-            account_sid="AC123456",
-            auth_token="test_token",
+            api_key="SK123456",
+            api_token="test_token",
             service_id="IS123456",
         )
 
         # Verify credentials are stored
-        assert client.account_sid == "AC123456"
-        assert client.auth_token == "test_token"
-        # Note: These credentials are passed to httpx.AsyncClient as auth=(account_sid, auth_token)
+        assert client.api_key == "SK123456"
+        assert client.api_token == "test_token"
+        # Note: These credentials are passed to httpx.AsyncClient as auth=(api_key, api_token)
 
     @pytest.mark.asyncio
     @patch("httpx.AsyncClient")
@@ -513,8 +513,8 @@ class TestConversationClient:
 
         client = ConversationClient(
             base_url="https://maestro.twilio.com",
-            account_sid="AC123456",
-            auth_token="test_token",
+            api_key="SK123456",
+            api_token="test_token",
             service_id="IS999999",
         )
 
@@ -575,8 +575,8 @@ class TestConversationClient:
 
         client = ConversationClient(
             base_url="https://maestro.twilio.com",
-            account_sid="AC123456",
-            auth_token="test_token",
+            api_key="SK123456",
+            api_token="test_token",
             service_id="IS123456",
         )
 
@@ -621,8 +621,8 @@ class TestConversationClient:
 
         client = ConversationClient(
             base_url="https://maestro.twilio.com",
-            account_sid="AC123456",
-            auth_token="test_token",
+            api_key="SK123456",
+            api_token="test_token",
             service_id="IS123456",
         )
 
@@ -706,8 +706,8 @@ class TestConversationClient:
 
         client = ConversationClient(
             base_url="https://maestro.twilio.com",
-            account_sid="AC123456",
-            auth_token="test_token",
+            api_key="SK123456",
+            api_token="test_token",
             service_id="IS123456",
         )
 
@@ -746,8 +746,8 @@ class TestConversationClient:
 
         client = ConversationClient(
             base_url="https://maestro.twilio.com",
-            account_sid="AC123456",
-            auth_token="test_token",
+            api_key="SK123456",
+            api_token="test_token",
             service_id="IS123456",
         )
 
@@ -781,8 +781,8 @@ class TestConversationClient:
 
         client = ConversationClient(
             base_url="https://maestro.twilio.com",
-            account_sid="AC123456",
-            auth_token="test_token",
+            api_key="SK123456",
+            api_token="test_token",
             service_id="IS123456",
         )
 

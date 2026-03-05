@@ -33,31 +33,11 @@
                 <!-- Left Column - Form -->
                 <div class="flex-1 p-6 border-r border-slate-200 min-w-0">
                     <form id="setupForm" class="max-w-4xl">
-                        <!-- Account Credentials -->
+                        <!-- API Keys -->
                         <div class="mb-3">
                             <h3 class="text-xs font-semibold text-slate-700 uppercase tracking-wide mb-2 flex items-center gap-2">
                                 <span class="w-1 h-3 bg-blue-500 rounded"></span>
-                                Account Credentials
-                            </h3>
-                            <div class="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label class="block text-xs font-medium text-slate-700 mb-1" for="account_sid">Account SID</label>
-                                    <input type="text" id="account_sid" name="account_sid" placeholder="ACxxxxxxxx..." required
-                                        class="w-full px-2.5 py-1.5 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-medium text-slate-700 mb-1" for="auth_token">Auth Token</label>
-                                    <input type="text" id="auth_token" name="auth_token" placeholder="Your auth token" required
-                                        class="w-full px-2.5 py-1.5 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- API Keys -->
-                        <div class="mb-3 pt-3 border-t border-slate-100">
-                            <h3 class="text-xs font-semibold text-slate-700 uppercase tracking-wide mb-2 flex items-center gap-2">
-                                <span class="w-1 h-3 bg-blue-500 rounded"></span>
-                                API Keys (Standard)
+                                API Keys
                             </h3>
                             <div class="grid grid-cols-2 gap-3">
                                 <div>
@@ -73,11 +53,11 @@
                             </div>
                         </div>
 
-                        <!-- Memory Store Configuration -->
+                        <!-- Twilio Conversation Memory -->
                         <div class="mb-3 pt-3 border-t border-slate-100">
                             <h3 class="text-xs font-semibold text-slate-700 uppercase tracking-wide mb-2 flex items-center gap-2">
-                                <span class="w-1 h-3 bg-slate-300 rounded"></span>
-                                Memory Store <span class="text-slate-400 font-normal normal-case">(optional)</span>
+                                <span class="w-1 h-3 bg-blue-500 rounded"></span>
+                                Twilio Conversation Memory <span class="text-slate-400 font-normal normal-case">(optional)</span>
                             </h3>
                             <div class="grid grid-cols-2 gap-3">
                                 <div>
@@ -123,11 +103,11 @@
                             </div>
                         </div>
 
-                        <!-- Conversation Settings -->
+                        <!-- Twilio Conversation Orchestrator -->
                         <div class="mb-3 pt-3 border-t border-slate-100">
                             <h3 class="text-xs font-semibold text-slate-700 uppercase tracking-wide mb-2 flex items-center gap-2">
                                 <span class="w-1 h-3 bg-blue-500 rounded"></span>
-                                Conversation Settings
+                                Twilio Conversation Orchestrator
                             </h3>
                             <div class="grid grid-cols-2 gap-3">
                                 <div>
@@ -145,20 +125,40 @@
                             <div class="grid grid-cols-2 gap-3 mt-3">
                                 <div>
                                     <label class="block text-xs font-medium text-slate-700 mb-1" for="maestro_display_name">
-                                        Maestro Display Name <span class="text-slate-400 font-normal">(optional)</span>
+                                        Maestro Display Name
                                     </label>
-                                    <input type="text" id="maestro_display_name" name="maestro_display_name" placeholder="my-maestro-service" maxlength="32"
+                                    <input type="text" id="maestro_display_name" name="maestro_display_name" placeholder="my-maestro-service" maxlength="32" required
                                         pattern="^[A-Za-z0-9._~-]+$" title="Must be URL-safe: letters, numbers, dot (.), underscore (_), tilde (~), and hyphen (-) only, max 32 characters"
                                         class="w-full px-2.5 py-1.5 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                                    <p class="mt-0.5 text-xs text-slate-500">Must be unique, URL-safe, max 32 chars (auto-generated if not provided)</p>
+                                    <p class="mt-0.5 text-xs text-slate-500">Must be unique, URL-safe, max 32 chars</p>
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium text-slate-700 mb-1" for="maestro_description">
-                                        Maestro Description <span class="text-slate-400 font-normal">(optional)</span>
+                                        Maestro Description
                                     </label>
-                                    <input type="text" id="maestro_description" name="maestro_description" placeholder="Maestro service description" maxlength="128"
+                                    <input type="text" id="maestro_description" name="maestro_description" placeholder="Maestro service description" maxlength="128" required
                                         class="w-full px-2.5 py-1.5 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                                     <p class="mt-0.5 text-xs text-slate-500">Max 128 characters</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- SMS Channel -->
+                        <div class="mb-3 pt-3 border-t border-slate-100">
+                            <h3 class="text-xs font-semibold text-slate-700 uppercase tracking-wide mb-2 flex items-center gap-2">
+                                <span class="w-1 h-3 bg-blue-500 rounded"></span>
+                                SMS Channel
+                            </h3>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-700 mb-1" for="account_sid">Account SID</label>
+                                    <input type="text" id="account_sid" name="account_sid" placeholder="ACxxxxxxxx..." required
+                                        class="w-full px-2.5 py-1.5 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-700 mb-1" for="auth_token">Auth Token</label>
+                                    <input type="text" id="auth_token" name="auth_token" placeholder="Your auth token" required
+                                        class="w-full px-2.5 py-1.5 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                                 </div>
                             </div>
                         </div>
@@ -274,7 +274,7 @@
                                     <span id="envIcon" class="hidden w-4 h-4 bg-green-100 rounded-full items-center justify-center text-xs text-green-600">✓</span>
                                     <span id="envTitleText">Environment Variables</span>
                                 </h3>
-                                <p class="text-xs text-slate-500 mt-1">Copy to <code class="bg-slate-100 px-1.5 py-0.5 rounded text-xs">examples/.env</code></p>
+                                <p class="text-xs text-slate-500 mt-1">Copy to <code class="bg-slate-100 px-1.5 py-0.5 rounded text-xs">getting_started/examples/.env</code></p>
                             </div>
                             <button id="copyBtn" onclick="copyEnvContent()" disabled
                                 class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-400 text-white text-xs font-medium rounded-md transition-colors disabled:cursor-not-allowed flex-shrink-0">
@@ -464,7 +464,6 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        account_sid: credentials.account_sid,
                         api_key: credentials.api_key,
                         api_secret: credentials.api_secret,
                         memory_display_name: credentials.memory_display_name || null,
@@ -683,8 +682,8 @@
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            account_sid: credentials.account_sid,
-                            auth_token: credentials.auth_token,
+                            api_key: credentials.api_key,
+                            api_secret: credentials.api_secret,
                             memory_store_id: memoryStoreId,
                             twilio_phone: credentials.twilio_phone,
                             ngrok_domain: credentials.ngrok_domain,
@@ -728,15 +727,13 @@
 
         // Maestro Configurations Management
         async function loadMaestroConfigurations() {
-            const accountSid = document.getElementById('account_sid').value;
-            const authToken = document.getElementById('auth_token').value;
             const apiKey = document.getElementById('api_key').value;
             const apiSecret = document.getElementById('api_secret').value;
             const configsList = document.getElementById('configsList');
             const configsError = document.getElementById('configsError');
 
-            if (!accountSid || !authToken) {
-                configsError.textContent = 'Please enter Account SID and Auth Token first';
+            if (!apiKey || !apiSecret) {
+                configsError.textContent = 'Please enter API Key and API Secret first';
                 configsError.classList.remove('hidden');
                 return;
             }
@@ -749,8 +746,8 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        account_sid: accountSid,
-                        auth_token: authToken
+                        api_key: apiKey,
+                        api_secret: apiSecret
                     })
                 });
 
@@ -929,13 +926,13 @@
                 return;
             }
 
-            const accountSid = document.getElementById('account_sid').value;
-            const authToken = document.getElementById('auth_token').value;
+            const apiKey = document.getElementById('api_key').value;
+            const apiSecret = document.getElementById('api_secret').value;
             const configElement = document.getElementById(`config-${configId}`);
             const configsError = document.getElementById('configsError');
 
-            if (!accountSid || !authToken) {
-                alert('Please enter Account SID and Auth Token first');
+            if (!apiKey || !apiSecret) {
+                alert('Please enter API Key and API Secret first');
                 return;
             }
 
@@ -951,8 +948,8 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        account_sid: accountSid,
-                        auth_token: authToken,
+                        api_key: apiKey,
+                        api_secret: apiSecret,
                         configuration_id: configId
                     })
                 });
@@ -1040,40 +1037,26 @@
         }
 
         function generateEnvContent(credentials) {
-            return `# Twilio Agent Connect Environment Variables
-# Copy this file to .env and update with your actual values
+            return `# Twilio Agent Connect - Environment Variables
+# Copy this file to .env and update with your values
 
-# ============================================================================
-# TAC Core Configuration
-# ============================================================================
-
-TWILIO_TAC_ENVIRONMENT=prod
+# Required
 TWILIO_TAC_ACCOUNT_SID=${credentials.account_sid || 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'}
 TWILIO_TAC_AUTH_TOKEN=${credentials.auth_token || 'your_auth_token_here'}
-TWILIO_TAC_PHONE_NUMBER=${credentials.twilio_phone || '+1234567890'}
+TWILIO_TAC_API_KEY=${credentials.api_key || 'SKxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'}
+TWILIO_TAC_API_TOKEN=${credentials.api_secret || 'your_api_token_here'}
+TWILIO_TAC_PHONE_NUMBER=${credentials.twilio_phone || '+1xxxxxxxxxx'}
+TWILIO_TAC_CONVERSATION_SERVICE_SID=${conversationServiceId || 'conv_configuration_xxxxxxxxxxxxxxxxxxxxxxxxxx'}
 
-# ============================================================================
-# Memory Service Configuration (Twilio Memory/Memora)
-# ============================================================================
+# Optional - Memory Service
+TWILIO_TAC_MEMORY_STORE_ID=${memoryStoreId || 'mem_store_xxxxxxxxxxxxxxxxxxxxxxxxxx'}
 
-TWILIO_TAC_MEMORY_STORE_ID=${memoryStoreId || 'mem_store_00000000000000000000000000'}
-TWILIO_TAC_MEMORY_API_KEY=${credentials.api_key || 'your_api_key_here'}
-TWILIO_TAC_MEMORY_API_TOKEN=${credentials.api_secret || 'your_api_token_here'}
+# Optional - Voice Channel (ngrok domain without https://)
+TWILIO_TAC_VOICE_PUBLIC_DOMAIN=${credentials.ngrok_domain || 'your-domain.ngrok.app'}
 
-# ============================================================================
-# Conversation Service Configuration (Maestro)
-# ============================================================================
-
-TWILIO_TAC_CONVERSATION_SERVICE_SID=${conversationServiceId || 'conv_configuration_0000000000000000000000000'}
-
-# ============================================================================
-# Additional Configuration
-# ============================================================================
-
-TWILIO_TAC_OPENAI_API_KEY=${credentials.openai_api_key || 'your_openai_api_key_here'}
-TWILIO_TAC_VOICE_PUBLIC_DOMAIN=${credentials.ngrok_domain || 'your-ngrok-domain.ngrok.io'}
-TWILIO_TAC_LOG_LEVEL=DEBUG
-TWILIO_TAC_ENABLE_VOICE_ACTIVE_HYDRATION=true`;
+# Optional - OpenAI Example
+TWILIO_TAC_OPENAI_API_KEY=${credentials.openai_api_key || 'sk-proj-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'}
+`;
         }
 
         function copyEnvContent() {
@@ -1186,18 +1169,9 @@ TWILIO_TAC_ENABLE_VOICE_ACTIVE_HYDRATION=true`;
         // Load saved values on page load
         loadSavedValues();
 
-        // Auto-load configurations on page load only if credentials are available
-        try {
-            const savedConfig = localStorage.getItem(STORAGE_KEY);
-            if (savedConfig) {
-                const data = JSON.parse(savedConfig);
-                if (data.account_sid && data.auth_token) {
-                    loadMaestroConfigurations();
-                }
-            }
-        } catch (e) {
-            // If anything goes wrong reading saved credentials, skip auto-loading
-        }
+        // Note: Auto-load configurations removed because api_secret is intentionally
+        // not persisted to localStorage for security. User must enter api_secret
+        // and click the Refresh button to load configurations.
 
         // Real-time validation on blur
         document.getElementById('email').addEventListener('blur', function() {

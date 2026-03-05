@@ -74,24 +74,23 @@ class TAC:
             self.memora_client = MemoryClient(
                 base_url=self.config.memora_base_url,
                 store_id=self.config.twilio_memory_config.memory_store_id,
-                api_key=self.config.twilio_memory_config.api_key,
-                api_token=self.config.twilio_memory_config.api_token,
+                api_key=self.config.api_key,
+                api_token=self.config.api_token,
             )
 
-        # Initialize Knowledge client only if memory config is provided
-        # Knowledge client uses the same authentication as Memory client
+        # Initialize Knowledge client only if knowledge_base_id is configured
         self.knowledge_client: Optional[KnowledgeClient] = None
-        if self.config.twilio_memory_config:
+        if self.config.knowledge_base_id:
             self.knowledge_client = KnowledgeClient(
                 base_url=self.config.knowledge_base_url,
-                api_key=self.config.twilio_memory_config.api_key,
-                api_token=self.config.twilio_memory_config.api_token,
+                api_key=self.config.api_key,
+                api_token=self.config.api_token,
             )
 
         self.maestro_client = ConversationClient(
             base_url=self.config.maestro_base_url,
-            account_sid=self.config.twilio_account_sid,
-            auth_token=self.config.twilio_auth_token,
+            api_key=self.config.api_key,
+            api_token=self.config.api_token,
             service_id=self.config.conversation_service_sid,
         )
 

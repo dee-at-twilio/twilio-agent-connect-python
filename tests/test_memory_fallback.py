@@ -27,6 +27,8 @@ def get_test_config_without_memory():
     """Get test configuration without Twilio Memory."""
     return {
         "twilio_auth_token": "test_token_123",
+        "api_key": "SK123",
+        "api_token": "test_api_token",
         "environment": "prod",
         "twilio_account_sid": "ACtest123",
         "conversation_service_sid": "IS123test",
@@ -39,8 +41,6 @@ def get_test_config_with_memory():
     config = get_test_config_without_memory()
     config["twilio_memory_config"] = {
         "memory_store_id": "MGtest123",
-        "api_key": "test_api_key",
-        "api_token": "test_api_token",
     }
     return config
 

@@ -73,12 +73,6 @@ class TwilioMemoryConfig(BaseModel):
     memory_store_id: str = Field(
         description="Memory Store ID (starts with mem_store_ or mem_service_)",
     )
-    api_key: str = Field(
-        description="Twilio API Key SID (starts with SK)",
-    )
-    api_token: str = Field(
-        description="Twilio API Key Secret",
-    )
 
     trait_groups: Optional[list[str]] = Field(
         default=None,
@@ -90,8 +84,6 @@ class TwilioMemoryConfig(BaseModel):
             "example": {
                 "memory_store_id": "mem_service_xxxxxxxxxxxxxxxxxx",
                 "trait_groups": ["Contact", "Preferences"],
-                "api_key": "SKxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-                "api_token": "your_api_key_secret_here",
             }
         },
     )
@@ -103,12 +95,10 @@ class TwilioMemoryConfig(BaseModel):
 
         Loads configuration from the following environment variables:
         - TWILIO_TAC_MEMORY_STORE_ID: Memory Store ID (starts with mem_store_ or mem_service_)
-        - TWILIO_TAC_MEMORY_API_KEY: Twilio API Key SID (starts with SK)
-        - TWILIO_TAC_MEMORY_API_TOKEN: Twilio API Key Secret
         - TWILIO_TAC_TRAIT_GROUPS: Comma-separated list of trait groups (optional)
 
         Returns:
-            TwilioMemoryConfig instance if all required env vars are set, None otherwise.
+            TwilioMemoryConfig instance if memory_store_id is set, None otherwise.
 
         Example:
             >>> # From environment variables
@@ -117,17 +107,13 @@ class TwilioMemoryConfig(BaseModel):
             >>> # Or manually construct with custom trait_groups
             >>> config = TwilioMemoryConfig(
             >>>     memory_store_id="mem_service_123",
-            >>>     api_key="key",
-            >>>     api_token="token",
             >>>     trait_groups=["Contact", "Preferences"],
             >>> )
         """
         memory_store_id = os.environ.get("TWILIO_TAC_MEMORY_STORE_ID")
-        api_key = os.environ.get("TWILIO_TAC_MEMORY_API_KEY")
-        api_token = os.environ.get("TWILIO_TAC_MEMORY_API_TOKEN")
 
-        # Return None if any required variable is missing
-        if not (memory_store_id and api_key and api_token):
+        # Return None if memory_store_id is missing
+        if not memory_store_id:
             return None
 
         # Parse trait groups from environment variable
@@ -138,8 +124,6 @@ class TwilioMemoryConfig(BaseModel):
 
         return cls(
             memory_store_id=memory_store_id,
-            api_key=api_key,
-            api_token=api_token,
             trait_groups=trait_groups,
         )
 
@@ -147,7 +131,7 @@ class TwilioMemoryConfig(BaseModel):
 class TACConfig(BaseModel):
     """Configuration model for Twilio Agent Connect settings."""
 
-    environment: str = Field(description="TAC environment (dev, stage, or prod)")
+    environment: str = Field(default="prod", description="TAC environment (dev, stage, or prod)")
     conversation_service_sid: str = Field(description="Twilio Conversation Service SID")
 
     @field_validator("environment")
@@ -168,7 +152,9 @@ class TACConfig(BaseModel):
     )
 
     twilio_account_sid: str = Field(description="Twilio Account SID")
-    twilio_auth_token: str = Field(description="Twilio Auth Token from Twilio Console")
+    twilio_auth_token: str = Field(description="Twilio Auth Token")
+    api_key: str = Field(description="Twilio API Key SID (starts with SK)")
+    api_token: str = Field(description="Twilio API Key Secret")
 
     twilio_phone_number: str = Field(
         description="Twilio Phone Number for Voice (inbound) and SMS (send/receive).",
@@ -238,11 +224,11 @@ class TACConfig(BaseModel):
                 "conversation_service_sid": "conv_configuration_xxxxxxxxxxxxxxxxxx",
                 "twilio_account_sid": "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
                 "twilio_auth_token": "your_auth_token_here",
+                "api_key": "SKxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+                "api_token": "your_api_token_here",
                 "twilio_phone_number": "your_phone_number_here",
                 "twilio_memory_config": {
                     "memory_store_id": "mem_service_xxxxxxxxxxxxxxxxxx",
-                    "api_key": "your_api_key_here",
-                    "api_token": "your_api_token_here",
                     "trait_groups": ["Contact", "Preferences"],
                 },
                 "conversation_intelligence_config": {
@@ -260,11 +246,13 @@ class TACConfig(BaseModel):
         Create TACConfig from environment variables.
 
         Loads configuration from the following environment variables:
-        - TWILIO_TAC_ENVIRONMENT: TAC environment (dev, stage, or prod)
+        - TWILIO_TAC_ENVIRONMENT: TAC environment (dev, stage, or prod) (optional, defaults to prod)
         - TWILIO_TAC_CONVERSATION_SERVICE_SID: Twilio Conversation Service SID
+        - TWILIO_TAC_API_KEY: Twilio API Key SID (starts with SK)
+        - TWILIO_TAC_API_TOKEN: Twilio API Key Secret
+        - TWILIO_TAC_PHONE_NUMBER: Twilio Phone Number for Voice and SMS channels
         - TWILIO_TAC_ACCOUNT_SID: Twilio Account SID
         - TWILIO_TAC_AUTH_TOKEN: Twilio Auth Token
-        - TWILIO_TAC_PHONE_NUMBER: Twilio Phone Number for Voice and SMS channels
         - TWILIO_TAC_KNOWLEDGE_BASE_ID: Knowledge Base ID (optional)
         - TWILIO_TAC_LOG_LEVEL: Logging level (optional, defaults to INFO)
         - TWILIO_TAC_ENABLE_VOICE_ACTIVE_HYDRATION: Enable voice active hydration (optional,
@@ -273,8 +261,6 @@ class TACConfig(BaseModel):
         Memory configuration is automatically loaded via TwilioMemoryConfig.from_env()
         from these environment variables (all optional):
         - TWILIO_TAC_MEMORY_STORE_ID: Memory Store ID
-        - TWILIO_TAC_MEMORY_API_KEY: Twilio API Key SID
-        - TWILIO_TAC_MEMORY_API_TOKEN: Twilio API Key Secret
         - TWILIO_TAC_TRAIT_GROUPS: Comma-separated list of trait groups
 
         Conversation Intelligence configuration is automatically loaded via
@@ -314,10 +300,12 @@ class TACConfig(BaseModel):
             enable_voice_active_hydration = True
 
         return cls(
-            environment=os.environ["TWILIO_TAC_ENVIRONMENT"],
+            environment=os.environ.get("TWILIO_TAC_ENVIRONMENT", "prod"),
             conversation_service_sid=os.environ["TWILIO_TAC_CONVERSATION_SERVICE_SID"],
             twilio_account_sid=os.environ["TWILIO_TAC_ACCOUNT_SID"],
             twilio_auth_token=os.environ["TWILIO_TAC_AUTH_TOKEN"],
+            api_key=os.environ["TWILIO_TAC_API_KEY"],
+            api_token=os.environ["TWILIO_TAC_API_TOKEN"],
             twilio_phone_number=os.environ["TWILIO_TAC_PHONE_NUMBER"],
             knowledge_base_id=os.environ.get("TWILIO_TAC_KNOWLEDGE_BASE_ID"),
             log_level=os.environ.get("TWILIO_TAC_LOG_LEVEL", "INFO"),

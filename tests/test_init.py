@@ -19,6 +19,8 @@ def test_basic_tac_functionality():
     """Test basic TAC functionality works."""
     config = {
         "twilio_auth_token": "test_token_123",
+        "api_key": "SK123",
+        "api_token": "test_api_token",
         "environment": "prod",
         "twilio_account_sid": "ACtest123",
         "conversation_service_sid": "IS123test",
@@ -26,3 +28,5 @@ def test_basic_tac_functionality():
     }
     tac = TAC(config)
     assert tac.config.twilio_auth_token == "test_token_123"
+    assert tac.config.api_key == "SK123"
+    assert tac.config.api_token == "test_api_token"

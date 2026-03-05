@@ -9,6 +9,8 @@ def get_test_config(with_memory=False):
     """Get a valid test configuration."""
     config = {
         "twilio_auth_token": "test_token_123",
+        "api_key": "SK123",
+        "api_token": "test_api_token",
         "environment": "prod",
         "twilio_account_sid": "ACtest123",
         "conversation_service_sid": "IS123test",
@@ -17,8 +19,6 @@ def get_test_config(with_memory=False):
     if with_memory:
         config["twilio_memory_config"] = {
             "memory_store_id": "MGtest123",
-            "api_key": "test_api_key",
-            "api_token": "test_api_token",
         }
     return config
 

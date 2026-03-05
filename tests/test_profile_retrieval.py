@@ -83,8 +83,6 @@ def get_test_config_with_trait_groups(trait_groups: Optional[list[str]] = None) 
     """Get test configuration with optional trait groups."""
     memory_config = TwilioMemoryConfig(
         memory_store_id="MGtest123",
-        api_key="test_api_key",
-        api_token="test_api_token",
         trait_groups=trait_groups,
     )
     return TACConfig(
@@ -92,6 +90,8 @@ def get_test_config_with_trait_groups(trait_groups: Optional[list[str]] = None) 
         conversation_service_sid="IStest123",
         twilio_account_sid="ACtest123",
         twilio_auth_token="test_token_123",
+        api_key="SK123",
+        api_token="test_api_token",
         twilio_phone_number="+15551234567",
         twilio_memory_config=memory_config,
     )
@@ -191,6 +191,8 @@ class TestProfileRetrieval:
             conversation_service_sid="IStest123",
             twilio_account_sid="ACtest123",
             twilio_auth_token="test_token_123",
+            api_key="SK123",
+            api_token="test_api_token",
             twilio_phone_number="+15551234567",
             twilio_memory_config=None,  # No memory config
         )

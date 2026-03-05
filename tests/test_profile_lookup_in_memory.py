@@ -17,11 +17,11 @@ def get_test_config_with_memory() -> TACConfig:
         conversation_service_sid="conv_configuration_test123",
         twilio_account_sid="ACtest123",
         twilio_auth_token="test_token_123",
+        api_key="SK123",
+        api_token="test_api_token",
         twilio_phone_number="+15551234567",
         twilio_memory_config=TwilioMemoryConfig(
             memory_store_id="mem_service_test123",
-            api_key="test_api_key",
-            api_token="test_api_token",
         ),
     )
 

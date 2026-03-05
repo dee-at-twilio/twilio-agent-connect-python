@@ -25,6 +25,8 @@ def get_test_config() -> dict:
     """Get a valid test configuration."""
     return {
         "twilio_auth_token": "test_token_123",
+        "api_key": "SK123",
+        "api_token": "test_api_token",
         "environment": "prod",
         "conversation_service_sid": "IStest123",
         "twilio_account_sid": "ACtest123",

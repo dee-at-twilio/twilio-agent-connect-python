@@ -25,7 +25,7 @@ format: ## Format code with ruff
 	uv run ruff check --fix .
 
 type-check: ## Run type checking with mypy
-	MYPYPATH=src uv run mypy src/tac examples
+	MYPYPATH=src uv run mypy src/tac getting_started
 
 pre-commit: ## Run pre-commit hooks on all files
 	uv run pre-commit run --all-files
@@ -47,14 +47,8 @@ clean: ## Clean up cache and build artifacts
 build: ## Build the package
 	uv build
 
-server: ## Start the webhook test server on port 8000
-	python examples/channels/sms.py --port 8000
-
-quickstart: ## Start the TAC quickstart setup wizard on port 8080
-	uv run --with fastapi --with uvicorn python examples/quickstart/server.py
-
-exec-demo: ## Start the exec_demo server with hot reloading (watches both examples and src)
-	cd examples/exec_demo && uv run uvicorn server:app --host 0.0.0.0 --port 8000 --reload --reload-dir . --reload-dir ../../src/tac
+setup: ## Start the Twilio setup wizard on port 8080
+	uv run --with fastapi --with uvicorn python getting_started/twilio_setup/server.py
 
 dev-setup: sync install-pre-commit ## Complete development environment setup
 

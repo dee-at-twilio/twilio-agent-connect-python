@@ -23,8 +23,8 @@ class ConversationClient:
     def __init__(
         self,
         base_url: str,
-        account_sid: str,
-        auth_token: str,
+        api_key: str,
+        api_token: str,
         service_id: str,
     ) -> None:
         """
@@ -32,20 +32,20 @@ class ConversationClient:
 
         Args:
             base_url: Base URL for the Maestro API
-            account_sid: Twilio Account SID for authentication
-            auth_token: Twilio Auth Token for authentication
+            api_key: Twilio API Key SID for authentication
+            api_token: Twilio API Key Secret for authentication
             service_id: Conversation Service SID for API requests
         """
         self.base_url = base_url
         self.service_id = service_id
-        self.account_sid = account_sid
-        self.auth_token = auth_token
+        self.api_key = api_key
+        self.api_token = api_token
         self.logger = get_logger(__name__)
 
     def _get_client(self) -> httpx.AsyncClient:
         """Create a new httpx.AsyncClient for each request to avoid event loop issues."""
         return httpx.AsyncClient(
-            auth=(self.account_sid, self.auth_token),
+            auth=(self.api_key, self.api_token),
             timeout=30.0,
         )
 

@@ -59,7 +59,6 @@ async def create_memory_store(request: Request) -> dict:
 
     Expected payload:
     {
-        "account_sid": "AC...",
         "api_key": "SK...",
         "api_secret": "...",
         "memory_display_name": "..." (optional),
@@ -68,16 +67,15 @@ async def create_memory_store(request: Request) -> dict:
     """
     data = await request.json()
 
-    account_sid = data.get("account_sid")
     api_key = data.get("api_key")
     api_secret = data.get("api_secret")
     memory_display_name = data.get("memory_display_name")
     memory_description = data.get("memory_description")
 
-    if not all([account_sid, api_key, api_secret]):
+    if not all([api_key, api_secret]):
         return {
             "status": "error",
-            "message": "Missing required fields: account_sid, api_key, api_secret",
+            "message": "Missing required fields: api_key, api_secret",
         }
 
     # Generate display name if not provided (required by API)
@@ -132,7 +130,9 @@ async def create_memory_store(request: Request) -> dict:
                 logger.error(f"  Response: {error_text}")
                 return {
                     "status": "error",
-                    "message": f"Failed to create Memory Store: {response.status_code} - {error_text}",
+                    "message": (
+                        f"Failed to create Memory Store: {response.status_code} - {error_text}"
+                    ),
                     "payload": payload,
                     "response": error_text,
                     "status_code": response.status_code,
@@ -197,7 +197,9 @@ async def get_memory_store(request: Request) -> dict:
                 logger.error(f"  Response: {response.text}")
                 return {
                     "status": "error",
-                    "message": f"Failed to get Memory Store: {response.status_code} - {response.text}",
+                    "message": (
+                        f"Failed to get Memory Store: {response.status_code} - {response.text}"
+                    ),
                     "endpoint": endpoint,
                     "response": response.text,
                     "status_code": response.status_code,
@@ -266,7 +268,9 @@ async def verify_memory_store(request: Request) -> dict:
                 logger.error(f"  Response: {response.text}")
                 return {
                     "status": "error",
-                    "message": f"Failed to verify Memory Store: {response.status_code} - {response.text}",
+                    "message": (
+                        f"Failed to verify Memory Store: {response.status_code} - {response.text}"
+                    ),
                     "endpoint": endpoint,
                     "response": response.text,
                     "status_code": response.status_code,
@@ -307,7 +311,9 @@ async def create_profile(request: Request) -> dict:
     if not all([memory_store_id, api_key, api_secret, email, phone]):
         return {
             "status": "error",
-            "message": "Missing required fields: memory_store_id, api_key, api_secret, email, phone",
+            "message": (
+                "Missing required fields: memory_store_id, api_key, api_secret, email, phone"
+            ),
         }
 
     # Build traits object
@@ -347,7 +353,9 @@ async def create_profile(request: Request) -> dict:
                 logger.error(f"  Response: {response.text}")
                 return {
                     "status": "error",
-                    "message": f"Failed to create Profile: {response.status_code} - {response.text}",
+                    "message": (
+                        f"Failed to create Profile: {response.status_code} - {response.text}"
+                    ),
                     "endpoint": endpoint,
                     "payload": payload,
                     "response": response.text,
@@ -448,7 +456,9 @@ async def verify_profile(request: Request) -> dict:
                 logger.error(f"  Response: {response.text}")
                 return {
                     "status": "error",
-                    "message": f"Failed to verify Profile: {response.status_code} - {response.text}",
+                    "message": (
+                        f"Failed to verify Profile: {response.status_code} - {response.text}"
+                    ),
                     "endpoint": endpoint,
                     "response": response.text,
                     "status_code": response.status_code,
@@ -513,7 +523,9 @@ async def lookup_profile(request: Request) -> dict:
                 else:
                     return {
                         "status": "pending",
-                        "message": f"Profile not yet indexed for lookup. Found profiles: {profiles}",
+                        "message": (
+                            f"Profile not yet indexed for lookup. Found profiles: {profiles}"
+                        ),
                     }
             elif response.status_code == 404:
                 return {
@@ -530,7 +542,9 @@ async def lookup_profile(request: Request) -> dict:
                 logger.error(f"  Response: {response.text}")
                 return {
                     "status": "error",
-                    "message": f"Failed to lookup Profile: {response.status_code} - {response.text}",
+                    "message": (
+                        f"Failed to lookup Profile: {response.status_code} - {response.text}"
+                    ),
                     "endpoint": endpoint,
                     "payload": payload,
                     "response": response.text,
@@ -556,8 +570,8 @@ async def create_maestro_service(request: Request) -> dict:
 
     Expected payload:
     {
-        "account_sid": "AC...",
-        "auth_token": "...",
+        "api_key": "SK...",
+        "api_secret": "...",
         "memory_store_id": "mem_store_...",
         "twilio_phone": "+18001234567",
         "ngrok_domain": "your-app.ngrok.app"
@@ -565,8 +579,8 @@ async def create_maestro_service(request: Request) -> dict:
     """
     data = await request.json()
 
-    account_sid = data.get("account_sid")
-    auth_token = data.get("auth_token")
+    api_key = data.get("api_key")
+    api_secret = data.get("api_secret")
     memory_store_id = data.get("memory_store_id")
     twilio_phone = data.get("twilio_phone")
     ngrok_domain = data.get("ngrok_domain")
@@ -574,7 +588,7 @@ async def create_maestro_service(request: Request) -> dict:
     maestro_display_name = data.get("maestro_display_name", "").strip()
     maestro_description = data.get("maestro_description", "").strip()
 
-    if not all([account_sid, auth_token, memory_store_id, twilio_phone, ngrok_domain]):
+    if not all([api_key, api_secret, memory_store_id, twilio_phone, ngrok_domain]):
         return {"status": "error", "message": "Missing required fields"}
 
     # Use user's display name as-is, or generate a default
@@ -657,7 +671,7 @@ async def create_maestro_service(request: Request) -> dict:
                 f"{MAESTRO_API_BASE}/Configurations",
                 headers={
                     "Content-Type": "application/json",
-                    "Authorization": get_basic_auth_header(account_sid, auth_token),
+                    "Authorization": get_basic_auth_header(api_key, api_secret),
                 },
                 json=payload,
                 timeout=30.0,
@@ -705,17 +719,17 @@ async def list_maestro_services(request: Request) -> dict:
 
     Expected payload:
     {
-        "account_sid": "AC...",
-        "auth_token": "..."
+        "api_key": "SK...",
+        "api_secret": "..."
     }
     """
     data = await request.json()
 
-    account_sid = data.get("account_sid")
-    auth_token = data.get("auth_token")
+    api_key = data.get("api_key")
+    api_secret = data.get("api_secret")
 
-    if not all([account_sid, auth_token]):
-        return {"status": "error", "message": "Missing required fields: account_sid, auth_token"}
+    if not all([api_key, api_secret]):
+        return {"status": "error", "message": "Missing required fields: api_key, api_secret"}
 
     try:
         async with httpx.AsyncClient() as client:
@@ -723,7 +737,7 @@ async def list_maestro_services(request: Request) -> dict:
                 f"{MAESTRO_API_BASE}/Configurations",
                 headers={
                     "Content-Type": "application/json",
-                    "Authorization": get_basic_auth_header(account_sid, auth_token),
+                    "Authorization": get_basic_auth_header(api_key, api_secret),
                 },
                 timeout=30.0,
             )
@@ -758,7 +772,9 @@ async def list_maestro_services(request: Request) -> dict:
                 logger.error(f"  Response: {response.text}")
                 return {
                     "status": "error",
-                    "message": f"Failed to list configurations: {response.status_code} - {response.text}",
+                    "message": (
+                        f"Failed to list configurations: {response.status_code} - {response.text}"
+                    ),
                     "response": response.text,
                     "status_code": response.status_code,
                 }
@@ -778,21 +794,21 @@ async def delete_maestro_service(request: Request) -> dict:
 
     Expected payload:
     {
-        "account_sid": "AC...",
-        "auth_token": "...",
+        "api_key": "SK...",
+        "api_secret": "...",
         "configuration_id": "conv_configuration_..."
     }
     """
     data = await request.json()
 
-    account_sid = data.get("account_sid")
-    auth_token = data.get("auth_token")
+    api_key = data.get("api_key")
+    api_secret = data.get("api_secret")
     configuration_id = data.get("configuration_id")
 
-    if not all([account_sid, auth_token, configuration_id]):
+    if not all([api_key, api_secret, configuration_id]):
         return {
             "status": "error",
-            "message": "Missing required fields: account_sid, auth_token, configuration_id",
+            "message": "Missing required fields: api_key, api_secret, configuration_id",
         }
 
     try:
@@ -801,7 +817,7 @@ async def delete_maestro_service(request: Request) -> dict:
                 f"{MAESTRO_API_BASE}/Configurations/{configuration_id}",
                 headers={
                     "Content-Type": "application/json",
-                    "Authorization": get_basic_auth_header(account_sid, auth_token),
+                    "Authorization": get_basic_auth_header(api_key, api_secret),
                 },
                 timeout=30.0,
             )
@@ -820,7 +836,9 @@ async def delete_maestro_service(request: Request) -> dict:
                 logger.error(f"  Response: {response.text}")
                 return {
                     "status": "error",
-                    "message": f"Failed to delete configuration: {response.status_code} - {response.text}",
+                    "message": (
+                        f"Failed to delete configuration: {response.status_code} - {response.text}"
+                    ),
                     "response": response.text,
                     "status_code": response.status_code,
                 }
