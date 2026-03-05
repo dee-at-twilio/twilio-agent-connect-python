@@ -5,7 +5,7 @@ context-aware applications using Twilio's communication technologies. TAC provid
 Memory and Conversation services, enabling you to build LLM-powered agents with persistent memory and conversation context.
 
 > [!NOTE]
-> Looking for the JavaScript/TypeScript version? Check out [TAC SDK JS/TS](https://github.com/twilio/twilio-agent-connect-typescript).
+> Looking for the JavaScript/TypeScript version? Check out [TAC SDK JS/TS](https://github.com/twilio-innovation/twilio-agent-connect-typescript).
 
 Explore the [getting_started](getting_started) directory to see the SDK in action.
 
@@ -29,10 +29,10 @@ We recommend using [uv](https://docs.astral.sh/uv/) for the best development exp
 
 ```bash
 uv init
-uv add git+https://github.com/twilio/twilio-agent-connect-python.git
+uv add git+https://github.com/twilio-innovation/twilio-agent-connect-python.git
 
 # Install with server support (includes FastAPI and uvicorn for TACServer)
-uv add git+https://github.com/twilio/twilio-agent-connect-python.git --extra server
+uv add git+https://github.com/twilio-innovation/twilio-agent-connect-python.git --extra server
 ```
 
 ### pip/venv (Alternative)
@@ -42,10 +42,10 @@ If you prefer using pip and venv:
 ```bash
 python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-pip install git+https://github.com/twilio/twilio-agent-connect-python.git
+pip install git+https://github.com/twilio-innovation/twilio-agent-connect-python.git
 
 # Install with server support
-pip install "git+https://github.com/twilio/twilio-agent-connect-python.git[server]"
+pip install "git+https://github.com/twilio-innovation/twilio-agent-connect-python.git[server]"
 ```
 
 ## Quick Examples
@@ -55,7 +55,7 @@ pip install "git+https://github.com/twilio/twilio-agent-connect-python.git[serve
 Use the [Twilio Setup Wizard](getting_started/twilio_setup/) to automatically create Memory and Conversation services and generate your `.env` file:
 
 ```bash
-git clone https://github.com/twilio/twilio-agent-connect-python.git
+git clone https://github.com/twilio-innovation/twilio-agent-connect-python.git
 cd twilio-agent-connect-python
 make setup  # Open http://localhost:8080
 ```
