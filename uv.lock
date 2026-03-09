@@ -2272,69 +2272,6 @@ wheels = [
 ]
 
 [[package]]
-name = "tac"
-version = "0.0.2"
-source = { editable = "." }
-dependencies = [
-    { name = "httpx" },
-    { name = "pydantic" },
-    { name = "python-dotenv" },
-    { name = "requests" },
-    { name = "twilio" },
-]
-
-[package.optional-dependencies]
-bedrock = [
-    { name = "boto3" },
-]
-dev = [
-    { name = "boto3" },
-    { name = "fastapi" },
-    { name = "mypy" },
-    { name = "openai" },
-    { name = "openai-agents" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-cov" },
-    { name = "python-multipart" },
-    { name = "ruff" },
-    { name = "types-requests", version = "2.31.0.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
-    { name = "types-requests", version = "2.32.4.20250913", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
-    { name = "uvicorn", extra = ["standard"] },
-]
-server = [
-    { name = "fastapi" },
-    { name = "python-multipart" },
-    { name = "uvicorn", extra = ["standard"] },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "boto3", marker = "extra == 'bedrock'", specifier = ">=1.34.0,<2" },
-    { name = "boto3", marker = "extra == 'dev'", specifier = ">=1.34.0,<2" },
-    { name = "fastapi", marker = "extra == 'dev'", specifier = ">=0.115.0,<1" },
-    { name = "fastapi", marker = "extra == 'server'", specifier = ">=0.115.0,<1" },
-    { name = "httpx", specifier = ">=0.27.0,<1" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0.0,<2" },
-    { name = "openai", marker = "extra == 'dev'", specifier = ">=2.0.0" },
-    { name = "openai-agents", marker = "extra == 'dev'", specifier = ">=0.6.0" },
-    { name = "pydantic", specifier = ">=2.0.0,<3" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0,<8" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.21.0,<1" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0.0,<6" },
-    { name = "python-dotenv", specifier = ">=1.0.0,<2" },
-    { name = "python-multipart", marker = "extra == 'dev'", specifier = ">=0.0.12" },
-    { name = "python-multipart", marker = "extra == 'server'", specifier = ">=0.0.12" },
-    { name = "requests", specifier = ">=2.31.0,<3" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.0,<1" },
-    { name = "twilio", specifier = ">=9.8.3,<10" },
-    { name = "types-requests", marker = "extra == 'dev'", specifier = ">=2.31.0,<3" },
-    { name = "uvicorn", extras = ["standard"], marker = "extra == 'dev'", specifier = ">=0.32.0,<1" },
-    { name = "uvicorn", extras = ["standard"], marker = "extra == 'server'", specifier = ">=0.32.0,<1" },
-]
-provides-extras = ["dev", "server", "bedrock"]
-
-[[package]]
 name = "tomli"
 version = "2.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2409,6 +2346,69 @@ sdist = { url = "https://files.pythonhosted.org/packages/00/ab/e8593cd07d1cd3cf7
 wheels = [
     { url = "https://files.pythonhosted.org/packages/3d/6c/b7d23e45bcfc0d717343b2a1e5478a529a6b8bb4d1a18a2184ab4c1aa014/twilio-9.8.5-py2.py3-none-any.whl", hash = "sha256:7e1d04bb2cd480a97937f1fbea5fe35377925b6f70745baade08bde9cd4fb319", size = 1834872, upload-time = "2025-10-28T10:06:56.406Z" },
 ]
+
+[[package]]
+name = "twilio-agent-connect"
+version = "0.0.2"
+source = { editable = "." }
+dependencies = [
+    { name = "httpx" },
+    { name = "pydantic" },
+    { name = "python-dotenv" },
+    { name = "requests" },
+    { name = "twilio" },
+]
+
+[package.optional-dependencies]
+bedrock = [
+    { name = "boto3" },
+]
+dev = [
+    { name = "boto3" },
+    { name = "fastapi" },
+    { name = "mypy" },
+    { name = "openai" },
+    { name = "openai-agents" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-cov" },
+    { name = "python-multipart" },
+    { name = "ruff" },
+    { name = "types-requests", version = "2.31.0.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "types-requests", version = "2.32.4.20250913", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+    { name = "uvicorn", extra = ["standard"] },
+]
+server = [
+    { name = "fastapi" },
+    { name = "python-multipart" },
+    { name = "uvicorn", extra = ["standard"] },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "boto3", marker = "extra == 'bedrock'", specifier = ">=1.34.0,<2" },
+    { name = "boto3", marker = "extra == 'dev'", specifier = ">=1.34.0,<2" },
+    { name = "fastapi", marker = "extra == 'dev'", specifier = ">=0.115.0,<1" },
+    { name = "fastapi", marker = "extra == 'server'", specifier = ">=0.115.0,<1" },
+    { name = "httpx", specifier = ">=0.27.0,<1" },
+    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0.0,<2" },
+    { name = "openai", marker = "extra == 'dev'", specifier = ">=2.0.0" },
+    { name = "openai-agents", marker = "extra == 'dev'", specifier = ">=0.6.0" },
+    { name = "pydantic", specifier = ">=2.0.0,<3" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0,<8" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.21.0,<1" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0.0,<6" },
+    { name = "python-dotenv", specifier = ">=1.0.0,<2" },
+    { name = "python-multipart", marker = "extra == 'dev'", specifier = ">=0.0.12" },
+    { name = "python-multipart", marker = "extra == 'server'", specifier = ">=0.0.12" },
+    { name = "requests", specifier = ">=2.31.0,<3" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.0,<1" },
+    { name = "twilio", specifier = ">=9.8.3,<10" },
+    { name = "types-requests", marker = "extra == 'dev'", specifier = ">=2.31.0,<3" },
+    { name = "uvicorn", extras = ["standard"], marker = "extra == 'dev'", specifier = ">=0.32.0,<1" },
+    { name = "uvicorn", extras = ["standard"], marker = "extra == 'server'", specifier = ">=0.32.0,<1" },
+]
+provides-extras = ["dev", "server", "bedrock"]
 
 [[package]]
 name = "types-requests"

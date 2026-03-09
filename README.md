@@ -70,9 +70,18 @@ After completing setup, here's a minimal example to get started:
 
 ### Multi-Channel with OpenAI SDK
 
-Use the OpenAI adapter to automatically inject conversation memory and user context into your OpenAI API calls across both Voice and SMS channels:
+Use the OpenAI adapter to automatically inject conversation memory and user context into your OpenAI API calls across both Voice and SMS channels.
+
+First, install the required packages:
+
+```bash
+uv add openai python-dotenv
+```
+
+Then create your application:
 
 ```python
+from dotenv import load_dotenv
 from openai import AsyncOpenAI
 from tac import TAC, TACConfig
 from tac.adapters.openai import with_tac_memory
@@ -80,29 +89,42 @@ from tac.channels.sms import SMSChannel
 from tac.channels.voice import VoiceChannel
 from tac.server import TACServer
 
+load_dotenv()
+
 tac = TAC(config=TACConfig.from_env())
 voice_channel = VoiceChannel(tac)
 sms_channel = SMSChannel(tac)
 openai_client = AsyncOpenAI()
 
+conversation_history = {}
+
 async def handle_message_ready(user_message, context, memory_response):
+    conv_id = context.conversation_id
+
+    if conv_id not in conversation_history:
+        conversation_history[conv_id] = []
+    conversation_history[conv_id].append({"role": "user", "content": user_message})
+
     client = with_tac_memory(openai_client, memory_response, context)
+
     response = await client.chat.completions.create(
         model="gpt-4o",
-        messages=[{"role": "user", "content": user_message}]
+        messages=conversation_history[conv_id]
     )
-    llm_response = response.choices[0].message.content
+
+    llm_response = response.choices[0].message.content or ""
+    conversation_history[conv_id].append({"role": "assistant", "content": llm_response})
 
     if context.channel == "voice":
-        await voice_channel.send_response(context.conversation_id, llm_response)
+        await voice_channel.send_response(conv_id, llm_response)
     elif context.channel == "sms":
-        await sms_channel.send_response(context.conversation_id, llm_response)
+        await sms_channel.send_response(conv_id, llm_response)
 
 tac.on_message_ready(handle_message_ready)
 TACServer(tac=tac, voice_channel=voice_channel, sms_channel=sms_channel).start()
 ```
 
-> See the [full example](getting_started/examples/openai/openai_sdk.py) for a complete implementation.
+> **Note**: See the [getting started guide](getting_started/README.md) for complete setup instructions and `.env` configuration details.
 
 **That's it!** The server automatically:
 - Creates FastAPI app with `/twiml`, `/ws`, and `/webhook` endpoints

@@ -12,7 +12,7 @@ from openai import AsyncOpenAI
 
 from tac import TAC, TACConfig
 from tac.adapters.openai import with_tac_memory
-from tac.channels import SMSChannel
+from tac.channels.sms import SMSChannel
 from tac.channels.voice import VoiceChannel
 from tac.core.logging import get_logger
 from tac.models.session import ConversationSession
