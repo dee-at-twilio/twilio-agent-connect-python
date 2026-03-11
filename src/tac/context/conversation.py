@@ -1,12 +1,14 @@
 from typing import Any, Literal, Optional
 
 import httpx
+from pydantic import ValidationError
 
 from tac.core.logging import get_logger
 from tac.models.conversation import (
     Communication,
     CommunicationRequest,
     CommunicationsListResponse,
+    ConversationConfiguration,
     ConversationRequest,
     ConversationResponse,
     ConversationsListResponse,
@@ -45,6 +47,13 @@ class ConversationClient:
     def _get_client(self) -> httpx.AsyncClient:
         """Create a new httpx.AsyncClient for each request to avoid event loop issues."""
         return httpx.AsyncClient(
+            auth=(self.api_key, self.api_token),
+            timeout=30.0,
+        )
+
+    def _get_sync_client(self) -> httpx.Client:
+        """Create a new synchronous httpx.Client."""
+        return httpx.Client(
             auth=(self.api_key, self.api_token),
             timeout=30.0,
         )
@@ -368,5 +377,47 @@ class ConversationClient:
                 f"URL: {url}\n"
                 f"Query params: {params}\n"
                 f"Response: {response_text}"
+            )
+            raise
+
+    def get_configuration(self, configuration_id: str) -> ConversationConfiguration:
+        """
+        Retrieve the details for a single configuration.
+
+        Args:
+            configuration_id: The configuration ID to retrieve
+
+        Returns:
+            ConversationConfiguration object containing the configuration details
+
+        Raises:
+            httpx.HTTPError: If the API request fails
+            ValueError: If the response schema is invalid
+        """
+        url = f"{self.base_url}/v2/ControlPlane/Configurations/{configuration_id}"
+
+        try:
+            with self._get_sync_client() as client:
+                response = client.get(url)
+                response.raise_for_status()
+
+                try:
+                    configuration = ConversationConfiguration(**response.json())
+                    return configuration
+                except ValidationError as e:
+                    self.logger.error(
+                        f"Failed to parse configuration response: {e}\n"
+                        f"URL: {url}\nResponse: {response.text}"
+                    )
+                    raise ValueError(f"Invalid configuration response schema: {e}") from e
+
+        except httpx.HTTPError as e:
+            response_text = (
+                getattr(e.response, "text", "No response body")
+                if hasattr(e, "response")
+                else "No response"
+            )
+            self.logger.error(
+                f"Failed to get configuration: {e}\nURL: {url}\nResponse: {response_text}"
             )
             raise

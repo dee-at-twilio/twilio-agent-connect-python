@@ -81,7 +81,7 @@ class VoiceChannel(BaseChannel):
         self,
         tac: TAC,
         session_manager: Optional[SessionManager] = None,
-        auto_retrieve_memory: bool = True,
+        auto_retrieve_memory: bool = False,
     ):
         """
         Initialize Voice channel for websocket protocol handling.
@@ -93,10 +93,9 @@ class VoiceChannel(BaseChannel):
                 encapsulates the stream_generator for LLM responses
                 If provided, enables task cancellation on interrupts
                 and new prompts.
-            auto_retrieve_memory: If True (default), automatically retrieve memory
-                before invoking the on_message_ready callback. Set to False to
-                disable automatic memory retrieval (e.g., for latency-sensitive
-                voice applications).
+            auto_retrieve_memory: If True, automatically retrieve memory
+                before invoking the on_message_ready callback. Default is False.
+                Set to True to enable automatic memory retrieval.
         """
         super().__init__(tac, auto_retrieve_memory=auto_retrieve_memory)
         self.session_manager = session_manager

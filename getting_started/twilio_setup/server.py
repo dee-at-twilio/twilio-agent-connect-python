@@ -61,8 +61,8 @@ async def create_memory_store(request: Request) -> dict:
     {
         "api_key": "SK...",
         "api_secret": "...",
-        "memory_display_name": "..." (optional),
-        "memory_description": "..." (optional)
+        "memory_display_name": "..." (required),
+        "memory_description": "..." (required)
     }
     """
     data = await request.json()
@@ -72,19 +72,17 @@ async def create_memory_store(request: Request) -> dict:
     memory_display_name = data.get("memory_display_name")
     memory_description = data.get("memory_description")
 
-    if not all([api_key, api_secret]):
+    if not all([api_key, api_secret, memory_display_name, memory_description]):
         return {
             "status": "error",
-            "message": "Missing required fields: api_key, api_secret",
+            "message": (
+                "Missing required fields: api_key, api_secret, "
+                "memory_display_name, memory_description"
+            ),
         }
 
-    # Generate display name if not provided (required by API)
-    if not memory_display_name:
-        unique_suffix = str(uuid.uuid4())[:8]
-        memory_display_name = f"tac-quickstart-{unique_suffix}"
-
     # Validate memory_description length (must not exceed 128 characters)
-    if memory_description and len(memory_description) > 128:
+    if len(memory_description) > 128:
         return {
             "status": "error",
             "message": "Memory description must not exceed 128 characters",

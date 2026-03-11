@@ -68,15 +68,32 @@ class TAC:
         setup_logging(log_level=self.config.log_level, log_format="console")
         self.logger = get_logger(__name__)
 
-        # Initialize Memora client only if memory config is provided
-        self.memora_client: Optional[MemoryClient] = None
-        if self.config.twilio_memory_config:
-            self.memora_client = MemoryClient(
-                base_url=self.config.memora_base_url,
-                store_id=self.config.twilio_memory_config.memory_store_id,
-                api_key=self.config.api_key,
-                api_token=self.config.api_token,
+        self.maestro_client = ConversationClient(
+            base_url=self.config.maestro_base_url,
+            api_key=self.config.api_key,
+            api_token=self.config.api_token,
+            service_id=self.config.conversation_service_sid,
+        )
+
+        try:
+            configuration = self.maestro_client.get_configuration(
+                self.config.conversation_service_sid
             )
+        except Exception as e:
+            raise ValueError(
+                f"Failed to fetch Maestro configuration: {e}. "
+                "TAC initialization requires a valid Maestro configuration. "
+                "Please check your conversation_service_sid and credentials."
+            ) from e
+
+        # Initialize Memory client using memory_store_id from Maestro configuration
+        # Memory is always available - twilio_memory_config only configures trait groups
+        self.memora_client = MemoryClient(
+            base_url=self.config.memora_base_url,
+            store_id=configuration.memory_store_id,
+            api_key=self.config.api_key,
+            api_token=self.config.api_token,
+        )
 
         # Initialize Knowledge client only if knowledge_base_id is configured
         self.knowledge_client: Optional[KnowledgeClient] = None
@@ -87,16 +104,9 @@ class TAC:
                 api_token=self.config.api_token,
             )
 
-        self.maestro_client = ConversationClient(
-            base_url=self.config.maestro_base_url,
-            api_key=self.config.api_key,
-            api_token=self.config.api_token,
-            service_id=self.config.conversation_service_sid,
-        )
-
-        # Initialize CI processor if both memory and CI config are provided
+        # Initialize CI processor if CI config is provided
         self.ci_processor: Optional[OperatorResultProcessor] = None
-        if self.memora_client and self.config.conversation_intelligence_config:
+        if self.config.conversation_intelligence_config:
             self.ci_processor = OperatorResultProcessor(
                 memory_client=self.memora_client,
                 config=self.config.conversation_intelligence_config,
@@ -127,16 +137,6 @@ class TAC:
             ]
         ] = None
 
-    def is_twilio_memory_enabled(self) -> bool:
-        """
-        Check if Twilio Memory functionality is enabled.
-
-        Returns:
-            True if twilio_memory_config is provided and memory client is initialized,
-            False otherwise.
-        """
-        return self.config.twilio_memory_config is not None
-
     async def retrieve_memory(
         self,
         conversation_context: ConversationSession,
@@ -145,9 +145,11 @@ class TAC:
         """
         Retrieve memories from Memory Service or fallback to Maestro Communications API.
 
-        This method implements a lenient, graceful degradation strategy for memory retrieval.
-        All failures in profile lookup and fetching are logged at WARNING level and handled
-        gracefully without raising exceptions.
+        This method attempts to retrieve memory using the following strategy:
+        1. Try to get profile_id (via lookup if missing)
+        2. Try to fetch profile data
+        3. Try to retrieve memory from Memory Service
+        If any step fails, falls back to Maestro Communications API.
 
         Args:
             conversation_context: Conversation context containing conversation_id, profile_id,
@@ -158,7 +160,7 @@ class TAC:
         Returns:
             TACMemoryResponse: Unified wrapper providing access to memory data.
 
-            When Memory is available (with profile_id):
+            When Memory retrieval succeeds (with profile_id):
             - observations, summaries, and communications with full metadata
             - communications include author name, type, and participant details
 
@@ -166,87 +168,45 @@ class TAC:
             - observations and summaries are empty lists
             - communications have basic fields only (no author metadata)
 
-        Behavior:
-            Profile ID Resolution (if Memory is configured):
-            1. If profile_id is missing:
-               - Attempts lookup using author_info.address (phone number)
-               - On successful lookup: Sets profile_id and immediately fetches profile (once)
-               - On failure: Logs WARNING and falls back to Maestro
-            2. If profile_id exists but profile not fetched:
-               - Fetches profile data (one-time attempt only)
-               - On failure: Logs WARNING and continues with profile_id only
-
-            Memory Retrieval:
-            - If profile_id available: Retrieves from Memory with observations, summaries
-            - If profile_id unavailable: Falls back to Maestro Communications API
-            - If Memory not configured: Falls back to Maestro Communications API
-
         Note:
-            All profile lookup and fetch failures are handled gracefully. The method never
-            raises exceptions for profile-related failures, ensuring memory retrieval
-            continues even when profile enrichment is unavailable.
-
-        Raises:
-            httpx.HTTPError: Only if the Memory or Maestro API request itself fails
+            All failures in memory retrieval are handled gracefully and fall back to Maestro.
+            This ensures the system continues to function even when Memory Service is unavailable.
         """
-        if self.memora_client and self.config.twilio_memory_config:
+        try:
+            # Try to get profile_id if not already available
             if not conversation_context.profile_id:
                 self.logger.debug(
                     "profile_id not found, attempting to lookup profile using phone number"
                 )
 
-                if (
-                    not conversation_context.author_info
-                    or not conversation_context.author_info.address
-                ):
-                    self.logger.warning(
-                        "profile_id is required for memory retrieval but was not found in "
-                        "conversation context. Additionally, author_info.address is not available "
-                        "for profile lookup. Memory will be retrieved without profile_id."
-                    )
-                else:
-                    # Attempt to lookup profile using phone number
+                if conversation_context.author_info and conversation_context.author_info.address:
                     phone_number = conversation_context.author_info.address
-                    try:
-                        lookup_response: ProfileLookupResponse = (
-                            await self.memora_client.lookup_profile(
-                                id_type="phone",
-                                value=phone_number,
-                            )
+                    lookup_response: ProfileLookupResponse = (
+                        await self.memora_client.lookup_profile(
+                            id_type="phone",
+                            value=phone_number,
                         )
+                    )
 
-                        if not lookup_response.profiles:
-                            self.logger.warning(
-                                f"No profile found for phone number {phone_number}. "
-                                "Profile lookup returned no results. Memory will be retrieved "
-                                "without profile_id."
-                            )
-                        else:
-                            # Use the first profile ID
-                            conversation_context.profile_id = lookup_response.profiles[0]
+                    if lookup_response.profiles:
+                        conversation_context.profile_id = lookup_response.profiles[0]
+                        self.logger.debug(f"Found profile_id: {conversation_context.profile_id}")
+                    else:
+                        self.logger.debug(f"No profile found for phone number {phone_number}")
+                        raise ValueError("No profile found for phone number")
+                else:
+                    self.logger.debug(
+                        "profile_id not found and author_info.address not available for lookup"
+                    )
+                    raise ValueError("No profile_id or author_info available")
 
-                    except Exception as e:
-                        self.logger.warning(
-                            f"Failed to lookup profile for {phone_number}: {e}. "
-                            "Memory will be retrieved without profile_id."
-                        )
-
+            # Try to fetch profile data if not already fetched
             if conversation_context.profile_id and not conversation_context.profile:
                 conversation_context.profile = await self.fetch_profile(
                     conversation_context.profile_id
                 )
 
-            # If we still don't have a profile_id after lookup attempts, fall back to Maestro
-            if not conversation_context.profile_id:
-                self.logger.warning(
-                    "Memory client is configured but profile_id is not available. "
-                    "Falling back to Maestro Communications API."
-                )
-                communications = await self.maestro_client.list_communications(
-                    conversation_id=conversation_context.conversation_id
-                )
-                return TACMemoryResponse(communications)
-
+            # Retrieve memory from Memory Service
             memory_response = await self.memora_client.retrieve_memory(
                 profile_id=conversation_context.profile_id,
                 conversation_id=conversation_context.conversation_id,
@@ -254,15 +214,14 @@ class TAC:
             )
             return TACMemoryResponse(memory_response)
 
-        else:
-            self.logger.info(
-                "Twilio Memory not configured, falling back to Maestro Communications API"
+        except Exception as e:
+            # Fall back to Maestro Communications API for any failure
+            self.logger.warning(
+                f"Memory retrieval failed: {e}. Falling back to Maestro Communications API."
             )
-
             communications = await self.maestro_client.list_communications(
                 conversation_id=conversation_context.conversation_id
             )
-
             return TACMemoryResponse(communications)
 
     async def fetch_profile(self, profile_id: str) -> Optional[ProfileResponse]:
@@ -279,14 +238,6 @@ class TAC:
         Returns:
             ProfileResponse with id, created_at, and traits, or None if fetch fails
         """
-        # Check if memory client is initialized
-        if not self.memora_client or not self.config.twilio_memory_config:
-            self.logger.warning(
-                "Memory client is not initialized. Cannot fetch profile. "
-                "Provide twilio_memory_config when creating TACConfig to enable profile fetching."
-            )
-            return None
-
         # Validate profile_id
         if not profile_id:
             self.logger.warning("profile_id is required for profile fetching but was not provided")
@@ -294,7 +245,11 @@ class TAC:
 
         try:
             # Get trait_groups from config if provided
-            trait_groups = self.config.twilio_memory_config.trait_groups
+            trait_groups = (
+                self.config.twilio_memory_config.trait_groups
+                if self.config.twilio_memory_config
+                else None
+            )
 
             # Fetch profile
             profile_response = await self.memora_client.get_profile(

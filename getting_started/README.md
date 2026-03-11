@@ -104,9 +104,6 @@ See `examples/.env.example` for all available configuration options. Key variabl
 - `TWILIO_TAC_PHONE_NUMBER`: Your Twilio phone number
 - `TWILIO_TAC_CONVERSATION_SERVICE_SID`: Conversation service ID
 
-### Optional (Memory)
-- `TWILIO_TAC_MEMORY_STORE_ID`: Memory store ID
-
 ### Optional (Voice Channel)
 - `TWILIO_TAC_VOICE_PUBLIC_DOMAIN`: Your ngrok domain (required for voice)
 

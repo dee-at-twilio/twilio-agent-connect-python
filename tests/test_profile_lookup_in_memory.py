@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from tac import TAC, TACConfig
+from tac.context.memory import MemoryClient
 from tac.core.config import TwilioMemoryConfig
 from tac.models.memory import MemoryRetrievalResponse, ProfileLookupResponse
 from tac.models.session import AuthorInfo, ConversationSession
@@ -20,9 +21,17 @@ def get_test_config_with_memory() -> TACConfig:
         api_key="SK123",
         api_token="test_api_token",
         twilio_phone_number="+15551234567",
-        twilio_memory_config=TwilioMemoryConfig(
-            memory_store_id="mem_service_test123",
-        ),
+        twilio_memory_config=TwilioMemoryConfig(),
+    )
+
+
+def create_memora_client(tac: TAC) -> MemoryClient:
+    """Helper to manually create memora_client for tests."""
+    return MemoryClient(
+        base_url=tac.config.memora_base_url,
+        store_id="MGtest123",
+        api_key=tac.config.api_key,
+        api_token=tac.config.api_token,
     )
 
 
@@ -34,6 +43,7 @@ class TestProfileLookupInMemoryRetrieval:
         """Test retrieve_memory works normally when profile_id is provided."""
         config = get_test_config_with_memory()
         tac = TAC(config)
+        tac.memora_client = create_memora_client(tac)
 
         # Mock memory retrieval
         mock_memory_response = MemoryRetrievalResponse(
@@ -69,6 +79,7 @@ class TestProfileLookupInMemoryRetrieval:
         """Test retrieve_memory automatically looks up profile when missing."""
         config = get_test_config_with_memory()
         tac = TAC(config)
+        tac.memora_client = create_memora_client(tac)
 
         # Mock profile lookup
         mock_lookup_response = ProfileLookupResponse(
@@ -126,6 +137,7 @@ class TestProfileLookupInMemoryRetrieval:
         """Test that first profile is used when multiple profiles are found."""
         config = get_test_config_with_memory()
         tac = TAC(config)
+        tac.memora_client = create_memora_client(tac)
 
         # Mock profile lookup with multiple profiles
         mock_lookup_response = ProfileLookupResponse(
@@ -166,6 +178,7 @@ class TestProfileLookupInMemoryRetrieval:
         """Test retrieve_memory falls back to Maestro without profile_id or author_info."""
         config = get_test_config_with_memory()
         tac = TAC(config)
+        tac.memora_client = create_memora_client(tac)
 
         # Mock Maestro fallback (since profile_id is unavailable)
         from tac.models.conversation import (
@@ -219,6 +232,7 @@ class TestProfileLookupInMemoryRetrieval:
         """Test retrieve_memory falls back to Maestro when address is missing."""
         config = get_test_config_with_memory()
         tac = TAC(config)
+        tac.memora_client = create_memora_client(tac)
 
         # Mock Maestro fallback (since profile_id is unavailable)
         from tac.models.conversation import (
@@ -275,6 +289,7 @@ class TestProfileLookupInMemoryRetrieval:
         """Test retrieve_memory falls back to Maestro when profile lookup returns no profiles."""
         config = get_test_config_with_memory()
         tac = TAC(config)
+        tac.memora_client = create_memora_client(tac)
 
         # Mock profile lookup with empty profiles list
         mock_lookup_response = ProfileLookupResponse(
@@ -335,6 +350,7 @@ class TestProfileLookupInMemoryRetrieval:
         """Test that retrieve_memory falls back to Maestro when profile lookup API fails."""
         config = get_test_config_with_memory()
         tac = TAC(config)
+        tac.memora_client = create_memora_client(tac)
 
         # Mock profile lookup to raise an exception
         tac.memora_client.lookup_profile = AsyncMock(
@@ -393,6 +409,7 @@ class TestProfileLookupInMemoryRetrieval:
         """Test that profile lookup modifies the original session object."""
         config = get_test_config_with_memory()
         tac = TAC(config)
+        tac.memora_client = create_memora_client(tac)
 
         # Mock profile lookup
         mock_lookup_response = ProfileLookupResponse(
@@ -426,6 +443,7 @@ class TestProfileLookupInMemoryRetrieval:
         """Test that phone numbers are normalized during lookup."""
         config = get_test_config_with_memory()
         tac = TAC(config)
+        tac.memora_client = create_memora_client(tac)
 
         # Mock profile lookup (simulating normalization)
         mock_lookup_response = ProfileLookupResponse(

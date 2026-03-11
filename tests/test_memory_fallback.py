@@ -5,6 +5,8 @@ from unittest.mock import AsyncMock
 import pytest
 
 from tac import TAC, TACConfig
+from tac.context.memory import MemoryClient
+from tac.core.config import TwilioMemoryConfig
 from tac.models.conversation import (
     Communication,
     CommunicationContent,
@@ -39,10 +41,18 @@ def get_test_config_without_memory():
 def get_test_config_with_memory():
     """Get test configuration with Twilio Memory."""
     config = get_test_config_without_memory()
-    config["twilio_memory_config"] = {
-        "memory_store_id": "MGtest123",
-    }
+    config["twilio_memory_config"] = TwilioMemoryConfig(trait_groups=["Contact"])
     return config
+
+
+def create_memora_client(tac: TAC) -> MemoryClient:
+    """Helper to manually create memora_client for tests."""
+    return MemoryClient(
+        base_url=tac.config.memora_base_url,
+        store_id="MGtest123",
+        api_key=tac.config.api_key,
+        api_token=tac.config.api_token,
+    )
 
 
 class TestMemoryFallback:
@@ -54,6 +64,16 @@ class TestMemoryFallback:
         # Setup
         config = TACConfig(**get_test_config_with_memory())
         tac = TAC(config)
+
+        # Manually create memora_client for testing (auto-init will fail with mock credentials)
+        from tac.context.memory import MemoryClient
+
+        tac.memora_client = MemoryClient(
+            base_url=config.memora_base_url,
+            store_id="MGtest123",
+            api_key=config.api_key,
+            api_token=config.api_token,
+        )
 
         tac.memora_client.retrieve_memory = AsyncMock(
             return_value=MemoryRetrievalResponse(
@@ -312,20 +332,6 @@ class TestMemoryFallback:
         for i, comm in enumerate(result.communications):
             assert comm.id == f"comm_{i}"
             assert comm.content.text == f"Message {i}"
-
-    def test_is_twilio_memory_enabled_with_memory(self):
-        """Test is_twilio_memory_enabled returns True when configured."""
-        config = TACConfig(**get_test_config_with_memory())
-        tac = TAC(config)
-
-        assert tac.is_twilio_memory_enabled() is True
-
-    def test_is_twilio_memory_enabled_without_memory(self):
-        """Test is_twilio_memory_enabled returns False when not configured."""
-        config = TACConfig(**get_test_config_without_memory())
-        tac = TAC(config)
-
-        assert tac.is_twilio_memory_enabled() is False
 
 
 class TestTACCommunicationConversion:

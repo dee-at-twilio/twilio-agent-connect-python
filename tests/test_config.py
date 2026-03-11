@@ -68,7 +68,7 @@ class TestTACConfig:
 
     def test_config_with_memory_enabled(self):
         """Test config with Twilio Memory enabled."""
-        memory_config = TwilioMemoryConfig(memory_store_id="MGtest123")
+        memory_config = TwilioMemoryConfig(trait_groups=["Contact", "Preferences"])
         config = TACConfig(
             twilio_auth_token="test_token_123",
             api_key="SK123",
@@ -80,7 +80,7 @@ class TestTACConfig:
             twilio_memory_config=memory_config,
         )
         assert config.twilio_memory_config is not None
-        assert config.twilio_memory_config.memory_store_id == "MGtest123"
+        assert config.twilio_memory_config.trait_groups == ["Contact", "Preferences"]
 
     def test_config_dict_conversion(self):
         """Test converting config to dictionary."""
@@ -92,7 +92,7 @@ class TestTACConfig:
             twilio_account_sid="ACtest123",
             conversation_service_sid="IS123test",
             twilio_phone_number="+15551234567",
-            twilio_memory_config=TwilioMemoryConfig(memory_store_id="MGtest123"),
+            twilio_memory_config=TwilioMemoryConfig(trait_groups=["Contact", "Preferences"]),
         )
         config_dict = config.model_dump()
 
@@ -108,7 +108,7 @@ class TestTACConfig:
         assert "log_level" in config_dict
         assert config_dict["log_level"] == "INFO"
         assert "twilio_memory_config" in config_dict
-        assert config_dict["twilio_memory_config"]["memory_store_id"] == "MGtest123"
+        assert config_dict["twilio_memory_config"]["trait_groups"] == ["Contact", "Preferences"]
 
     def test_config_from_dict(self):
         """Test creating config from dictionary."""
@@ -121,7 +121,7 @@ class TestTACConfig:
             "conversation_service_sid": "IS123test",
             "twilio_phone_number": "+15551234567",
             "twilio_memory_config": {
-                "memory_store_id": "MGtest123",
+                "trait_groups": ["Contact", "Preferences"],
             },
         }
         config = TACConfig(**config_data)
@@ -131,7 +131,7 @@ class TestTACConfig:
         assert config.memora_base_url == "https://memory.twilio.com"
         assert config.environment == "prod"
         assert config.twilio_memory_config is not None
-        assert config.twilio_memory_config.memory_store_id == "MGtest123"
+        assert config.twilio_memory_config.trait_groups == ["Contact", "Preferences"]
 
     def test_config_json_schema(self):
         """Test that config has valid JSON schema."""

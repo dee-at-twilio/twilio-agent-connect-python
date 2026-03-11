@@ -100,12 +100,20 @@ class TestVoiceChannel:
         """Test handling prompt message retrieves memory when auto_retrieve_memory=True."""
         # Create config with memory enabled
         config = get_test_config()
-        config["twilio_memory_config"] = {
-            "memory_store_id": "MGtest123",
-            "api_key": "test_api_key",
-            "api_token": "test_api_token",
-        }
+        from tac.core.config import TwilioMemoryConfig
+
+        config["twilio_memory_config"] = TwilioMemoryConfig(trait_groups=["Contact"])
         tac = TAC(config)
+
+        # Manually create memora_client for this test
+        from tac.context.memory import MemoryClient
+
+        tac.memora_client = MemoryClient(
+            base_url=tac.config.memora_base_url,
+            store_id="MGtest123",
+            api_key=tac.config.api_key,
+            api_token=tac.config.api_token,
+        )
 
         # Mock the memory retrieval
         mock_memory_response = MemoryRetrievalResponse(

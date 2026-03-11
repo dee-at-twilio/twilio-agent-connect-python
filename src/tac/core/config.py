@@ -66,13 +66,10 @@ class TwilioMemoryConfig(BaseModel):
     """
     Configuration for Twilio Memory Service integration.
 
-    This config should only be provided if you have purchased Twilio Memory functionality.
-    When provided, TAC will automatically retrieve memory for SMS conversations.
+    Note: Memory client is always initialized automatically by fetching memory_store_id
+    from the Maestro configuration. This config only controls optional memory settings
+    like which trait groups to include when fetching profiles.
     """
-
-    memory_store_id: str = Field(
-        description="Memory Store ID (starts with mem_store_ or mem_service_)",
-    )
 
     trait_groups: Optional[list[str]] = Field(
         default=None,
@@ -82,50 +79,41 @@ class TwilioMemoryConfig(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "memory_store_id": "mem_service_xxxxxxxxxxxxxxxxxx",
                 "trait_groups": ["Contact", "Preferences"],
             }
         },
     )
 
     @classmethod
-    def from_env(cls) -> Optional["TwilioMemoryConfig"]:
+    def from_env(cls) -> "TwilioMemoryConfig":
         """
         Create TwilioMemoryConfig from environment variables.
 
         Loads configuration from the following environment variables:
-        - TWILIO_TAC_MEMORY_STORE_ID: Memory Store ID (starts with mem_store_ or mem_service_)
         - TWILIO_TAC_TRAIT_GROUPS: Comma-separated list of trait groups (optional)
 
         Returns:
-            TwilioMemoryConfig instance if memory_store_id is set, None otherwise.
+            TwilioMemoryConfig instance with parsed trait groups from environment,
+            or default values if no environment variables are set.
 
         Example:
-            >>> # From environment variables
+            >>> # With trait groups from environment
             >>> config = TwilioMemoryConfig.from_env()
 
-            >>> # Or manually construct with custom trait_groups
-            >>> config = TwilioMemoryConfig(
-            >>>     memory_store_id="mem_service_123",
-            >>>     trait_groups=["Contact", "Preferences"],
-            >>> )
-        """
-        memory_store_id = os.environ.get("TWILIO_TAC_MEMORY_STORE_ID")
+            >>> # Or manually construct
+            >>> config = TwilioMemoryConfig(trait_groups=["Contact", "Preferences"])
 
-        # Return None if memory_store_id is missing
-        if not memory_store_id:
-            return None
+            >>> # Without trait groups (all traits included)
+            >>> config = TwilioMemoryConfig()
+        """
+        trait_groups_str = os.environ.get("TWILIO_TAC_TRAIT_GROUPS")
 
         # Parse trait groups from environment variable
         trait_groups = None
-        trait_groups_str = os.environ.get("TWILIO_TAC_TRAIT_GROUPS")
         if trait_groups_str:
             trait_groups = [g.strip() for g in trait_groups_str.split(",")]
 
-        return cls(
-            memory_store_id=memory_store_id,
-            trait_groups=trait_groups,
-        )
+        return cls(trait_groups=trait_groups)
 
 
 class TACConfig(BaseModel):
@@ -146,9 +134,9 @@ class TACConfig(BaseModel):
 
     twilio_memory_config: Optional[TwilioMemoryConfig] = Field(
         default=None,
-        description="Optional Twilio Memory configuration. Provide this if you have "
-        "purchased Twilio Memory functionality. When provided, memory will be "
-        "automatically retrieved for SMS conversations.",
+        description="Optional Twilio Memory configuration for controlling which trait groups "
+        "to include when fetching profiles. Note: Memory client is always initialized "
+        "automatically from Maestro configuration - this only configures trait group filtering.",
     )
 
     twilio_account_sid: str = Field(description="Twilio Account SID")
@@ -228,7 +216,6 @@ class TACConfig(BaseModel):
                 "api_token": "your_api_token_here",
                 "twilio_phone_number": "your_phone_number_here",
                 "twilio_memory_config": {
-                    "memory_store_id": "mem_service_xxxxxxxxxxxxxxxxxx",
                     "trait_groups": ["Contact", "Preferences"],
                 },
                 "conversation_intelligence_config": {
@@ -260,7 +247,6 @@ class TACConfig(BaseModel):
 
         Memory configuration is automatically loaded via TwilioMemoryConfig.from_env()
         from these environment variables (all optional):
-        - TWILIO_TAC_MEMORY_STORE_ID: Memory Store ID
         - TWILIO_TAC_TRAIT_GROUPS: Comma-separated list of trait groups
 
         Conversation Intelligence configuration is automatically loaded via
@@ -270,7 +256,6 @@ class TACConfig(BaseModel):
         - TWILIO_TAC_CI_SUMMARY_OPERATOR_SID: Operator SID for summaries
 
         Returns:
-            TACConfig instance with all configuration loaded from environment.
 
         Raises:
             KeyError: If required environment variables are not set.

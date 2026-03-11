@@ -24,7 +24,7 @@ class SMSChannel(BaseChannel):
     SMS-specific metadata extraction.
     """
 
-    def __init__(self, tac: TAC, dedup_capacity: int = 10000, auto_retrieve_memory: bool = True):
+    def __init__(self, tac: TAC, dedup_capacity: int = 10000, auto_retrieve_memory: bool = False):
         """
         Initialize SMS channel with idempotency-based deduplication.
 
@@ -33,9 +33,9 @@ class SMSChannel(BaseChannel):
             dedup_capacity: Maximum number of idempotency tokens to track.
                           Default 10000 is suitable for most applications.
                           Uses Twilio's i-twilio-idempotency-token header for deduplication.
-            auto_retrieve_memory: If True (default), automatically retrieve memory
-                before invoking the on_message_ready callback. Set to False to
-                disable automatic memory retrieval.
+            auto_retrieve_memory: If True, automatically retrieve memory
+                before invoking the on_message_ready callback. Default is False.
+                Set to True to enable automatic memory retrieval.
 
         Raises:
             ValueError: If twilio_phone_number is not configured

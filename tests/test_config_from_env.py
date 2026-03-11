@@ -8,19 +8,17 @@ from tac.core.config import TACConfig, TwilioMemoryConfig
 class TestTwilioMemoryConfigFromEnv:
     """Test suite for TwilioMemoryConfig.from_env() factory method."""
 
-    def test_from_env_with_all_required_vars(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Test from_env() creates config when all required env vars are set."""
-        monkeypatch.setenv("TWILIO_TAC_MEMORY_STORE_ID", "mem_service_123")
+    def test_from_env_no_vars_set(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Test from_env() returns empty config when no environment variables are set."""
+        monkeypatch.delenv("TWILIO_TAC_TRAIT_GROUPS", raising=False)
 
         config = TwilioMemoryConfig.from_env()
 
         assert config is not None
-        assert config.memory_store_id == "mem_service_123"
         assert config.trait_groups is None
 
     def test_from_env_with_trait_groups_env_var(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test from_env() parses TWILIO_TAC_TRAIT_GROUPS from environment."""
-        monkeypatch.setenv("TWILIO_TAC_MEMORY_STORE_ID", "mem_service_123")
         monkeypatch.setenv("TWILIO_TAC_TRAIT_GROUPS", "Contact, Preferences, Custom")
 
         config = TwilioMemoryConfig.from_env()
@@ -28,25 +26,8 @@ class TestTwilioMemoryConfigFromEnv:
         assert config is not None
         assert config.trait_groups == ["Contact", "Preferences", "Custom"]
 
-    def test_from_env_missing_memory_store_id(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Test from_env() returns None when TWILIO_TAC_MEMORY_STORE_ID is missing."""
-        monkeypatch.delenv("TWILIO_TAC_MEMORY_STORE_ID", raising=False)
-
-        config = TwilioMemoryConfig.from_env()
-
-        assert config is None
-
-    def test_from_env_no_vars_set(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Test from_env() returns None when no environment variables are set."""
-        monkeypatch.delenv("TWILIO_TAC_MEMORY_STORE_ID", raising=False)
-
-        config = TwilioMemoryConfig.from_env()
-
-        assert config is None
-
     def test_from_env_empty_trait_groups(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test from_env() handles empty TWILIO_TAC_TRAIT_GROUPS environment variable."""
-        monkeypatch.setenv("TWILIO_TAC_MEMORY_STORE_ID", "mem_service_123")
         monkeypatch.setenv("TWILIO_TAC_TRAIT_GROUPS", "")
 
         config = TwilioMemoryConfig.from_env()
@@ -87,18 +68,18 @@ class TestTACConfigFromEnv:
         assert config.api_token == "test_api_token"
         assert config.twilio_phone_number == "+1234567890"
         assert config.log_level == "INFO"  # Default
-        assert config.twilio_memory_config is None  # Memory vars not set
+        # Always returns config (memory store ID auto-fetched)
+        assert config.twilio_memory_config is not None
+        assert config.twilio_memory_config.trait_groups is None  # No trait groups env var set
 
     def test_from_env_with_memory_config(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test from_env() includes memory config when memory env vars are set."""
         self._set_all_env_vars(monkeypatch)
-        monkeypatch.setenv("TWILIO_TAC_MEMORY_STORE_ID", "mem_service_123")
         monkeypatch.setenv("TWILIO_TAC_TRAIT_GROUPS", "Contact, Preferences")
 
         config = TACConfig.from_env()
 
         assert config.twilio_memory_config is not None
-        assert config.twilio_memory_config.memory_store_id == "mem_service_123"
         assert config.twilio_memory_config.trait_groups == ["Contact", "Preferences"]
 
     def test_from_env_with_custom_log_level(self, monkeypatch: pytest.MonkeyPatch) -> None:

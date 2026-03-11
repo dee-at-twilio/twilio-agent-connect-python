@@ -96,6 +96,7 @@ class ParticipantAddress(BaseModel):
 class ConversationConfiguration(BaseModel):
     """Configuration settings for a conversation response."""
 
+    id: str = Field(..., description="Configuration ID")
     display_name: Optional[str] = Field(
         None,
         alias="displayName",
@@ -103,18 +104,18 @@ class ConversationConfiguration(BaseModel):
         pattern=r"^[a-zA-Z0-9-_ ]+$",
         description="A human-readable name for the configuration. Limited to 32 characters.",
     )
-    description: Optional[str] = Field(
-        None,
+    description: str = Field(
+        ...,
         description=(
             "Human-readable description for the configuration. "
             "Allows spaces and special characters, typically limited to a paragraph of text. "
             "This serves as a descriptive field rather than just a name."
         ),
     )
-    conversation_grouping_type: Optional[
-        Literal["GROUP_BY_PARTICIPANT_ADDRESSES", "GROUP_BY_PARTICIPANT_ADDRESSES_AND_CHANNEL_TYPE"]
+    conversation_grouping_type: Literal[
+        "GROUP_BY_PARTICIPANT_ADDRESSES", "GROUP_BY_PARTICIPANT_ADDRESSES_AND_CHANNEL_TYPE"
     ] = Field(
-        None,
+        ...,
         alias="conversationGroupingType",
         description=(
             "Type of Conversation grouping strategy:\n"
@@ -126,10 +127,10 @@ class ConversationConfiguration(BaseModel):
             "a different conversation than the same customer via WhatsApp."
         ),
     )
-    memory_store_id: Optional[str] = Field(
-        None,
+    memory_store_id: str = Field(
+        ...,
         alias="memoryStoreId",
-        description="Memory Store ID for Profile Resolution",
+        description="Memory Store ID for Profile Resolution using Twilio Type ID (TTID) format",
     )
     channel_settings: Optional[dict[str, ChannelSettings]] = Field(
         None,
@@ -141,6 +142,7 @@ class ConversationConfiguration(BaseModel):
     status_callbacks: Optional[list[StatusCallback]] = Field(
         None,
         alias="statusCallbacks",
+        max_length=20,
         description=(
             "List of default webhook configurations applied to "
             "conversations under this configuration"
@@ -149,8 +151,16 @@ class ConversationConfiguration(BaseModel):
     intelligence_configuration_ids: Optional[list[str]] = Field(
         None,
         alias="intelligenceConfigurationIds",
+        max_length=5,
         description="List of Intelligence Configuration IDs for this configuration",
     )
+    created_at: Optional[str] = Field(
+        None, alias="createdAt", description="Timestamp when this configuration was created"
+    )
+    updated_at: Optional[str] = Field(
+        None, alias="updatedAt", description="Timestamp when this configuration was last updated"
+    )
+    version: Optional[int] = Field(None, description="Version number used for optimistic locking")
 
     model_config = {"populate_by_name": True}
 
@@ -191,9 +201,6 @@ class ConversationResponse(BaseModel):
     name: Optional[str] = Field(None, description="Conversation name")
     configuration_id: Optional[str] = Field(
         None, alias="configurationId", description="Configuration used to create this conversation"
-    )
-    configuration: Optional[ConversationConfiguration] = Field(
-        None, description="Conversation configuration settings"
     )
     created_at: Optional[str] = Field(None, alias="createdAt", description="Creation timestamp")
     updated_at: Optional[str] = Field(None, alias="updatedAt", description="Last update timestamp")

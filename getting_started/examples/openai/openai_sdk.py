@@ -25,6 +25,13 @@ logger = get_logger(__name__)
 
 # Initialize TAC and channels
 tac = TAC(config=TACConfig.from_env())
+
+# Note: To use Twilio Memory Service for automatic memory retrieval:
+# 1. Configure a memory store in your Twilio Maestro configuration
+# 2. Set auto_retrieve_memory=True when initializing channels:
+#    voice_channel = VoiceChannel(tac, auto_retrieve_memory=True)
+#    sms_channel = SMSChannel(tac, auto_retrieve_memory=True)
+# Memory will be automatically retrieved and passed to on_message_ready callback
 voice_channel = VoiceChannel(tac)
 sms_channel = SMSChannel(tac)
 

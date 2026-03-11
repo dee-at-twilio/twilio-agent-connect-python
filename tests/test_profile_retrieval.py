@@ -7,6 +7,7 @@ import pytest
 
 from tac import TAC, TACConfig
 from tac.channels.sms import SMSChannel
+from tac.context.memory import MemoryClient
 from tac.core.config import TwilioMemoryConfig
 from tac.models.memory import (
     MemoryRetrievalMeta,
@@ -82,7 +83,6 @@ def create_communication_created_webhook(
 def get_test_config_with_trait_groups(trait_groups: Optional[list[str]] = None) -> TACConfig:
     """Get test configuration with optional trait groups."""
     memory_config = TwilioMemoryConfig(
-        memory_store_id="MGtest123",
         trait_groups=trait_groups,
     )
     return TACConfig(
@@ -94,6 +94,16 @@ def get_test_config_with_trait_groups(trait_groups: Optional[list[str]] = None) 
         api_token="test_api_token",
         twilio_phone_number="+15551234567",
         twilio_memory_config=memory_config,
+    )
+
+
+def create_memora_client(tac: TAC) -> MemoryClient:
+    """Helper to manually create memora_client for tests."""
+    return MemoryClient(
+        base_url=tac.config.memora_base_url,
+        store_id="MGtest123",
+        api_key=tac.config.api_key,
+        api_token=tac.config.api_token,
     )
 
 
@@ -130,6 +140,7 @@ class TestProfileRetrieval:
         """Test that profile is fetched with configured trait groups."""
         config = get_test_config_with_trait_groups(trait_groups=["Contact", "Preferences"])
         tac = TAC(config)
+        tac.memora_client = create_memora_client(tac)
 
         mock_profile = get_mock_profile_response()
 
@@ -154,6 +165,7 @@ class TestProfileRetrieval:
         """Test that profile is fetched without trait_groups when not configured."""
         config = get_test_config_with_trait_groups(trait_groups=None)
         tac = TAC(config)
+        tac.memora_client = create_memora_client(tac)
 
         mock_profile = get_mock_profile_response()
 
@@ -175,6 +187,7 @@ class TestProfileRetrieval:
         """Test that profile fetch errors are handled gracefully."""
         config = get_test_config_with_trait_groups()
         tac = TAC(config)
+        tac.memora_client = create_memora_client(tac)
 
         # Simulate an error during profile fetch
         tac.memora_client.get_profile = AsyncMock(side_effect=Exception("API Error"))
@@ -184,34 +197,11 @@ class TestProfileRetrieval:
         assert profile is None
 
     @pytest.mark.asyncio
-    async def test_profile_fetch_without_memory_config(self) -> None:
-        """Test that profile fetch returns None when memory config is not provided."""
-        config = TACConfig(
-            environment="prod",
-            conversation_service_sid="IStest123",
-            twilio_account_sid="ACtest123",
-            twilio_auth_token="test_token_123",
-            api_key="SK123",
-            api_token="test_api_token",
-            twilio_phone_number="+15551234567",
-            twilio_memory_config=None,  # No memory config
-        )
-        tac = TAC(config)
-
-        # Verify memora_client is None
-        assert tac.memora_client is None
-
-        # Attempt to fetch profile
-        profile = await tac.fetch_profile("profile_test_123")
-
-        # Should return None without error
-        assert profile is None
-
-    @pytest.mark.asyncio
     async def test_profile_fetch_with_empty_profile_id(self) -> None:
         """Test that profile fetch handles empty profile_id gracefully."""
         config = get_test_config_with_trait_groups()
         tac = TAC(config)
+        tac.memora_client = create_memora_client(tac)
 
         # Test with empty string
         profile = await tac.fetch_profile("")
@@ -227,6 +217,7 @@ class TestProfileInSMSChannel:
         with patch("tac.channels.sms.Client"):
             config = get_test_config_with_trait_groups(trait_groups=["Contact"])
             tac = TAC(config)
+            tac.memora_client = create_memora_client(tac)
             channel = SMSChannel(tac, auto_retrieve_memory=True)  # Enable auto retrieval
 
             # Track callback data
@@ -301,6 +292,7 @@ class TestProfileInSMSChannel:
 
             config = get_test_config_with_trait_groups(trait_groups=["Contact"])
             tac = TAC(config)
+            tac.memora_client = create_memora_client(tac)
             channel = SMSChannel(tac, auto_retrieve_memory=False)
 
             mock_profile = get_mock_profile_response()
@@ -328,6 +320,7 @@ class TestProfileInSMSChannel:
         with patch("tac.channels.sms.Client"):
             config = get_test_config_with_trait_groups()
             tac = TAC(config)
+            tac.memora_client = create_memora_client(tac)
             channel = SMSChannel(tac, auto_retrieve_memory=True)  # Enable auto retrieval
 
             mock_profile = get_mock_profile_response()
@@ -381,6 +374,7 @@ class TestProfileInSMSChannel:
         with patch("tac.channels.sms.Client"):
             config = get_test_config_with_trait_groups()
             tac = TAC(config)
+            tac.memora_client = create_memora_client(tac)
             channel = SMSChannel(tac, auto_retrieve_memory=True)  # Enable auto retrieval
 
             mock_profile_v1 = ProfileResponse(
@@ -488,6 +482,7 @@ class TestProfileLookup:
         """Test profile lookup by phone number."""
         config = get_test_config_with_trait_groups()
         tac = TAC(config)
+        tac.memora_client = create_memora_client(tac)
 
         mock_lookup_response = ProfileLookupResponse(
             normalizedValue="+13175556789",
@@ -514,6 +509,7 @@ class TestProfileLookup:
         """Test profile lookup by email address."""
         config = get_test_config_with_trait_groups()
         tac = TAC(config)
+        tac.memora_client = create_memora_client(tac)
 
         mock_lookup_response = ProfileLookupResponse(
             normalizedValue="test@example.com",
@@ -533,6 +529,7 @@ class TestProfileLookup:
         """Test profile lookup with multiple matching profiles."""
         config = get_test_config_with_trait_groups()
         tac = TAC(config)
+        tac.memora_client = create_memora_client(tac)
 
         mock_lookup_response = ProfileLookupResponse(
             normalizedValue="+13175556789",
@@ -555,6 +552,7 @@ class TestProfileLookup:
         """Test profile lookup with no matching profiles."""
         config = get_test_config_with_trait_groups()
         tac = TAC(config)
+        tac.memora_client = create_memora_client(tac)
 
         mock_lookup_response = ProfileLookupResponse(
             normalizedValue="+13175556789",
@@ -572,6 +570,7 @@ class TestProfileLookup:
         """Test profile lookup error handling."""
         config = get_test_config_with_trait_groups()
         tac = TAC(config)
+        tac.memora_client = create_memora_client(tac)
 
         # Simulate API error
         tac.memora_client.lookup_profile = AsyncMock(

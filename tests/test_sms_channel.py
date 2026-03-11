@@ -125,9 +125,9 @@ def get_test_config(with_memory: bool = True) -> dict[str, Any]:
         "twilio_phone_number": "+15551234567",
     }
     if with_memory:
-        config["twilio_memory_config"] = {
-            "memory_store_id": "MGtest123",
-        }
+        from tac.core.config import TwilioMemoryConfig
+
+        config["twilio_memory_config"] = TwilioMemoryConfig(trait_groups=["Contact"])
     return config
 
 
@@ -170,6 +170,17 @@ class TestSMSChannel:
     async def test_process_message_auto_initialize(self) -> None:
         """Test processing message auto-initializes conversation if not started."""
         tac = TAC(get_test_config())
+
+        # Manually create memora_client for this test
+        from tac.context.memory import MemoryClient
+
+        tac.memora_client = MemoryClient(
+            base_url=tac.config.memora_base_url,
+            store_id="MGtest123",
+            api_key=tac.config.api_key,
+            api_token=tac.config.api_token,
+        )
+
         channel = SMSChannel(tac, auto_retrieve_memory=False)
 
         # Callback to capture context
@@ -211,7 +222,18 @@ class TestSMSChannel:
     async def test_process_message_with_existing_conversation(self) -> None:
         """Test processing message with pre-existing conversation."""
         tac = TAC(get_test_config())
-        channel = SMSChannel(tac)  # auto_retrieve_memory=True to test memory retrieval
+
+        # Manually create memora_client for this test
+        from tac.context.memory import MemoryClient
+
+        tac.memora_client = MemoryClient(
+            base_url=tac.config.memora_base_url,
+            store_id="MGtest123",
+            api_key=tac.config.api_key,
+            api_token=tac.config.api_token,
+        )
+
+        channel = SMSChannel(tac, auto_retrieve_memory=True)  # Enable memory retrieval for test
 
         # Start conversation via participant added
         participant_webhook = create_participant_added_webhook(
@@ -240,6 +262,17 @@ class TestSMSChannel:
     async def test_process_empty_message_ignored(self) -> None:
         """Test that empty messages are ignored."""
         tac = TAC(get_test_config())
+
+        # Manually create memora_client for this test
+        from tac.context.memory import MemoryClient
+
+        tac.memora_client = MemoryClient(
+            base_url=tac.config.memora_base_url,
+            store_id="MGtest123",
+            api_key=tac.config.api_key,
+            api_token=tac.config.api_token,
+        )
+
         channel = SMSChannel(tac, auto_retrieve_memory=False)
 
         webhook_data = create_communication_created_webhook(

@@ -7,6 +7,8 @@ import pytest
 
 from tac import TAC, TACConfig
 from tac.channels.sms import SMSChannel
+from tac.context.memory import MemoryClient
+from tac.core.config import TwilioMemoryConfig
 from tac.models.memory import MemoryRetrievalMeta, MemoryRetrievalResponse
 from tac.models.session import ConversationSession
 from tac.models.tac import TACMemoryResponse
@@ -124,10 +126,18 @@ def get_test_config(with_memory=True):
         "twilio_phone_number": "+15551234567",
     }
     if with_memory:
-        config["twilio_memory_config"] = {
-            "memory_store_id": "MGtest123",
-        }
+        config["twilio_memory_config"] = TwilioMemoryConfig(trait_groups=["Contact"])
     return config
+
+
+def create_memora_client(tac: TAC) -> MemoryClient:
+    """Helper to manually create memora_client for tests."""
+    return MemoryClient(
+        base_url=tac.config.memora_base_url,
+        store_id="MGtest123",
+        api_key=tac.config.api_key,
+        api_token=tac.config.api_token,
+    )
 
 
 class TestTACIntegration:
@@ -174,7 +184,8 @@ class TestTACIntegration:
             )
 
             tac = TAC(get_test_config())
-            channel = SMSChannel(tac)  # auto_retrieve_memory=True to test memory retrieval
+            tac.memora_client = create_memora_client(tac)
+            channel = SMSChannel(tac, auto_retrieve_memory=True)  # Enable memory retrieval for test
 
             # Track callback invocations
             callback_invoked = False
@@ -239,6 +250,7 @@ class TestTACIntegration:
         """Test SMS channel auto-initializes conversation on first message."""
         with patch("tac.channels.sms.Client"):
             tac = TAC(get_test_config())
+            tac.memora_client = create_memora_client(tac)
             channel = SMSChannel(tac, auto_retrieve_memory=False)
 
             callback_invoked = False
@@ -288,6 +300,7 @@ class TestTACIntegration:
             )
 
             tac = TAC(get_test_config())
+            tac.memora_client = create_memora_client(tac)
             channel = SMSChannel(tac, auto_retrieve_memory=False)
 
             callback_invoked = False
@@ -375,6 +388,7 @@ class TestTACIntegration:
             )
 
             tac = TAC(get_test_config())
+            tac.memora_client = create_memora_client(tac)
             channel = SMSChannel(tac, auto_retrieve_memory=False)
 
             callback_count = 0
@@ -431,6 +445,7 @@ class TestTACIntegration:
         """Test SMS channel with real-world webhook data including all fields."""
         with patch("tac.channels.sms.Client"):
             tac = TAC(get_test_config())
+            tac.memora_client = create_memora_client(tac)
             channel = SMSChannel(tac, auto_retrieve_memory=False)
 
             callback_invoked = False

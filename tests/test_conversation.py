@@ -31,7 +31,6 @@ class TestConversationModels:
             "name": "Test Conversation",
             "created_at": "2025-01-01T00:00:00Z",
             "updated_at": "2025-01-01T01:00:00Z",
-            "configuration": {"intelligenceConfigurationIds": ["IS001", "IS002"]},
         }
 
         conversation = ConversationResponse(**response_data)
@@ -43,8 +42,6 @@ class TestConversationModels:
         assert conversation.name == "Test Conversation"
         assert conversation.created_at == "2025-01-01T00:00:00Z"
         assert conversation.updated_at == "2025-01-01T01:00:00Z"
-        assert conversation.configuration is not None
-        assert conversation.configuration.intelligence_configuration_ids == ["IS001", "IS002"]
 
     def test_conversation_response_minimal_fields(self):
         """Test ConversationResponse with only required fields."""
@@ -62,7 +59,6 @@ class TestConversationModels:
         assert conversation.name is None
         assert conversation.created_at is None
         assert conversation.updated_at is None
-        assert conversation.configuration is None
 
     def test_conversation_request_model(self):
         """Test ConversationRequest model with all fields."""
@@ -788,3 +784,121 @@ class TestConversationClient:
 
         with pytest.raises(httpx.HTTPError, match="API Error"):
             await client.list_communications(conversation_id="CH123456")
+
+    @pytest.mark.no_auto_mock
+    def test_get_configuration_success(self):
+        """Test successful configuration retrieval."""
+        from tac.models.conversation import ConversationConfiguration
+
+        mock_response = Mock()
+        mock_response.json.return_value = {
+            "id": "IS123456",
+            "memoryStoreId": "MGtest123",
+            "displayName": "Test Configuration",
+            "description": "Test configuration description",
+            "conversationGroupingType": "GROUP_BY_PARTICIPANT_ADDRESSES_AND_CHANNEL_TYPE",
+        }
+        mock_response.raise_for_status = Mock()
+
+        mock_client = Mock()
+        mock_client.get = Mock(return_value=mock_response)
+        mock_client.__enter__ = Mock(return_value=mock_client)
+        mock_client.__exit__ = Mock(return_value=False)
+
+        client = ConversationClient(
+            base_url="https://maestro.twilio.com",
+            api_key="SK123456",
+            api_token="test_token",
+            service_id="IS123456",
+        )
+
+        with patch.object(client, "_get_sync_client", return_value=mock_client):
+            result = client.get_configuration(configuration_id="IS123456")
+
+        # Verify API call
+        expected_url = "https://maestro.twilio.com/v2/ControlPlane/Configurations/IS123456"
+        mock_client.get.assert_called_once_with(expected_url)
+
+        # Verify response
+        assert isinstance(result, ConversationConfiguration)
+        assert result.id == "IS123456"
+        assert result.memory_store_id == "MGtest123"
+        assert result.display_name == "Test Configuration"
+
+    @pytest.mark.no_auto_mock
+    def test_get_configuration_http_error(self):
+        """Test get_configuration handles HTTP errors."""
+        mock_response = Mock()
+        mock_response.raise_for_status = Mock(
+            side_effect=httpx.HTTPStatusError(
+                "401 Unauthorized",
+                request=Mock(),
+                response=Mock(status_code=401, text='{"error": "Unauthorized"}'),
+            )
+        )
+
+        mock_client = Mock()
+        mock_client.get = Mock(return_value=mock_response)
+        mock_client.__enter__ = Mock(return_value=mock_client)
+        mock_client.__exit__ = Mock(return_value=False)
+
+        client = ConversationClient(
+            base_url="https://maestro.twilio.com",
+            api_key="SK123456",
+            api_token="test_token",
+            service_id="IS123456",
+        )
+
+        with patch.object(client, "_get_sync_client", return_value=mock_client):
+            with pytest.raises(httpx.HTTPStatusError, match="401 Unauthorized"):
+                client.get_configuration(configuration_id="IS123456")
+
+    @pytest.mark.no_auto_mock
+    def test_get_configuration_validation_error(self):
+        """Test get_configuration handles schema validation errors."""
+        mock_response = Mock()
+        # Missing required field 'description'
+        mock_response.json.return_value = {
+            "id": "IS123456",
+            "memoryStoreId": "MGtest123",
+            "displayName": "Test Configuration",
+            # Missing 'description' - required field
+            "conversationGroupingType": "GROUP_BY_PARTICIPANT_ADDRESSES_AND_CHANNEL_TYPE",
+        }
+        mock_response.raise_for_status = Mock()
+        mock_response.text = '{"id":"IS123456","memoryStoreId":"MGtest123"}'
+
+        mock_client = Mock()
+        mock_client.get = Mock(return_value=mock_response)
+        mock_client.__enter__ = Mock(return_value=mock_client)
+        mock_client.__exit__ = Mock(return_value=False)
+
+        client = ConversationClient(
+            base_url="https://maestro.twilio.com",
+            api_key="SK123456",
+            api_token="test_token",
+            service_id="IS123456",
+        )
+
+        with patch.object(client, "_get_sync_client", return_value=mock_client):
+            with pytest.raises(ValueError, match="Invalid configuration response schema"):
+                client.get_configuration(configuration_id="IS123456")
+
+    @pytest.mark.no_auto_mock
+    def test_get_configuration_network_error(self):
+        """Test get_configuration handles network errors."""
+        mock_client = Mock()
+        mock_client.get = Mock(side_effect=httpx.NetworkError("Connection failed"))
+        mock_client.__enter__ = Mock(return_value=mock_client)
+        mock_client.__exit__ = Mock(return_value=False)
+
+        client = ConversationClient(
+            base_url="https://maestro.twilio.com",
+            api_key="SK123456",
+            api_token="test_token",
+            service_id="IS123456",
+        )
+
+        with patch.object(client, "_get_sync_client", return_value=mock_client):
+            with pytest.raises(httpx.NetworkError, match="Connection failed"):
+                client.get_configuration(configuration_id="IS123456")
