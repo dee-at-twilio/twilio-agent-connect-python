@@ -86,8 +86,6 @@ select = [
     "N",   # pep8-naming
 ]
 
-[tool.ruff.lint.per-file-ignores]
-"examples/**/*.py" = ["E402", "E501", "N803"]  # Allow import order, long lines, and Twilio parameter names in examples
 
 [tool.ruff.lint.isort]
 known-first-party = ["tac"]
@@ -124,36 +122,11 @@ exclude = [
 module = ["src.tac.*", "twilio.*"]  # twilio.* added to ignore missing type stubs
 ignore_missing_imports = true
 
-# Bedrock examples use boto3 which lacks type stubs
-[[tool.mypy.overrides]]
-module = ["examples.agents.bedrock.*"]
-ignore_errors = true
-
-# Scripts and tools examples have Optional/complex typing issues
-[[tool.mypy.overrides]]
-module = ["examples.scripts.*", "examples.tools.*"]
-ignore_errors = true
-
-# exec_demo uses Python 3.10 syntax and local imports
-[[tool.mypy.overrides]]
-module = ["examples.exec_demo.*"]
-ignore_errors = true
-
 # Ignore mcp module to avoid Python 3.10 syntax errors when checking with 3.9
 [[tool.mypy.overrides]]
 module = "mcp.*"
 ignore_errors = true
 follow_imports = "skip"
-
-# voice_escalation has complex OpenAI API overload issues
-[[tool.mypy.overrides]]
-module = ["examples.channels.voice_escalation"]
-ignore_errors = true
-
-# Relaxed rules for examples (allow untyped decorators like @app.post())
-[[tool.mypy.overrides]]
-module = ["examples.*"]
-disallow_untyped_decorators = false
 
 [tool.pytest.ini_options]
 minversion = "7.0"
