@@ -30,7 +30,26 @@ The wizard will:
 
 Create services manually through the [Twilio Console](https://1console.twilio.com/).
 
-## Step 2: Run the Example
+## Step 2: Choose an Example
+
+TAC includes examples for different integration approaches:
+
+### `overview.py` - Framework-Agnostic Pattern
+
+Learn the core pattern for manually extracting and injecting TAC memory into **any** agent framework:
+- Works with OpenAI, AWS Bedrock, Azure AI, GCP Vertex AI, custom agents
+- Full control over memory formatting and injection
+- Uses TAC's official `MemoryPromptBuilder` utility
+- **Start here** to understand how TAC memory works
+
+### `openai/` - OpenAI SDK with Adapter
+
+Production-ready example using the OpenAI adapter:
+- Automatic memory injection with `with_tac_memory()`
+- Less boilerplate, more convention-based
+- Best for OpenAI SDK users who want plug-and-play integration
+
+## Step 3: Run an Example
 
 ### Install Dependencies
 
@@ -53,6 +72,10 @@ See the **Environment Variables** section below for details.
 ### Run the Server
 
 ```bash
+# Run overview example
+python overview.py
+
+# Or run OpenAI example
 python openai/openai_sdk.py
 ```
 
@@ -66,6 +89,8 @@ ngrok http 8000
 ```
 
 Update `TWILIO_TAC_VOICE_PUBLIC_DOMAIN` in your `.env` file with the ngrok URL (without `https://`).
+
+Restart the server to pick up the new configuration.
 
 ## Environment Variables
 
@@ -90,7 +115,8 @@ See `examples/.env.example` for all available configuration options. Key variabl
 
 ## Next Steps
 
-- Customize the agent's behavior by modifying the message handler in `examples/openai/openai_sdk.py`
+- Start with `examples/overview.py` to learn the core memory injection pattern
+- Try the `examples/openai/` example for a production-ready OpenAI integration
+- Customize the agent's behavior by modifying the message handler
 - Add tool calling to enable agent actions beyond text responses
 - Explore the main [README](../README.md) for advanced features
-- Review [CLAUDE.md](../CLAUDE.md) for architecture and development guidelines
