@@ -56,6 +56,6 @@ Tests are in `tests/` — one test file per module (e.g., `test_tac.py`, `test_s
 
 ## Dependencies
 
-- **Core**: `pydantic>=2`, `requests>=2.31`, `python-dotenv>=1`, `twilio>=9.8.3`
+- **Core**: `pydantic>=2`, `requests>=2.31`, `httpx>=0.27`, `twilio>=9.8.3`
 - **Server** (optional): `fastapi`, `uvicorn`, `python-multipart` — install with `pip install tac[server]`
 - **Dev**: `pytest`, `ruff`, `mypy`, `openai`, `openai-agents`

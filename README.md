@@ -78,6 +78,8 @@ First, install the required packages:
 uv add openai python-dotenv
 ```
 
+> **Note**: `python-dotenv` is optional — TAC works with environment variables from any source (`.env` files, Docker, Kubernetes, CI/CD, shell exports, etc.).
+
 Then create your application:
 
 ```python
