@@ -44,10 +44,11 @@ Learn the core pattern for manually extracting and injecting TAC memory into **a
 
 ### `openai/` - OpenAI SDK with Adapter
 
-Production-ready example using the OpenAI adapter:
+Production-ready examples using the OpenAI adapter:
+- **`chat_completions.py`**: Chat Completions API
+- **`responses_api.py`**: Responses API
 - Automatic memory injection with `with_tac_memory()`
 - Less boilerplate, more convention-based
-- Best for OpenAI SDK users who want plug-and-play integration
 
 ## Step 3: Run an Example
 
@@ -72,11 +73,14 @@ See the **Environment Variables** section below for details.
 ### Run the Server
 
 ```bash
-# Run overview example
+# Run overview example (framework-agnostic)
 python overview.py
 
-# Or run OpenAI example
-python openai/openai_sdk.py
+# Or run OpenAI Chat Completions example
+python openai/chat_completions.py
+
+# Or run OpenAI Responses API example
+python openai/responses_api.py
 ```
 
 ### Expose Your Server

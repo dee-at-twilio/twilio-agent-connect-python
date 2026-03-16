@@ -38,6 +38,11 @@ def mock_openai_client() -> Mock:
         }
     )
     client.chat.completions.stream = Mock(return_value=Mock())
+    # Add Responses API
+    client.responses = Mock()
+    client.responses.create = Mock(
+        return_value=Mock(output_text="Test response from Responses API")
+    )
     # Add other attributes that should be proxied
     client.embeddings = Mock()
     client.images = Mock()
@@ -62,6 +67,11 @@ def mock_async_openai_client() -> Mock:
         }
     )
     client.chat.completions.stream = Mock(return_value=Mock())
+    # Add Responses API
+    client.responses = Mock()
+    client.responses.create = AsyncMock(
+        return_value=Mock(output_text="Test async response from Responses API")
+    )
     # Add other attributes that should be proxied
     client.embeddings = Mock()
     client.images = Mock()
@@ -492,6 +502,110 @@ def test_stream_passes_through_kwargs(mock_openai_client: Mock) -> None:
     assert kwargs["max_tokens"] == 150
 
 
+# ========== Responses API Tests ==========
+
+
+def test_responses_api_memory_injection(
+    mock_openai_client: Mock,
+    sample_memory_response: TACMemoryResponse,
+    sample_context: ConversationSession,
+) -> None:
+    """Test that Responses API injects memory into instructions."""
+    wrapper = with_tac_memory(mock_openai_client, sample_memory_response, sample_context)
+
+    wrapper.responses.create(
+        model="gpt-5.4",
+        instructions="You are a helpful assistant.",
+        input=[{"role": "user", "content": "Hello"}],
+    )
+
+    # Check that create was called with enhanced instructions
+    call_args = mock_openai_client.responses.create.call_args
+    enhanced_instructions = call_args[1]["instructions"]
+
+    # Should have memory prepended to instructions
+    assert "Customer prefers email communication" in enhanced_instructions
+    assert "You are a helpful assistant." in enhanced_instructions
+
+
+def test_responses_api_no_injection_without_memory(mock_openai_client: Mock) -> None:
+    """Test that Responses API doesn't inject when memory is absent."""
+    wrapper = with_tac_memory(mock_openai_client)
+
+    original_instructions = "You are a helpful assistant."
+    wrapper.responses.create(
+        model="gpt-5.4",
+        instructions=original_instructions,
+        input=[{"role": "user", "content": "Hello"}],
+    )
+
+    call_args = mock_openai_client.responses.create.call_args
+    enhanced_instructions = call_args[1]["instructions"]
+
+    # Should be unchanged
+    assert enhanced_instructions == original_instructions
+
+
+def test_responses_api_with_profile(
+    mock_openai_client: Mock, sample_context: ConversationSession
+) -> None:
+    """Test that Responses API injects profile traits into instructions."""
+    wrapper = with_tac_memory(mock_openai_client, context=sample_context)
+
+    wrapper.responses.create(
+        model="gpt-5.4",
+        instructions="You are a helpful assistant.",
+        input=[{"role": "user", "content": "Hello"}],
+    )
+
+    call_args = mock_openai_client.responses.create.call_args
+    enhanced_instructions = call_args[1]["instructions"]
+
+    # Check profile traits are in the instructions
+    assert "John Doe" in enhanced_instructions
+    assert "john@example.com" in enhanced_instructions
+
+
+def test_responses_api_without_instructions(
+    mock_openai_client: Mock,
+    sample_memory_response: TACMemoryResponse,
+    sample_context: ConversationSession,
+) -> None:
+    """Test that Responses API can inject memory even without original instructions."""
+    wrapper = with_tac_memory(mock_openai_client, sample_memory_response, sample_context)
+
+    wrapper.responses.create(
+        model="gpt-5.4",
+        input=[{"role": "user", "content": "Hello"}],
+    )
+
+    call_args = mock_openai_client.responses.create.call_args
+    enhanced_instructions = call_args[1]["instructions"]
+
+    # Should have memory as the instructions
+    assert "Customer prefers email communication" in enhanced_instructions
+
+
+def test_responses_api_passes_through_kwargs(mock_openai_client: Mock) -> None:
+    """Test that Responses API passes through other kwargs."""
+    wrapper = with_tac_memory(mock_openai_client)
+
+    wrapper.responses.create(
+        model="gpt-5.4",
+        instructions="You are a helpful assistant.",
+        input=[{"role": "user", "content": "Hello"}],
+        temperature=0.7,
+        max_tokens=100,
+    )
+
+    call_args = mock_openai_client.responses.create.call_args
+    kwargs = call_args[1]
+
+    assert kwargs["model"] == "gpt-5.4"
+    assert kwargs["temperature"] == 0.7
+    assert kwargs["max_tokens"] == 100
+
+
 # ========== Async Tests ==========
 
 
@@ -583,3 +697,51 @@ async def test_async_wrapper_proxies_other_attributes(mock_async_openai_client: 
     # Should proxy to original client
     assert embeddings is mock_async_openai_client.embeddings
     assert images is mock_async_openai_client.images
+
+
+# ========== Async Responses API Tests ==========
+
+
+@pytest.mark.asyncio
+async def test_async_responses_api_memory_injection(
+    mock_async_openai_client: Mock,
+    sample_memory_response: TACMemoryResponse,
+    sample_context: ConversationSession,
+) -> None:
+    """Test that async Responses API injects memory into instructions."""
+    wrapper = with_tac_memory(mock_async_openai_client, sample_memory_response, sample_context)
+
+    await wrapper.responses.create(
+        model="gpt-5.4",
+        instructions="You are a helpful assistant.",
+        input=[{"role": "user", "content": "Hello"}],
+    )
+
+    # Check that create was called with enhanced instructions
+    call_args = mock_async_openai_client.responses.create.call_args
+    enhanced_instructions = call_args[1]["instructions"]
+
+    # Should have memory prepended to instructions
+    assert "Customer prefers email communication" in enhanced_instructions
+    assert "You are a helpful assistant." in enhanced_instructions
+
+
+@pytest.mark.asyncio
+async def test_async_responses_api_no_injection_without_memory(
+    mock_async_openai_client: Mock,
+) -> None:
+    """Test that async Responses API doesn't inject when memory is absent."""
+    wrapper = with_tac_memory(mock_async_openai_client)
+
+    original_instructions = "You are a helpful assistant."
+    await wrapper.responses.create(
+        model="gpt-5.4",
+        instructions=original_instructions,
+        input=[{"role": "user", "content": "Hello"}],
+    )
+
+    call_args = mock_async_openai_client.responses.create.call_args
+    enhanced_instructions = call_args[1]["instructions"]
+
+    # Should be unchanged
+    assert enhanced_instructions == original_instructions

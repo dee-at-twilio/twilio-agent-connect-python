@@ -135,8 +135,9 @@ if __name__ == "__main__":
 
     This approach is framework-agnostic and works with ANY agent or LLM.
 
-    For automatic injection with zero config, see the OpenAI adapter example:
-    `examples/openai/openai_sdk.py`
+    For automatic injection with zero config, see the OpenAI adapter examples:
+    - `examples/openai/chat_completions.py` - Chat Completions API
+    - `examples/openai/responses_api.py` - Responses API
     """
     server = TACServer(tac=tac, voice_channel=voice_channel, sms_channel=sms_channel)
     server.start()

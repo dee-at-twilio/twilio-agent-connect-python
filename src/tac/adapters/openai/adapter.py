@@ -73,6 +73,51 @@ class AsyncTACCompletionsNamespace(_BaseCompletionsNamespace):
         return self._completions.stream(*args, messages=self._enhance_messages(messages), **kwargs)
 
 
+class _BaseResponsesNamespace:
+    """Base class for responses namespace wrappers with shared logic."""
+
+    def __init__(
+        self,
+        responses: Any,
+        memory_response: Optional[TACMemoryResponse],
+        context: Optional[ConversationSession],
+        options: Optional[AdapterOptions],
+    ):
+        self._responses = responses
+        self._memory_response = memory_response
+        self._context = context
+        self._options = options
+
+    def _enhance_instructions(self, instructions: Optional[str]) -> Optional[str]:
+        """Enhance instructions with memory injection."""
+        return _inject_memory_to_instructions(
+            instructions, self._memory_response, self._context, self._options
+        )
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._responses, name)
+
+
+class TACResponsesNamespace(_BaseResponsesNamespace):
+    """Sync wrapper for OpenAI responses namespace with memory injection."""
+
+    def create(self, *args: Any, instructions: Optional[str] = None, **kwargs: Any) -> Any:
+        """Intercepts create() calls to inject memory automatically."""
+        return self._responses.create(
+            *args, instructions=self._enhance_instructions(instructions), **kwargs
+        )
+
+
+class AsyncTACResponsesNamespace(_BaseResponsesNamespace):
+    """Async wrapper for OpenAI responses namespace with memory injection."""
+
+    async def create(self, *args: Any, instructions: Optional[str] = None, **kwargs: Any) -> Any:
+        """Intercepts async create() calls to inject memory automatically."""
+        return await self._responses.create(
+            *args, instructions=self._enhance_instructions(instructions), **kwargs
+        )
+
+
 class _BaseChatNamespace:
     """Base class for chat namespace wrappers with shared logic."""
 
@@ -145,6 +190,12 @@ class TACOpenAIClient(_BaseOpenAIClient):
             self._client.chat, self._memory_response, self._context, self._options
         )
 
+    @property
+    def responses(self) -> TACResponsesNamespace:
+        return TACResponsesNamespace(
+            self._client.responses, self._memory_response, self._context, self._options
+        )
+
 
 class AsyncTACOpenAIClient(_BaseOpenAIClient):
     """
@@ -157,6 +208,12 @@ class AsyncTACOpenAIClient(_BaseOpenAIClient):
     def chat(self) -> AsyncTACChatNamespace:
         return AsyncTACChatNamespace(
             self._client.chat, self._memory_response, self._context, self._options
+        )
+
+    @property
+    def responses(self) -> AsyncTACResponsesNamespace:
+        return AsyncTACResponsesNamespace(
+            self._client.responses, self._memory_response, self._context, self._options
         )
 
 
@@ -268,3 +325,40 @@ def _inject_memory(
     enhanced_messages.insert(0, memory_message)
 
     return enhanced_messages
+
+
+def _inject_memory_to_instructions(
+    instructions: Optional[str],
+    memory_response: Optional[TACMemoryResponse],
+    context: Optional[ConversationSession],
+    options: Optional[AdapterOptions],
+) -> Optional[str]:
+    """
+    Inject TAC memory and profile into OpenAI Responses API instructions.
+
+    Uses MemoryPromptBuilder to create a memory prompt, then prepends it
+    to the instructions parameter.
+
+    Args:
+        instructions: Original instructions for the Responses API
+        memory_response: Memory data from TAC.retrieve_memory()
+        context: Conversation session with profile data
+        options: Adapter options for trait filtering
+
+    Returns:
+        Enhanced instructions with memory prepended,
+        or original instructions if no memory data is available.
+    """
+    # Build memory prompt using shared builder
+    memory_content = MemoryPromptBuilder.build(memory_response, context, options)
+
+    # No memory to inject
+    if not memory_content:
+        return instructions
+
+    logger.debug("[ADAPTER:OPENAI] Injecting memory into instructions")
+
+    # Prepend memory to instructions
+    if instructions:
+        return f"{memory_content}\n\n{instructions}"
+    return memory_content

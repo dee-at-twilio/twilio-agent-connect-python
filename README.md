@@ -99,6 +99,7 @@ sms_channel = SMSChannel(tac)
 openai_client = AsyncOpenAI()
 
 conversation_history = {}
+SYSTEM_INSTRUCTIONS = "You are a helpful customer service agent. Be concise and friendly."
 
 async def handle_message_ready(user_message, context, memory_response):
     conv_id = context.conversation_id
@@ -109,12 +110,13 @@ async def handle_message_ready(user_message, context, memory_response):
 
     client = with_tac_memory(openai_client, memory_response, context)
 
-    response = await client.chat.completions.create(
+    response = await client.responses.create(
         model="gpt-4o",
-        messages=conversation_history[conv_id]
+        instructions=SYSTEM_INSTRUCTIONS,
+        input=conversation_history[conv_id]
     )
 
-    llm_response = response.choices[0].message.content or ""
+    llm_response = response.output_text
     conversation_history[conv_id].append({"role": "assistant", "content": llm_response})
 
     if context.channel == "voice":

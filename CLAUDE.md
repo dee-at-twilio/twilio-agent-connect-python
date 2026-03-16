@@ -54,6 +54,20 @@ Tests are in `tests/` — one test file per module (e.g., `test_tac.py`, `test_s
 - **Memory auto-init**: Memory client is always initialized from Conversation Orchestrator configuration's `memory_store_id`
 - **Auth**: All API clients use HTTP Basic Auth (API Key as username, API Token as password)
 
+## OpenAI Adapter
+
+The OpenAI adapter (`src/tac/adapters/openai/adapter.py`) supports both Chat Completions and Responses APIs for automatic memory injection:
+
+**Chat Completions API**:
+- Injects memory as system message at start of messages array
+- Example: `client.chat.completions.create(model="gpt-5.4", messages=[...])`
+
+**Responses API**:
+- Injects memory by prepending to instructions parameter
+- Example: `client.responses.create(model="gpt-5.4", instructions="...", input=[...])`
+
+Both APIs are fully supported with sync/async variants and streaming support.
+
 ## Dependencies
 
 - **Core**: `pydantic>=2`, `requests>=2.31`, `httpx>=0.27`, `twilio>=9.8.3`
