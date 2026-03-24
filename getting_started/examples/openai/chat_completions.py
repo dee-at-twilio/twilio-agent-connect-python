@@ -24,7 +24,7 @@ from tac.channels.voice import VoiceChannel
 from tac.core.logging import get_logger
 from tac.models.session import ConversationSession
 from tac.models.tac import TACMemoryResponse
-from tac.server import TACServer
+from tac.server import TACFastAPIServer
 
 load_dotenv()
 
@@ -108,10 +108,10 @@ async def handle_message_ready(
 tac.on_message_ready(handle_message_ready)
 
 if __name__ == "__main__":
-    # TACServer creates a FastAPI app with all required endpoints:
+    # TACFastAPIServer creates a FastAPI app with all required endpoints:
     # - /twiml: Voice call webhook (returns TwiML with ConversationRelay)
     # - /ws: WebSocket endpoint for Voice channel
     # - /webhook: SMS webhook endpoint
     # - /conversation-relay-callback: Voice status callback
-    server = TACServer(tac=tac, voice_channel=voice_channel, sms_channel=sms_channel)
+    server = TACFastAPIServer(tac=tac, voice_channel=voice_channel, sms_channel=sms_channel)
     server.start()

@@ -31,7 +31,7 @@ We recommend using [uv](https://docs.astral.sh/uv/) for the best development exp
 uv init
 uv add git+https://github.com/twilio-innovation/twilio-agent-connect-python.git
 
-# Install with server support (includes FastAPI and uvicorn for TACServer)
+# Install with server support (includes FastAPI and uvicorn for TACFastAPIServer)
 uv add git+https://github.com/twilio-innovation/twilio-agent-connect-python.git --extra server
 ```
 
@@ -89,7 +89,7 @@ from tac import TAC, TACConfig
 from tac.adapters.openai import with_tac_memory
 from tac.channels.sms import SMSChannel
 from tac.channels.voice import VoiceChannel
-from tac.server import TACServer
+from tac.server import TACFastAPIServer
 
 load_dotenv()
 
@@ -125,7 +125,7 @@ async def handle_message_ready(user_message, context, memory_response):
         await sms_channel.send_response(conv_id, llm_response)
 
 tac.on_message_ready(handle_message_ready)
-TACServer(tac=tac, voice_channel=voice_channel, sms_channel=sms_channel).start()
+TACFastAPIServer(tac=tac, voice_channel=voice_channel, sms_channel=sms_channel).start()
 ```
 
 > **Note**: See the [getting started guide](getting_started/README.md) for complete setup instructions and `.env` configuration details.

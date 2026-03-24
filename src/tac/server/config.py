@@ -1,4 +1,4 @@
-"""Configuration for TACServer."""
+"""Configuration for TAC server implementations."""
 
 import os
 from typing import Optional
@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 
 class TACServerConfig(BaseModel):
-    """Configuration for the TACServer FastAPI wrapper.
+    """Configuration for TAC server implementations.
 
     Controls host/port binding, public domain for WebSocket URLs,
     and customizable webhook paths.

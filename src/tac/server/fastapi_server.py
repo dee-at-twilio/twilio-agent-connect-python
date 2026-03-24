@@ -1,7 +1,7 @@
-"""TACServer: Batteries-included FastAPI server for TAC channels.
+"""TACFastAPIServer: Batteries-included FastAPI server for TAC channels.
 
 This module provides FastAPIWebSocketAdapter (bridges FastAPI WebSocket to
-WebSocketProtocol) and TACServer (creates a FastAPI app with routes for
+WebSocketProtocol) and TACFastAPIServer (creates a FastAPI app with routes for
 voice, SMS, and CI webhooks).
 
 Requires: pip install tac[server]
@@ -29,7 +29,7 @@ try:
     from fastapi.responses import JSONResponse, Response
 except ImportError as e:
     raise ImportError(
-        "TACServer requires FastAPI and uvicorn. Install with: pip install tac[server]"
+        "TACFastAPIServer requires FastAPI and uvicorn. Install with: pip install tac[server]"
     ) from e
 
 logger = get_logger(__name__)
@@ -64,7 +64,7 @@ class FastAPIWebSocketAdapter:
         await self._ws.close()
 
 
-class TACServer:
+class TACFastAPIServer:
     """Batteries-included FastAPI server for TAC channels.
 
     Creates a FastAPI app with routes for voice, SMS, and CI webhooks,
@@ -185,7 +185,7 @@ class TACServer:
     def start(self) -> None:
         """Create the FastAPI app and start uvicorn."""
         app = self._create_app()
-        logger.info(f"Starting TAC Server on {self.config.host}:{self.config.port}")
+        logger.info(f"Starting TAC FastAPI Server on {self.config.host}:{self.config.port}")
         uvicorn.run(
             app,
             host=self.config.host,

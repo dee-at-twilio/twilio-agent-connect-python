@@ -37,7 +37,7 @@ class VoiceChannel(BaseChannel):
 
     This channel is framework-agnostic: it accepts any WebSocket implementation
     satisfying WebSocketProtocol. For a batteries-included FastAPI server, use
-    tac.server.TACServer.
+    tac.server.TACFastAPIServer.
 
     Provides two approaches for TwiML generation:
 

@@ -1,4 +1,4 @@
-"""Tests for TACServer module."""
+"""Tests for TACFastAPIServer module."""
 
 import pytest
 
@@ -181,16 +181,16 @@ class TestFastAPIWebSocketAdapter:
         assert isinstance(adapter, WebSocketProtocol)
 
 
-class TestTACServer:
-    """Test TACServer route creation."""
+class TestTACFastAPIServer:
+    """Test TACFastAPIServer route creation."""
 
     def test_create_app_voice_only(self) -> None:
         from tac.channels.voice import VoiceChannel
-        from tac.server import TACServer
+        from tac.server import TACFastAPIServer
 
         tac = TAC(get_test_config())
         vc = VoiceChannel(tac=tac, auto_retrieve_memory=False)
-        server = TACServer(
+        server = TACFastAPIServer(
             tac=tac,
             config=TACServerConfig(public_domain="test.ngrok.io"),
             voice_channel=vc,
@@ -207,11 +207,11 @@ class TestTACServer:
 
     def test_create_app_sms_only(self) -> None:
         from tac.channels import SMSChannel
-        from tac.server import TACServer
+        from tac.server import TACFastAPIServer
 
         tac = TAC(get_test_config())
         sms = SMSChannel(tac)
-        server = TACServer(
+        server = TACFastAPIServer(
             tac=tac,
             config=TACServerConfig(public_domain="test.ngrok.io"),
             sms_channel=sms,
@@ -225,10 +225,10 @@ class TestTACServer:
         assert "/ws" not in route_paths
 
     def test_create_app_with_cintel(self) -> None:
-        from tac.server import TACServer
+        from tac.server import TACFastAPIServer
 
         tac = TAC(get_test_config())
-        server = TACServer(
+        server = TACFastAPIServer(
             tac=tac,
             config=TACServerConfig(
                 public_domain="test.ngrok.io", cintel_webhook_path="/ci-webhook"
@@ -242,10 +242,10 @@ class TestTACServer:
     def test_create_app_custom_paths(self) -> None:
         from tac.channels import SMSChannel
         from tac.channels.voice import VoiceChannel
-        from tac.server import TACServer
+        from tac.server import TACFastAPIServer
 
         tac = TAC(get_test_config())
-        server = TACServer(
+        server = TACFastAPIServer(
             tac=tac,
             config=TACServerConfig(
                 public_domain="test.ngrok.io",

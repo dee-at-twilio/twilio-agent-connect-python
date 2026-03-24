@@ -32,7 +32,7 @@ src/tac/
 ├── intelligence/   # Conversation Intelligence webhook processing
 ├── tools/          # LLM tool integration (@function_tool decorator, TACTool)
 ├── adapters/       # Runtime adapters (OpenAI memory injection, prompt builder)
-└── server/         # Optional TACServer (FastAPI-based, install with tac[server])
+└── server/         # Optional TACFastAPIServer (FastAPI-based, install with tac[server])
 ```
 
 Tests are in `tests/` — one test file per module (e.g., `test_tac.py`, `test_sms_channel.py`, `test_voice_channel.py`).

@@ -24,7 +24,7 @@ from tac.channels.voice import VoiceChannel
 from tac.core.logging import get_logger
 from tac.models.session import ConversationSession
 from tac.models.tac import TACMemoryResponse
-from tac.server import TACServer
+from tac.server import TACFastAPIServer
 
 load_dotenv()
 
@@ -139,5 +139,5 @@ if __name__ == "__main__":
     - `examples/openai/chat_completions.py` - Chat Completions API
     - `examples/openai/responses_api.py` - Responses API
     """
-    server = TACServer(tac=tac, voice_channel=voice_channel, sms_channel=sms_channel)
+    server = TACFastAPIServer(tac=tac, voice_channel=voice_channel, sms_channel=sms_channel)
     server.start()
