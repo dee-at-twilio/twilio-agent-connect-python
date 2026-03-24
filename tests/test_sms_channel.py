@@ -137,7 +137,7 @@ class TestSMSChannel:
     def test_initialization(self) -> None:
         """Test SMS channel initialization."""
         tac = TAC(get_test_config())
-        channel = SMSChannel(tac, auto_retrieve_memory=False)
+        channel = SMSChannel(tac)
 
         assert channel.tac == tac
 
@@ -154,7 +154,7 @@ class TestSMSChannel:
     async def test_process_conversation_started(self) -> None:
         """Test processing participant.added event to start conversation."""
         tac = TAC(get_test_config())
-        channel = SMSChannel(tac, auto_retrieve_memory=False)
+        channel = SMSChannel(tac)
 
         # Process participant.added (creates conversation session)
         participant_webhook = create_participant_added_webhook(
@@ -181,7 +181,7 @@ class TestSMSChannel:
             api_token=tac.config.api_token,
         )
 
-        channel = SMSChannel(tac, auto_retrieve_memory=False)
+        channel = SMSChannel(tac)
 
         # Callback to capture context
         captured_context = None
@@ -233,7 +233,9 @@ class TestSMSChannel:
             api_token=tac.config.api_token,
         )
 
-        channel = SMSChannel(tac, auto_retrieve_memory=True)  # Enable memory retrieval for test
+        channel = SMSChannel(
+            tac, config={"auto_retrieve_memory": True}
+        )  # Enable memory retrieval for test
 
         # Start conversation via participant added
         participant_webhook = create_participant_added_webhook(
@@ -273,7 +275,7 @@ class TestSMSChannel:
             api_token=tac.config.api_token,
         )
 
-        channel = SMSChannel(tac, auto_retrieve_memory=False)
+        channel = SMSChannel(tac)
 
         webhook_data = create_communication_created_webhook(
             "CH123456", "MB123", "", "2025-11-18T00:00:00.000Z"
@@ -290,7 +292,7 @@ class TestSMSChannel:
     async def test_process_conversation_ended(self) -> None:
         """Test processing onConversationRemoved event."""
         tac = TAC(get_test_config())
-        channel = SMSChannel(tac, auto_retrieve_memory=False)
+        channel = SMSChannel(tac)
 
         # Start conversation via participant added
         start_webhook = create_participant_added_webhook(
@@ -310,7 +312,7 @@ class TestSMSChannel:
     async def test_send_response_with_active_conversation(self) -> None:
         """Test sending response to active conversation."""
         tac = TAC(get_test_config())
-        channel = SMSChannel(tac, auto_retrieve_memory=False)
+        channel = SMSChannel(tac)
 
         # Mock list_participants to return customer participant with matching profile_id
         from tac.models.conversation import ParticipantResponse
@@ -355,7 +357,7 @@ class TestSMSChannel:
     def test_send_response_to_unknown_conversation(self) -> None:
         """Test sending response to non-existent conversation logs error."""
         tac = TAC(get_test_config())
-        channel = SMSChannel(tac, auto_retrieve_memory=False)
+        channel = SMSChannel(tac)
 
         # Should log error but not raise
         asyncio.run(channel.send_response("CH_UNKNOWN", "Test response"))
@@ -364,7 +366,7 @@ class TestSMSChannel:
     async def test_multiple_concurrent_conversations(self) -> None:
         """Test handling multiple concurrent conversations."""
         tac = TAC(get_test_config())
-        channel = SMSChannel(tac, auto_retrieve_memory=False)
+        channel = SMSChannel(tac)
 
         # Start first conversation via participant added
         await channel.process_webhook(
@@ -393,7 +395,7 @@ class TestSMSChannel:
     async def test_ignores_unsupported_event_types(self) -> None:
         """Test that unsupported event types are ignored."""
         tac = TAC(get_test_config())
-        channel = SMSChannel(tac, auto_retrieve_memory=False)
+        channel = SMSChannel(tac)
 
         webhook_data = {
             "eventType": "SOME_UNSUPPORTED_EVENT",
@@ -408,7 +410,7 @@ class TestSMSChannel:
     async def test_conversation_ended_callback_fires_on_close(self) -> None:
         """Closing an SMS conversation triggers on_conversation_ended with correct data."""
         tac = TAC(get_test_config())
-        channel = SMSChannel(tac, auto_retrieve_memory=False)
+        channel = SMSChannel(tac)
         captured: list[ConversationSession] = []
 
         def handler(ctx: ConversationSession) -> None:
@@ -437,7 +439,7 @@ class TestSMSChannel:
     async def test_conversation_ended_callback_error_does_not_prevent_cleanup(self) -> None:
         """If on_conversation_ended callback raises, the session is still cleaned up."""
         tac = TAC(get_test_config())
-        channel = SMSChannel(tac, auto_retrieve_memory=False)
+        channel = SMSChannel(tac)
 
         def bad_handler(ctx: ConversationSession) -> None:
             raise RuntimeError("boom")
@@ -460,7 +462,7 @@ class TestSMSChannel:
     async def test_conversation_ended_async_callback(self) -> None:
         """Async on_conversation_ended callback is awaited correctly."""
         tac = TAC(get_test_config())
-        channel = SMSChannel(tac, auto_retrieve_memory=False)
+        channel = SMSChannel(tac)
         captured: list[ConversationSession] = []
 
         async def async_handler(ctx: ConversationSession) -> None:
@@ -485,7 +487,7 @@ class TestSMSChannel:
     async def test_conversation_ended_no_callback_registered(self) -> None:
         """Closing a conversation without a registered callback cleans up silently."""
         tac = TAC(get_test_config())
-        channel = SMSChannel(tac, auto_retrieve_memory=False)
+        channel = SMSChannel(tac)
 
         # No callback registered — should not raise
         await channel.process_webhook(

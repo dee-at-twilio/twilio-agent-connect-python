@@ -4,7 +4,7 @@ from collections.abc import AsyncGenerator
 from datetime import datetime, timezone
 from typing import Any, Optional, Union
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from twilio.twiml.voice_response import VoiceResponse
 
 from tac.channels.base import BaseChannel
@@ -26,6 +26,33 @@ from tac.models.voice import (
     TwiMLOptions,
 )
 from tac.session import SessionManager, SessionState
+
+
+class VoiceChannelConfig(BaseModel):
+    """
+    Configuration for Voice channel.
+
+    Attributes:
+        session_manager: Optional SessionManager for tracking and
+            canceling in-flight streaming tasks. The SessionManager
+            encapsulates the stream_generator for LLM responses.
+            If provided, enables task cancellation on interrupts
+            and new prompts.
+        auto_retrieve_memory: If True, automatically retrieve memory
+            before invoking the on_message_ready callback. Default is False.
+            Set to True to enable automatic memory retrieval.
+    """
+
+    model_config = {"arbitrary_types_allowed": True}
+
+    session_manager: Optional[SessionManager] = Field(
+        default=None,
+        description="SessionManager for tracking and canceling in-flight streaming tasks",
+    )
+    auto_retrieve_memory: bool = Field(
+        default=False,
+        description="Automatically retrieve memory before on_message_ready callback",
+    )
 
 
 class VoiceChannel(BaseChannel):
@@ -80,25 +107,29 @@ class VoiceChannel(BaseChannel):
     def __init__(
         self,
         tac: TAC,
-        session_manager: Optional[SessionManager] = None,
-        auto_retrieve_memory: bool = False,
+        config: Optional[Union[VoiceChannelConfig, dict[str, Any]]] = None,
     ):
         """
         Initialize Voice channel for websocket protocol handling.
 
         Args:
             tac: TAC instance for memory/context operations
-            session_manager: Optional SessionManager for tracking and
-                canceling in-flight streaming tasks. The SessionManager
-                encapsulates the stream_generator for LLM responses
-                If provided, enables task cancellation on interrupts
-                and new prompts.
-            auto_retrieve_memory: If True, automatically retrieve memory
-                before invoking the on_message_ready callback. Default is False.
-                Set to True to enable automatic memory retrieval.
+            config: Voice channel configuration (VoiceChannelConfig or dict).
+                If None, uses default configuration.
+
+        Examples:
+            >>> channel = VoiceChannel(tac, config={"auto_retrieve_memory": True})
+            >>> channel = VoiceChannel(tac, config=VoiceChannelConfig(session_manager=sm))
+            >>> channel = VoiceChannel(tac)  # Use defaults
         """
-        super().__init__(tac, auto_retrieve_memory=auto_retrieve_memory)
-        self.session_manager = session_manager
+        # Convert dict to config model or use defaults
+        if isinstance(config, dict):
+            config = VoiceChannelConfig(**config)
+        elif config is None:
+            config = VoiceChannelConfig()
+
+        super().__init__(tac, auto_retrieve_memory=config.auto_retrieve_memory)
+        self.session_manager = config.session_manager
         self._websocket_manager = WebSocketManager()
 
     async def handle_incoming_call(

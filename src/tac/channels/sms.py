@@ -4,6 +4,7 @@ from collections import OrderedDict
 from collections.abc import AsyncGenerator
 from typing import Any, Optional, Union
 
+from pydantic import BaseModel, Field
 from twilio.rest import Client
 
 from tac import TAC
@@ -16,6 +17,30 @@ from tac.models.conversation import (
 from tac.models.session import AuthorInfo
 
 
+class SMSChannelConfig(BaseModel):
+    """
+    Configuration for SMS channel.
+
+    Attributes:
+        dedup_capacity: Maximum number of idempotency tokens to track.
+            Default 10000 is suitable for most applications.
+            Uses Twilio's i-twilio-idempotency-token header for deduplication.
+        auto_retrieve_memory: If True, automatically retrieve memory
+            before invoking the on_message_ready callback. Default is False.
+            Set to True to enable automatic memory retrieval.
+    """
+
+    dedup_capacity: int = Field(
+        default=10000,
+        gt=0,
+        description="Maximum number of idempotency tokens to track for deduplication",
+    )
+    auto_retrieve_memory: bool = Field(
+        default=False,
+        description="Automatically retrieve memory before on_message_ready callback",
+    )
+
+
 class SMSChannel(BaseChannel):
     """
     SMS Channel for handling SMS-based conversations.
@@ -24,23 +49,35 @@ class SMSChannel(BaseChannel):
     SMS-specific metadata extraction.
     """
 
-    def __init__(self, tac: TAC, dedup_capacity: int = 10000, auto_retrieve_memory: bool = False):
+    def __init__(
+        self,
+        tac: TAC,
+        config: Optional[Union[SMSChannelConfig, dict[str, Any]]] = None,
+    ):
         """
         Initialize SMS channel with idempotency-based deduplication.
 
         Args:
             tac: TAC instance for memory/context operations
-            dedup_capacity: Maximum number of idempotency tokens to track.
-                          Default 10000 is suitable for most applications.
-                          Uses Twilio's i-twilio-idempotency-token header for deduplication.
-            auto_retrieve_memory: If True, automatically retrieve memory
-                before invoking the on_message_ready callback. Default is False.
-                Set to True to enable automatic memory retrieval.
+            config: SMS channel configuration (SMSChannelConfig or dict).
+                If None, uses default configuration.
 
         Raises:
             ValueError: If twilio_phone_number is not configured
+
+        Examples:
+            >>> channel = SMSChannel(tac, config={"dedup_capacity": 50000})
+            >>> channel = SMSChannel(tac, config=SMSChannelConfig(auto_retrieve_memory=True))
+            >>> channel = SMSChannel(tac)  # Use defaults
         """
-        super().__init__(tac, auto_retrieve_memory=auto_retrieve_memory)
+        # Convert dict to config model or use defaults
+        if isinstance(config, dict):
+            config = SMSChannelConfig(**config)
+        elif config is None:
+            config = SMSChannelConfig()
+
+        super().__init__(tac, auto_retrieve_memory=config.auto_retrieve_memory)
+
         if not tac.config.twilio_phone_number:
             raise ValueError(
                 "twilio_phone_number is required for SMS channel. "
@@ -51,7 +88,7 @@ class SMSChannel(BaseChannel):
         # Track processed idempotency tokens to prevent duplicate webhook processing
         # OrderedDict maintains insertion order for FIFO removal when at capacity
         self._processed_tokens: OrderedDict[str, bool] = OrderedDict()
-        self._max_tracked_tokens = dedup_capacity
+        self._max_tracked_tokens = config.dedup_capacity
 
     def _is_duplicate_webhook(self, idempotency_token: str) -> bool:
         """

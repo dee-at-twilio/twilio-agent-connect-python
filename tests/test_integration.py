@@ -185,7 +185,9 @@ class TestTACIntegration:
 
             tac = TAC(get_test_config())
             tac.memora_client = create_memora_client(tac)
-            channel = SMSChannel(tac, auto_retrieve_memory=True)  # Enable memory retrieval for test
+            channel = SMSChannel(
+                tac, config={"auto_retrieve_memory": True}
+            )  # Enable memory retrieval for test
 
             # Track callback invocations
             callback_invoked = False
@@ -251,7 +253,7 @@ class TestTACIntegration:
         with patch("tac.channels.sms.Client"):
             tac = TAC(get_test_config())
             tac.memora_client = create_memora_client(tac)
-            channel = SMSChannel(tac, auto_retrieve_memory=False)
+            channel = SMSChannel(tac)
 
             callback_invoked = False
 
@@ -301,7 +303,7 @@ class TestTACIntegration:
 
             tac = TAC(get_test_config())
             tac.memora_client = create_memora_client(tac)
-            channel = SMSChannel(tac, auto_retrieve_memory=False)
+            channel = SMSChannel(tac)
 
             callback_invoked = False
 
@@ -357,7 +359,7 @@ class TestTACIntegration:
             )
 
             tac = TAC(get_test_config())
-            channel = SMSChannel(tac, auto_retrieve_memory=False)
+            channel = SMSChannel(tac)
 
             # Start conversation via participant added
             await channel.process_webhook(
@@ -389,7 +391,7 @@ class TestTACIntegration:
 
             tac = TAC(get_test_config())
             tac.memora_client = create_memora_client(tac)
-            channel = SMSChannel(tac, auto_retrieve_memory=False)
+            channel = SMSChannel(tac)
 
             callback_count = 0
             conversation_ids = set()
@@ -446,7 +448,7 @@ class TestTACIntegration:
         with patch("tac.channels.sms.Client"):
             tac = TAC(get_test_config())
             tac.memora_client = create_memora_client(tac)
-            channel = SMSChannel(tac, auto_retrieve_memory=False)
+            channel = SMSChannel(tac)
 
             callback_invoked = False
             received_context = None
@@ -493,7 +495,7 @@ class TestTACIntegration:
         """Test SMS channel raises ValueError when profile_id is missing."""
         with patch("tac.channels.sms.Client"):
             tac = TAC(get_test_config())
-            channel = SMSChannel(tac, auto_retrieve_memory=False)
+            channel = SMSChannel(tac)
 
             callback_invoked = False
 

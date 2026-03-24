@@ -189,7 +189,7 @@ class TestTACFastAPIServer:
         from tac.server import TACFastAPIServer
 
         tac = TAC(get_test_config())
-        vc = VoiceChannel(tac=tac, auto_retrieve_memory=False)
+        vc = VoiceChannel(tac)
         server = TACFastAPIServer(
             tac=tac,
             config=TACServerConfig(public_domain="test.ngrok.io"),
@@ -254,7 +254,7 @@ class TestTACFastAPIServer:
                 websocket_path="/voice/ws",
                 conversation_relay_callback_path="/voice/callback",
             ),
-            voice_channel=VoiceChannel(tac=tac, auto_retrieve_memory=False),
+            voice_channel=VoiceChannel(tac),
             sms_channel=SMSChannel(tac),
         )
         app = server._create_app()
