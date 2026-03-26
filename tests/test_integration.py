@@ -122,7 +122,6 @@ def get_test_config(with_memory=True):
         "api_token": "test_api_token",
         "environment": "prod",
         "conversation_service_sid": "IStest123",
-        "twilio_account_sid": "ACtest123",
         "twilio_phone_number": "+15551234567",
     }
     if with_memory:

@@ -48,7 +48,6 @@ class TestTACConfigFromEnv:
         """
         monkeypatch.setenv("TWILIO_TAC_ENVIRONMENT", "prod")
         monkeypatch.setenv("TWILIO_TAC_CONVERSATION_SERVICE_SID", "conv_configuration_123")
-        monkeypatch.setenv("TWILIO_TAC_ACCOUNT_SID", "AC123")
         monkeypatch.setenv("TWILIO_TAC_AUTH_TOKEN", "test_auth_token")
         monkeypatch.setenv("TWILIO_TAC_API_KEY", "SK123")
         monkeypatch.setenv("TWILIO_TAC_API_TOKEN", "test_api_token")
@@ -62,7 +61,6 @@ class TestTACConfigFromEnv:
 
         assert config.environment == "prod"
         assert config.conversation_service_sid == "conv_configuration_123"
-        assert config.twilio_account_sid == "AC123"
         assert config.twilio_auth_token == "test_auth_token"
         assert config.api_key == "SK123"
         assert config.api_token == "test_api_token"
@@ -111,14 +109,6 @@ class TestTACConfigFromEnv:
         with pytest.raises(KeyError, match="TWILIO_TAC_CONVERSATION_SERVICE_SID"):
             TACConfig.from_env()
 
-    def test_from_env_missing_twilio_account_sid(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Test from_env() raises KeyError when TWILIO_TAC_ACCOUNT_SID is missing."""
-        self._set_all_env_vars(monkeypatch)
-        monkeypatch.delenv("TWILIO_TAC_ACCOUNT_SID", raising=False)
-
-        with pytest.raises(KeyError, match="TWILIO_TAC_ACCOUNT_SID"):
-            TACConfig.from_env()
-
     def test_from_env_missing_twilio_auth_token(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test from_env() raises KeyError when TWILIO_TAC_AUTH_TOKEN is missing."""
         self._set_all_env_vars(monkeypatch)
@@ -155,7 +145,6 @@ class TestTACConfigFromEnv:
         """Test from_env() raises KeyError when environment variables are missing."""
         monkeypatch.delenv("TWILIO_TAC_ENVIRONMENT", raising=False)
         monkeypatch.delenv("TWILIO_TAC_CONVERSATION_SERVICE_SID", raising=False)
-        monkeypatch.delenv("TWILIO_TAC_ACCOUNT_SID", raising=False)
         monkeypatch.delenv("TWILIO_TAC_AUTH_TOKEN", raising=False)
         monkeypatch.delenv("TWILIO_TAC_PHONE_NUMBER", raising=False)
 

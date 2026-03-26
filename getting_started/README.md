@@ -101,7 +101,6 @@ Restart the server to pick up the new configuration.
 See `examples/.env.example` for all available configuration options. Key variables:
 
 ### Required
-- `TWILIO_TAC_ACCOUNT_SID`: Twilio account SID
 - `TWILIO_TAC_AUTH_TOKEN`: Twilio auth token
 - `TWILIO_TAC_API_KEY`: Twilio API key SID (starts with SK)
 - `TWILIO_TAC_API_TOKEN`: Twilio API key secret

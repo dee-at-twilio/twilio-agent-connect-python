@@ -139,7 +139,6 @@ class TACConfig(BaseModel):
         "automatically from Maestro configuration - this only configures trait group filtering.",
     )
 
-    twilio_account_sid: str = Field(description="Twilio Account SID")
     twilio_auth_token: str = Field(description="Twilio Auth Token")
     api_key: str = Field(description="Twilio API Key SID (starts with SK)")
     api_token: str = Field(description="Twilio API Key Secret")
@@ -210,7 +209,6 @@ class TACConfig(BaseModel):
             "example": {
                 "environment": "prod",
                 "conversation_service_sid": "conv_configuration_xxxxxxxxxxxxxxxxxx",
-                "twilio_account_sid": "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
                 "twilio_auth_token": "your_auth_token_here",
                 "api_key": "SKxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
                 "api_token": "your_api_token_here",
@@ -238,7 +236,6 @@ class TACConfig(BaseModel):
         - TWILIO_TAC_API_KEY: Twilio API Key SID (starts with SK)
         - TWILIO_TAC_API_TOKEN: Twilio API Key Secret
         - TWILIO_TAC_PHONE_NUMBER: Twilio Phone Number for Voice and SMS channels
-        - TWILIO_TAC_ACCOUNT_SID: Twilio Account SID
         - TWILIO_TAC_AUTH_TOKEN: Twilio Auth Token
         - TWILIO_TAC_KNOWLEDGE_BASE_ID: Knowledge Base ID (optional)
         - TWILIO_TAC_LOG_LEVEL: Logging level (optional, defaults to INFO)
@@ -287,7 +284,6 @@ class TACConfig(BaseModel):
         return cls(
             environment=os.environ.get("TWILIO_TAC_ENVIRONMENT", "prod"),
             conversation_service_sid=os.environ["TWILIO_TAC_CONVERSATION_SERVICE_SID"],
-            twilio_account_sid=os.environ["TWILIO_TAC_ACCOUNT_SID"],
             twilio_auth_token=os.environ["TWILIO_TAC_AUTH_TOKEN"],
             api_key=os.environ["TWILIO_TAC_API_KEY"],
             api_token=os.environ["TWILIO_TAC_API_TOKEN"],

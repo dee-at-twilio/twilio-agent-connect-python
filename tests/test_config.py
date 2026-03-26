@@ -17,7 +17,6 @@ class TestTACConfig:
             api_key="SK123",
             api_token="test_api_token",
             environment="prod",
-            twilio_account_sid="ACtest123",
             conversation_service_sid="IS123test",
             twilio_phone_number="+15551234567",
         )
@@ -27,7 +26,6 @@ class TestTACConfig:
         assert config.memora_base_url == "https://memory.twilio.com"
         assert config.environment == "prod"
         assert config.maestro_base_url == "https://conversations.twilio.com"
-        assert config.twilio_account_sid == "ACtest123"
         assert config.log_level == "INFO"  # Default value
         assert config.twilio_memory_config is None  # Optional memory config
 
@@ -37,7 +35,6 @@ class TestTACConfig:
             twilio_auth_token="test_token_123",
             api_key="SK123",
             api_token="test_api_token",
-            twilio_account_sid="ACtest123",
             conversation_service_sid="IS123test",
             twilio_phone_number="+15551234567",
         )
@@ -52,7 +49,6 @@ class TestTACConfig:
             api_key="SK123",
             api_token="test_api_token",
             environment="dev",
-            twilio_account_sid="ACtest123",
             conversation_service_sid="IS123test",
             twilio_phone_number="+15551234567",
             log_level="DEBUG",
@@ -63,7 +59,6 @@ class TestTACConfig:
         assert config.environment == "dev"
         assert config.memora_base_url == "https://memory.dev.twilio.com"
         assert config.maestro_base_url == "https://conversations.dev.twilio.com"
-        assert config.twilio_account_sid == "ACtest123"
         assert config.log_level == "DEBUG"
 
     def test_config_with_memory_enabled(self):
@@ -74,7 +69,6 @@ class TestTACConfig:
             api_key="SK123",
             api_token="test_api_token",
             environment="prod",
-            twilio_account_sid="ACtest123",
             conversation_service_sid="IS123test",
             twilio_phone_number="+15551234567",
             twilio_memory_config=memory_config,
@@ -89,7 +83,6 @@ class TestTACConfig:
             api_key="SK123",
             api_token="test_api_token",
             environment="stage",
-            twilio_account_sid="ACtest123",
             conversation_service_sid="IS123test",
             twilio_phone_number="+15551234567",
             twilio_memory_config=TwilioMemoryConfig(trait_groups=["Contact", "Preferences"]),
@@ -117,7 +110,6 @@ class TestTACConfig:
             "api_key": "SK123",
             "api_token": "test_api_token",
             "environment": "prod",
-            "twilio_account_sid": "ACtest123",
             "conversation_service_sid": "IS123test",
             "twilio_phone_number": "+15551234567",
             "twilio_memory_config": {
@@ -140,7 +132,7 @@ class TestTACConfig:
         assert "properties" in schema
         assert "twilio_auth_token" in schema["properties"]
         assert "environment" in schema["properties"]
-        assert "twilio_account_sid" in schema["properties"]
+
         assert "twilio_phone_number" in schema["properties"]
         assert "log_level" in schema["properties"]
 
@@ -155,7 +147,7 @@ class TestTACConfig:
         assert "api_token" in required_fields
         assert "conversation_service_sid" in required_fields
         assert "twilio_phone_number" in required_fields
-        assert "twilio_account_sid" in required_fields
+
         assert "twilio_auth_token" in required_fields
         assert "environment" not in required_fields  # Optional with default
 
@@ -166,7 +158,6 @@ class TestTACConfig:
             "api_key": "SK123",
             "api_token": "test_api_token",
             "environment": "prod",
-            "twilio_account_sid": "ACtest123",
             "conversation_service_sid": "IS123test",
             "twilio_phone_number": "+15551234567",
         }
@@ -188,7 +179,7 @@ class TestTACConfig:
         error = exc_info.value
         assert "api_key" in str(error)
         assert "api_token" in str(error)
-        assert "twilio_account_sid" in str(error)
+
         assert "twilio_auth_token" in str(error)
 
     def test_partial_config_fails(self):
@@ -202,7 +193,6 @@ class TestTACConfig:
             TACConfig(
                 twilio_auth_token="test_token_123",
                 environment="invalid",  # Invalid environment
-                twilio_account_sid="ACtest123",
                 conversation_service_sid="IS123test",
                 twilio_phone_number="+15551234567",
             )

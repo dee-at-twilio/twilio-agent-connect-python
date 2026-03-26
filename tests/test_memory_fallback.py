@@ -32,7 +32,6 @@ def get_test_config_without_memory():
         "api_key": "SK123",
         "api_token": "test_api_token",
         "environment": "prod",
-        "twilio_account_sid": "ACtest123",
         "conversation_service_sid": "IS123test",
         "twilio_phone_number": "+15551234567",
     }

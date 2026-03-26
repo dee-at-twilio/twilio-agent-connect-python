@@ -16,7 +16,6 @@ def get_test_config_with_memory() -> TACConfig:
     return TACConfig(
         environment="prod",
         conversation_service_sid="conv_configuration_test123",
-        twilio_account_sid="ACtest123",
         twilio_auth_token="test_token_123",
         api_key="SK123",
         api_token="test_api_token",
