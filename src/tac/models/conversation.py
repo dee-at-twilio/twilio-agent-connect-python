@@ -414,3 +414,40 @@ class ConversationsListResponse(BaseModel):
     meta: PaginationMeta = Field(..., description="Pagination metadata")
 
     model_config = {"populate_by_name": True}
+
+
+class SendCommunicationParticipantAddress(BaseModel):
+    """Participant address for sending communications via the Send API."""
+
+    address: str = Field(..., min_length=1, max_length=254, description="Participant address")
+    channel: Literal["VOICE", "SMS", "RCS", "EMAIL", "WHATSAPP", "CHAT", "API", "SYSTEM"] = Field(
+        ..., description="Channel type"
+    )
+    participant_id: Optional[str] = Field(
+        default=None, alias="participantId", description="Participant ID"
+    )
+
+    model_config = {"populate_by_name": True}
+
+
+class SendCommunicationRequest(BaseModel):
+    """Request payload for sending communications via POST /v2/Communications."""
+
+    author: SendCommunicationParticipantAddress = Field(..., description="Message author")
+    content: CommunicationContent = Field(..., description="Message content")
+    recipients: list[SendCommunicationParticipantAddress] = Field(
+        ..., min_length=1, description="Message recipients (minimum 1)"
+    )
+    channel_id: Optional[str] = Field(default=None, alias="channelId", description="Channel ID")
+
+    model_config = {"populate_by_name": True}
+
+
+class SendCommunicationResponse(BaseModel):
+    """Response from POST /v2/Communications (202 Accepted)."""
+
+    message: str = Field(..., description="Status message")
+    conversation_id: str = Field(..., alias="conversationId", description="Conversation ID")
+    channel_id: Optional[str] = Field(default=None, alias="channelId", description="Channel ID")
+
+    model_config = {"populate_by_name": True}

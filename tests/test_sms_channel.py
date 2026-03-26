@@ -1,6 +1,5 @@
 """Tests for SMS Channel."""
 
-import asyncio
 from typing import Any, Optional
 from unittest.mock import AsyncMock, patch
 
@@ -310,57 +309,70 @@ class TestSMSChannel:
 
     @pytest.mark.asyncio
     async def test_send_response_with_active_conversation(self) -> None:
-        """Test sending response to active conversation."""
+        """Test sending response to active conversation using Send API."""
         tac = TAC(get_test_config())
         channel = SMSChannel(tac)
 
-        # Mock list_participants to return customer participant with matching profile_id
-        from tac.models.conversation import ParticipantResponse
+        from tac.models.conversation import ParticipantAddress, ParticipantResponse
 
+        # Mock agent participant
+        mock_agent_participant = ParticipantResponse(
+            **{  # type: ignore[arg-type]
+                "id": "PA_AGENT",
+                "accountId": "ACtest123",
+                "conversationId": "CH123456",
+                "name": "Test Agent",
+                "type": "AI_AGENT",
+                "addresses": [
+                    ParticipantAddress(channel="SMS", address="+15551234567").model_dump(
+                        by_alias=True
+                    )
+                ],
+            }
+        )
+
+        # Mock customer participant
         mock_customer_participant = ParticipantResponse(
             **{  # type: ignore[arg-type]
                 "id": "PA_CUSTOMER",
                 "accountId": "ACtest123",
-                "serviceId": "IStest123",
                 "conversationId": "CH123456",
-                "name": "Test Customer",
+                "name": "+12345678901",
                 "type": "CUSTOMER",
-                "profileId": "profile_test_123",  # Matching profile_id
-                "addresses": [{"channel": "SMS", "address": "+12345678901"}],
+                "addresses": [
+                    ParticipantAddress(channel="SMS", address="+12345678901").model_dump(
+                        by_alias=True
+                    )
+                ],
             }
         )
-
-        # Start conversation with profile_id via participant added
-        participant_webhook = create_participant_added_webhook(
-            "CH123456", "PA_CUSTOMER", "profile_test_123", "2025-11-18T00:00:01.000Z"
-        )
-        await channel.process_webhook(participant_webhook)
 
         with (
             patch.object(
                 tac.maestro_client,
                 "list_participants",
-                return_value=[mock_customer_participant],
+                return_value=[mock_agent_participant, mock_customer_participant],
             ),
-            patch.object(channel.twilio.messages, "create") as mock_twilio_send,
+            patch.object(tac.maestro_client, "send_communication") as mock_send_comm,
         ):
-            # Send response
             await channel.send_response("CH123456", "Test response")
 
-            # Verify Twilio message was sent to the correct recipient
-            mock_twilio_send.assert_called_once_with(
-                to="+12345678901",
-                from_=tac.config.twilio_phone_number,
-                body="Test response",
-            )
+            # Verify send_communication was called
+            mock_send_comm.assert_called_once()
+            call_args = mock_send_comm.call_args
+            assert call_args[0][0] == "CH123456"  # conversation_id
 
-    def test_send_response_to_unknown_conversation(self) -> None:
-        """Test sending response to non-existent conversation logs error."""
-        tac = TAC(get_test_config())
-        channel = SMSChannel(tac)
-
-        # Should log error but not raise
-        asyncio.run(channel.send_response("CH_UNKNOWN", "Test response"))
+            # Verify request structure
+            request = call_args[0][1]
+            assert request.author.address == "+15551234567"
+            assert request.author.channel == "SMS"
+            assert request.author.participant_id == "PA_AGENT"
+            assert request.content.type == "TEXT"
+            assert request.content.text == "Test response"
+            assert len(request.recipients) == 1
+            assert request.recipients[0].address == "+12345678901"
+            assert request.recipients[0].channel == "SMS"
+            assert request.recipients[0].participant_id == "PA_CUSTOMER"
 
     @pytest.mark.asyncio
     async def test_multiple_concurrent_conversations(self) -> None:
@@ -500,3 +512,13 @@ class TestSMSChannel:
         )
 
         assert "CH_NOCB" not in channel._conversations
+
+    @pytest.mark.asyncio
+    async def test_send_response_agent_participant_not_found(self) -> None:
+        """Test sending response when agent participant is not found."""
+        tac = TAC(get_test_config())
+        channel = SMSChannel(tac)
+
+        with patch.object(tac.maestro_client, "list_participants", return_value=[]):
+            # Should log error but not raise
+            await channel.send_response("CH123456", "Test response")

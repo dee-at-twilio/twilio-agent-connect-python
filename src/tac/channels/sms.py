@@ -5,14 +5,16 @@ from collections.abc import AsyncGenerator
 from typing import Any, Optional, Union
 
 from pydantic import BaseModel, Field
-from twilio.rest import Client
 
 from tac import TAC
 from tac.channels.base import BaseChannel
 from tac.models.conversation import (
     Communication,
+    CommunicationContent,
     ConversationResponse,
     ParticipantResponse,
+    SendCommunicationParticipantAddress,
+    SendCommunicationRequest,
 )
 from tac.models.session import AuthorInfo
 
@@ -84,7 +86,6 @@ class SMSChannel(BaseChannel):
                 "Please set TWILIO_TAC_PHONE_NUMBER environment variable or "
                 "provide twilio_phone_number in TACConfig."
             )
-        self.twilio = Client(tac.config.twilio_account_sid, tac.config.twilio_auth_token)
         # Track processed idempotency tokens to prevent duplicate webhook processing
         # OrderedDict maintains insertion order for FIFO removal when at capacity
         self._processed_tokens: OrderedDict[str, bool] = OrderedDict()
@@ -157,7 +158,7 @@ class SMSChannel(BaseChannel):
         role: Optional[str] = None,
     ) -> None:
         """
-        Send SMS response for a conversation using the Maestro Communications API.
+        Send SMS response for a conversation using the Conversation Orchestrator Send API.
 
         Note: SMS channel only supports simple string responses. Async generators
         (streaming) are not supported and will raise a TypeError.
@@ -169,25 +170,12 @@ class SMSChannel(BaseChannel):
 
         Raises:
             TypeError: If response is not a string
-
-        Note:
-            This is a placeholder implementation. In production, this would
-            use the Twilio SMS API to send the actual message.
         """
         # SMS only supports string responses (no streaming)
         if not isinstance(response, str):
             raise TypeError("SMS channel only supports string responses")
 
-        if conversation_id not in self._conversations:
-            self.logger.error(
-                "Cannot send response: conversation not found",
-                conversation_id=conversation_id,
-            )
-            return
-
-        # TODO this is a super hacky workaround because Maestro isn't ready to
-        # support sending messages yet. Defensively go from conversation_id ->
-        # participant -> address -> phone number
+        # Fetch all participants from Conversation Orchestrator
         try:
             participants = await self.tac.maestro_client.list_participants(conversation_id)
         except Exception as e:
@@ -198,24 +186,73 @@ class SMSChannel(BaseChannel):
             )
             return
 
+        # Find agent and customer participants with SMS addresses
+        agent_participant = None
+        customer_participant = None
+        customer_address = None
         for participant in participants:
-            if participant.type != "CUSTOMER":
-                continue
+            if not agent_participant and participant.type in ("AI_AGENT", "HUMAN_AGENT"):
+                for address in participant.addresses:
+                    if (
+                        address.channel == "SMS"
+                        and address.address == self.tac.config.twilio_phone_number
+                    ):
+                        agent_participant = participant
+                        break
+            elif not customer_participant and participant.type == "CUSTOMER":
+                for address in participant.addresses:
+                    if address.channel == "SMS":
+                        customer_participant = participant
+                        customer_address = address.address
+                        break
 
-            for address in participant.addresses:
-                if address.channel != "SMS":
-                    continue
+        if not agent_participant:
+            self.logger.error(
+                "Agent participant not found",
+                conversation_id=conversation_id,
+                phone_number=self.tac.config.twilio_phone_number,
+            )
+            return
 
-                self.twilio.messages.create(
-                    to=address.address,
-                    from_=self.tac.config.twilio_phone_number,
-                    body=response,
-                )
-                self.logger.info(
-                    "Sent SMS response",
-                    conversation_id=conversation_id,
-                    to_address=address.address,
-                )
+        if not customer_participant or not customer_address:
+            self.logger.error(
+                "Customer participant with SMS address not found",
+                conversation_id=conversation_id,
+            )
+            return
+
+        # Build and send communication via Send API
+        try:
+            send_request = SendCommunicationRequest(
+                author=SendCommunicationParticipantAddress(
+                    address=self.tac.config.twilio_phone_number,
+                    channel="SMS",
+                    participant_id=agent_participant.id,
+                ),
+                content=CommunicationContent(type="TEXT", text=response),
+                recipients=[
+                    SendCommunicationParticipantAddress(
+                        address=customer_address,
+                        channel="SMS",
+                        participant_id=customer_participant.id,
+                    )
+                ],
+            )
+
+            await self.tac.maestro_client.send_communication(conversation_id, send_request)
+
+            self.logger.debug(
+                "Sent SMS response via Send API",
+                conversation_id=conversation_id,
+                to_address=customer_address,
+            )
+        except Exception as e:
+            self.logger.error(
+                "Failed to send communication",
+                conversation_id=conversation_id,
+                error=str(e),
+                exc_info=True,
+            )
 
     def get_channel_name(self) -> str:
         """Get the channel name identifier."""

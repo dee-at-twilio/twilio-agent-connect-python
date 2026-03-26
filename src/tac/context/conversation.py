@@ -15,6 +15,8 @@ from tac.models.conversation import (
     ParticipantAddress,
     ParticipantRequest,
     ParticipantResponse,
+    SendCommunicationRequest,
+    SendCommunicationResponse,
     UpdateConversationRequest,
 )
 
@@ -376,6 +378,66 @@ class ConversationClient:
                 f"Failed to list communications: {e}\n"
                 f"URL: {url}\n"
                 f"Query params: {params}\n"
+                f"Response: {response_text}"
+            )
+            raise
+
+    async def send_communication(
+        self,
+        conversation_id: str,
+        request: SendCommunicationRequest,
+    ) -> SendCommunicationResponse:
+        """
+        Send a communication via POST /v2/Communications.
+
+        This endpoint sets up necessary conversation infrastructure and sends the message.
+        Returns 202 Accepted. The Communication record is created asynchronously after
+        delivery.
+
+        Args:
+            conversation_id: The conversation ID to send the communication to
+            request: SendCommunicationRequest with author, content, and recipients
+
+        Returns:
+            SendCommunicationResponse with message, conversationId, and channelId
+
+        Raises:
+            httpx.HTTPError: If the API request fails
+        """
+        url = f"{self.base_url}/v2/Communications"
+
+        # Merge conversationId into the request body
+        request_payload = {
+            "conversationId": conversation_id,
+            **request.model_dump(by_alias=True, exclude_none=True),
+        }
+
+        try:
+            async with self._get_client() as client:
+                response = await client.post(url, json=request_payload)
+                response.raise_for_status()
+
+                # Expect 202 Accepted, warn on other 2xx
+                if response.status_code != 202:
+                    self.logger.warning(
+                        f"Expected 202 Accepted, got {response.status_code}",
+                        url=url,
+                        status_code=response.status_code,
+                    )
+
+                send_response = SendCommunicationResponse(**response.json())
+                return send_response
+
+        except httpx.HTTPError as e:
+            response_text = (
+                getattr(e.response, "text", "No response body")
+                if hasattr(e, "response")
+                else "No response"
+            )
+            self.logger.error(
+                f"Failed to send communication: {e}\n"
+                f"URL: {url}\n"
+                f"ConversationId: {conversation_id}\n"
                 f"Response: {response_text}"
             )
             raise

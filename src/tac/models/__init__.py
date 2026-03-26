@@ -10,6 +10,9 @@ from tac.models.conversation import (
     ParticipantAddress,
     ParticipantRequest,
     ParticipantResponse,
+    SendCommunicationParticipantAddress,
+    SendCommunicationRequest,
+    SendCommunicationResponse,
 )
 from tac.models.intelligence import (
     CommunicationsRange,
@@ -70,6 +73,9 @@ __all__ = [
     "ParticipantRequest",
     "ParticipantResponse",
     "ProfileResponse",
+    "SendCommunicationParticipantAddress",
+    "SendCommunicationRequest",
+    "SendCommunicationResponse",
     "SummaryInfo",
     "TACCommunication",
     "TACCommunicationAuthor",

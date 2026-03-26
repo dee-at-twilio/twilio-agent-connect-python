@@ -15,6 +15,9 @@ from tac.models.conversation import (
     ConversationResponse,
     ParticipantRequest,
     ParticipantResponse,
+    SendCommunicationParticipantAddress,
+    SendCommunicationRequest,
+    SendCommunicationResponse,
 )
 
 
@@ -784,6 +787,98 @@ class TestConversationClient:
 
         with pytest.raises(httpx.HTTPError, match="API Error"):
             await client.list_communications(conversation_id="CH123456")
+
+    @pytest.mark.asyncio
+    @patch("httpx.AsyncClient")
+    async def test_send_communication_success(self, mock_async_client_class):
+        """Test successful communication send via POST /v2/Communications."""
+        mock_response = Mock()
+        mock_response.status_code = 202
+        mock_response.json.return_value = {
+            "message": "Conversation setup complete",
+            "conversationId": "CH123456",
+            "channelId": "SM123456",
+        }
+        mock_response.raise_for_status = Mock()
+
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(return_value=mock_response)
+        mock_async_client_class.return_value.__aenter__.return_value = mock_client
+
+        client = ConversationClient(
+            base_url="https://maestro.twilio.com",
+            api_key="SK123456",
+            api_token="test_token",
+            service_id="IS123456",
+        )
+
+        # Create send request
+        author = SendCommunicationParticipantAddress(
+            address="+15551234567", channel="SMS", participant_id="comms_participant_agent"
+        )
+        content = CommunicationContent(type="TEXT", text="Hello from agent!")
+        recipient = SendCommunicationParticipantAddress(
+            address="+12025551234", channel="SMS", participant_id="comms_participant_customer"
+        )
+        send_request = SendCommunicationRequest(
+            author=author, content=content, recipients=[recipient]
+        )
+
+        result = await client.send_communication(conversation_id="CH123456", request=send_request)
+
+        # Verify API call
+        expected_url = "https://maestro.twilio.com/v2/Communications"
+        mock_client.post.assert_called_once()
+        assert mock_client.post.call_args[0][0] == expected_url
+
+        # Verify request payload includes conversationId
+        payload = mock_client.post.call_args[1]["json"]
+        assert payload["conversationId"] == "CH123456"
+        assert payload["author"]["address"] == "+15551234567"
+        assert payload["content"]["text"] == "Hello from agent!"
+        assert len(payload["recipients"]) == 1
+
+        # Verify response
+        assert isinstance(result, SendCommunicationResponse)
+        assert result.message == "Conversation setup complete"
+        assert result.conversation_id == "CH123456"
+        assert result.channel_id == "SM123456"
+
+    @pytest.mark.asyncio
+    @patch("httpx.AsyncClient")
+    async def test_send_communication_api_error(self, mock_async_client_class):
+        """Test send_communication handles API errors."""
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(
+            side_effect=httpx.HTTPStatusError(
+                "400 Bad Request",
+                request=Mock(),
+                response=Mock(status_code=400, text='{"error": "Invalid request"}'),
+            )
+        )
+        mock_async_client_class.return_value.__aenter__.return_value = mock_client
+
+        client = ConversationClient(
+            base_url="https://maestro.twilio.com",
+            api_key="SK123456",
+            api_token="test_token",
+            service_id="IS123456",
+        )
+
+        # Create send request
+        author = SendCommunicationParticipantAddress(
+            address="+15551234567", channel="SMS", participant_id="comms_participant_agent"
+        )
+        content = CommunicationContent(type="TEXT", text="Hello from agent!")
+        recipient = SendCommunicationParticipantAddress(
+            address="+12025551234", channel="SMS", participant_id="comms_participant_customer"
+        )
+        send_request = SendCommunicationRequest(
+            author=author, content=content, recipients=[recipient]
+        )
+
+        with pytest.raises(httpx.HTTPStatusError, match="400 Bad Request"):
+            await client.send_communication(conversation_id="CH123456", request=send_request)
 
     @pytest.mark.no_auto_mock
     def test_get_configuration_success(self):
