@@ -176,15 +176,16 @@ class TAC:
             # Try to get profile_id if not already available
             if not conversation_context.profile_id:
                 self.logger.debug(
-                    "profile_id not found, attempting to lookup profile using phone number"
+                    "profile_id not found, attempting to lookup profile using address"
                 )
 
                 if conversation_context.author_info and conversation_context.author_info.address:
-                    phone_number = conversation_context.author_info.address
+                    address = conversation_context.author_info.address
+                    id_type = "email" if "@" in address else "phone"
                     lookup_response: ProfileLookupResponse = (
                         await self.memora_client.lookup_profile(
-                            id_type="phone",
-                            value=phone_number,
+                            id_type=id_type,
+                            value=address,
                         )
                     )
 
@@ -192,8 +193,8 @@ class TAC:
                         conversation_context.profile_id = lookup_response.profiles[0]
                         self.logger.debug(f"Found profile_id: {conversation_context.profile_id}")
                     else:
-                        self.logger.debug(f"No profile found for phone number {phone_number}")
-                        raise ValueError("No profile found for phone number")
+                        self.logger.debug(f"No profile found for address {address}")
+                        raise ValueError("No profile found for address")
                 else:
                     self.logger.debug(
                         "profile_id not found and author_info.address not available for lookup"

@@ -139,5 +139,7 @@ if __name__ == "__main__":
     - `examples/openai/chat_completions.py` - Chat Completions API
     - `examples/openai/responses_api.py` - Responses API
     """
-    server = TACFastAPIServer(tac=tac, voice_channel=voice_channel, sms_channel=sms_channel)
+    server = TACFastAPIServer(
+        tac=tac, voice_channel=voice_channel, messaging_channels=[sms_channel]
+    )
     server.start()

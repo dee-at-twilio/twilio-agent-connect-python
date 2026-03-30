@@ -28,7 +28,7 @@ class TestTACServerConfig:
         assert config.port == 8000
         assert config.public_domain == "example.ngrok.io"
         assert config.welcome_greeting == "Hello! How can I assist you today?"
-        assert config.sms_webhook_path == "/webhook"
+        assert config.messaging_webhook_path == "/webhook"
         assert config.twiml_path == "/twiml"
         assert config.websocket_path == "/ws"
         assert config.conversation_relay_callback_path == "/conversation-relay-callback"
@@ -39,14 +39,14 @@ class TestTACServerConfig:
             public_domain="my.domain.com",
             host="127.0.0.1",
             port=3000,
-            sms_webhook_path="/sms",
+            messaging_webhook_path="/messaging",
             twiml_path="/voice/twiml",
             websocket_path="/voice/ws",
             cintel_webhook_path="/ci",
         )
         assert config.host == "127.0.0.1"
         assert config.port == 3000
-        assert config.sms_webhook_path == "/sms"
+        assert config.messaging_webhook_path == "/messaging"
         assert config.twiml_path == "/voice/twiml"
         assert config.websocket_path == "/voice/ws"
         assert config.cintel_webhook_path == "/ci"
@@ -183,6 +183,51 @@ class TestFastAPIWebSocketAdapter:
 class TestTACFastAPIServer:
     """Test TACFastAPIServer route creation."""
 
+    @pytest.mark.asyncio
+    async def test_messaging_webhook_fanout(self) -> None:
+        """Messaging webhook fans out to all configured channels with idempotency token."""
+        import asyncio
+        from unittest.mock import AsyncMock, patch
+
+        from httpx import ASGITransport, AsyncClient
+
+        from tac.channels import ChatChannel, SMSChannel
+        from tac.server import TACFastAPIServer
+
+        tac = TAC(get_test_config())
+        sms = SMSChannel(tac)
+        chat = ChatChannel(tac)
+
+        server = TACFastAPIServer(
+            tac=tac,
+            config=TACServerConfig(public_domain="test.ngrok.io"),
+            messaging_channels=[sms, chat],
+        )
+        app = server._create_app()
+
+        with (
+            patch.object(sms, "process_webhook", new_callable=AsyncMock) as mock_sms,
+            patch.object(chat, "process_webhook", new_callable=AsyncMock) as mock_chat,
+        ):
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                resp = await client.post(
+                    "/webhook",
+                    json={"eventType": "COMMUNICATION_CREATED", "data": {}},
+                    headers={"i-twilio-idempotency-token": "tok-123"},
+                )
+
+            assert resp.status_code == 200
+            # Yield control so fire-and-forget tasks (mocked, instant) complete
+            await asyncio.sleep(0)
+
+            mock_sms.assert_called_once()
+            mock_chat.assert_called_once()
+            # Both receive the same webhook data and idempotency token
+            assert mock_sms.call_args[0][0] == {"eventType": "COMMUNICATION_CREATED", "data": {}}
+            assert mock_sms.call_args[0][1] == "tok-123"
+            assert mock_chat.call_args[0][1] == "tok-123"
+
     def test_create_app_voice_only(self) -> None:
         from tac.channels.voice import VoiceChannel
         from tac.server import TACFastAPIServer
@@ -201,10 +246,10 @@ class TestTACFastAPIServer:
         assert "/twiml" in route_paths
         assert "/ws" in route_paths
         assert "/conversation-relay-callback" in route_paths
-        # No SMS route
+        # No messaging route
         assert "/webhook" not in route_paths
 
-    def test_create_app_sms_only(self) -> None:
+    def test_create_app_messaging_only(self) -> None:
         from tac.channels import SMSChannel
         from tac.server import TACFastAPIServer
 
@@ -213,7 +258,7 @@ class TestTACFastAPIServer:
         server = TACFastAPIServer(
             tac=tac,
             config=TACServerConfig(public_domain="test.ngrok.io"),
-            sms_channel=sms,
+            messaging_channels=[sms],
         )
         app = server._create_app()
 
@@ -248,18 +293,18 @@ class TestTACFastAPIServer:
             tac=tac,
             config=TACServerConfig(
                 public_domain="test.ngrok.io",
-                sms_webhook_path="/sms",
+                messaging_webhook_path="/messaging",
                 twiml_path="/voice/twiml",
                 websocket_path="/voice/ws",
                 conversation_relay_callback_path="/voice/callback",
             ),
             voice_channel=VoiceChannel(tac),
-            sms_channel=SMSChannel(tac),
+            messaging_channels=[SMSChannel(tac)],
         )
         app = server._create_app()
 
         route_paths = [r.path for r in app.routes if hasattr(r, "path")]
-        assert "/sms" in route_paths
+        assert "/messaging" in route_paths
         assert "/voice/twiml" in route_paths
         assert "/voice/ws" in route_paths
         assert "/voice/callback" in route_paths

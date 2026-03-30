@@ -105,5 +105,7 @@ if __name__ == "__main__":
     # - /ws: WebSocket endpoint for Voice channel
     # - /webhook: SMS webhook endpoint
     # - /conversation-relay-callback: Voice status callback
-    server = TACFastAPIServer(tac=tac, voice_channel=voice_channel, sms_channel=sms_channel)
+    server = TACFastAPIServer(
+        tac=tac, voice_channel=voice_channel, messaging_channels=[sms_channel]
+    )
     server.start()

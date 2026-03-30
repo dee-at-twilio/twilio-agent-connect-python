@@ -356,7 +356,9 @@ class Communication(BaseModel):
     content: CommunicationContent = Field(
         ..., description="The content of the Communication using type field for discrimination"
     )
-    recipients: list[CommunicationParticipant] = Field(..., description="Communication recipients")
+    recipients: list[CommunicationParticipant] = Field(
+        default_factory=list, description="Communication recipients"
+    )
     channel_id: Optional[str] = Field(
         default=None,
         alias="channelId",

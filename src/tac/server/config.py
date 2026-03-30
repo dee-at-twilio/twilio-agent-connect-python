@@ -23,7 +23,9 @@ class TACServerConfig(BaseModel):
         description="Initial greeting message for callers",
     )
 
-    sms_webhook_path: str = Field(default="/webhook", description="Path for SMS webhook endpoint")
+    messaging_webhook_path: str = Field(
+        default="/webhook", description="Path for messaging webhook endpoint"
+    )
     twiml_path: str = Field(default="/twiml", description="Path for TwiML generation endpoint")
     websocket_path: str = Field(default="/ws", description="Path for voice WebSocket endpoint")
     conversation_relay_callback_path: str = Field(

@@ -125,7 +125,7 @@ async def handle_message_ready(user_message, context, memory_response):
         await sms_channel.send_response(conv_id, llm_response)
 
 tac.on_message_ready(handle_message_ready)
-TACFastAPIServer(tac=tac, voice_channel=voice_channel, sms_channel=sms_channel).start()
+TACFastAPIServer(tac=tac, voice_channel=voice_channel, messaging_channels=[sms_channel]).start()
 ```
 
 > **Note**: See the [getting started guide](getting_started/README.md) for complete setup instructions and `.env` configuration details.

@@ -2,7 +2,7 @@
 
 This module provides FastAPIWebSocketAdapter (bridges FastAPI WebSocket to
 WebSocketProtocol) and TACFastAPIServer (creates a FastAPI app with routes for
-voice, SMS, and CI webhooks).
+voice, messaging, and CI webhooks).
 
 Requires: pip install tac[server]
 """
@@ -20,7 +20,7 @@ from tac.core.tac import TAC
 from tac.server.config import TACServerConfig
 
 if TYPE_CHECKING:
-    from tac.channels.sms import SMSChannel
+    from tac.channels.messaging import MessagingChannel
     from tac.channels.voice import VoiceChannel
 
 try:
@@ -67,7 +67,7 @@ class FastAPIWebSocketAdapter:
 class TACFastAPIServer:
     """Batteries-included FastAPI server for TAC channels.
 
-    Creates a FastAPI app with routes for voice, SMS, and CI webhooks,
+    Creates a FastAPI app with routes for voice, messaging, and CI webhooks,
     then starts uvicorn. This replaces VoiceChannel.start() and provides
     a single entry point for multi-channel servers.
     """
@@ -76,36 +76,41 @@ class TACFastAPIServer:
         self,
         tac: TAC,
         voice_channel: VoiceChannel | None = None,
-        sms_channel: SMSChannel | None = None,
+        messaging_channels: list[MessagingChannel] | None = None,
         config: TACServerConfig | None = None,
     ) -> None:
         self.tac = tac
         self.config = config or TACServerConfig.from_env()
         self.voice_channel = voice_channel
-        self.sms_channel = sms_channel
+        self.messaging_channels: list[MessagingChannel] = messaging_channels or []
 
     def _create_app(self) -> FastAPI:
         """Create and configure the FastAPI application with routes."""
         app = FastAPI(title="TAC Server")
         config = self.config
 
-        if self.sms_channel is not None:
-            sms = self.sms_channel
+        if self.messaging_channels:
+            channels = self.messaging_channels
 
-            @app.post(config.sms_webhook_path)
-            async def sms_webhook(request: Request) -> JSONResponse:
-                """Handle incoming SMS webhooks from Twilio."""
+            @app.post(config.messaging_webhook_path)
+            async def messaging_webhook(request: Request) -> JSONResponse:
+                """Handle incoming messaging webhooks from Twilio."""
                 try:
                     form_data = await request.json()
                     webhook_data = dict(form_data)
                     idempotency_token = request.headers.get("i-twilio-idempotency-token")
-                    asyncio.create_task(sms.process_webhook(webhook_data, idempotency_token))
+                    for channel in channels:
+                        asyncio.create_task(
+                            channel.process_webhook(webhook_data, idempotency_token)
+                        )
                     return JSONResponse(content={"status": "ok"}, status_code=200)
                 except Exception as e:
-                    logger.error("SMS webhook error", error=str(e), exc_info=True)
+                    logger.error("Messaging webhook error", error=str(e), exc_info=True)
                     return JSONResponse(
                         content={"status": "error", "message": str(e)}, status_code=400
                     )
+        else:
+            logger.warning("No messaging channels configured — messaging webhook route disabled")
 
         if self.voice_channel is not None:
             vc = self.voice_channel

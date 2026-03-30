@@ -521,3 +521,39 @@ class TestSMSChannel:
         with patch.object(tac.maestro_client, "list_participants", return_value=[]):
             # Should log error but not raise
             await channel.send_response("CH123456", "Test response")
+
+    @pytest.mark.asyncio
+    async def test_ignores_chat_messages(self) -> None:
+        """COMMUNICATION_CREATED with author.channel=CHAT is filtered by SMSChannel."""
+        tac = TAC(get_test_config())
+        channel = SMSChannel(tac)
+        captured: list[str] = []
+
+        tac.on_message_ready(lambda msg, ctx, mem: captured.append(msg))
+
+        webhook = create_communication_created_webhook(
+            "CH123456", "MB123", "Chat message", "2025-11-18T00:00:00.000Z"
+        )
+        # Override author channel to CHAT
+        webhook["data"]["author"]["channel"] = "CHAT"
+
+        await channel.process_webhook(webhook)
+        assert len(captured) == 0
+
+    @pytest.mark.asyncio
+    async def test_ignores_messages_without_author_channel(self) -> None:
+        """COMMUNICATION_CREATED without author.channel is rejected for safe fanout."""
+        tac = TAC(get_test_config())
+        channel = SMSChannel(tac)
+        captured: list[str] = []
+
+        tac.on_message_ready(lambda msg, ctx, mem: captured.append(msg))
+
+        webhook = create_communication_created_webhook(
+            "CH123456", "MB123", "No channel", "2025-11-18T00:00:00.000Z"
+        )
+        # Remove author channel
+        del webhook["data"]["author"]["channel"]
+
+        await channel.process_webhook(webhook)
+        assert len(captured) == 0
