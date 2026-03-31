@@ -514,7 +514,7 @@ def test_responses_api_memory_injection(
     wrapper = with_tac_memory(mock_openai_client, sample_memory_response, sample_context)
 
     wrapper.responses.create(
-        model="gpt-5.4",
+        model="gpt-5.4-mini",
         instructions="You are a helpful assistant.",
         input=[{"role": "user", "content": "Hello"}],
     )
@@ -534,7 +534,7 @@ def test_responses_api_no_injection_without_memory(mock_openai_client: Mock) -> 
 
     original_instructions = "You are a helpful assistant."
     wrapper.responses.create(
-        model="gpt-5.4",
+        model="gpt-5.4-mini",
         instructions=original_instructions,
         input=[{"role": "user", "content": "Hello"}],
     )
@@ -553,7 +553,7 @@ def test_responses_api_with_profile(
     wrapper = with_tac_memory(mock_openai_client, context=sample_context)
 
     wrapper.responses.create(
-        model="gpt-5.4",
+        model="gpt-5.4-mini",
         instructions="You are a helpful assistant.",
         input=[{"role": "user", "content": "Hello"}],
     )
@@ -575,7 +575,7 @@ def test_responses_api_without_instructions(
     wrapper = with_tac_memory(mock_openai_client, sample_memory_response, sample_context)
 
     wrapper.responses.create(
-        model="gpt-5.4",
+        model="gpt-5.4-mini",
         input=[{"role": "user", "content": "Hello"}],
     )
 
@@ -591,7 +591,7 @@ def test_responses_api_passes_through_kwargs(mock_openai_client: Mock) -> None:
     wrapper = with_tac_memory(mock_openai_client)
 
     wrapper.responses.create(
-        model="gpt-5.4",
+        model="gpt-5.4-mini",
         instructions="You are a helpful assistant.",
         input=[{"role": "user", "content": "Hello"}],
         temperature=0.7,
@@ -601,7 +601,7 @@ def test_responses_api_passes_through_kwargs(mock_openai_client: Mock) -> None:
     call_args = mock_openai_client.responses.create.call_args
     kwargs = call_args[1]
 
-    assert kwargs["model"] == "gpt-5.4"
+    assert kwargs["model"] == "gpt-5.4-mini"
     assert kwargs["temperature"] == 0.7
     assert kwargs["max_tokens"] == 100
 
@@ -712,7 +712,7 @@ async def test_async_responses_api_memory_injection(
     wrapper = with_tac_memory(mock_async_openai_client, sample_memory_response, sample_context)
 
     await wrapper.responses.create(
-        model="gpt-5.4",
+        model="gpt-5.4-mini",
         instructions="You are a helpful assistant.",
         input=[{"role": "user", "content": "Hello"}],
     )
@@ -735,7 +735,7 @@ async def test_async_responses_api_no_injection_without_memory(
 
     original_instructions = "You are a helpful assistant."
     await wrapper.responses.create(
-        model="gpt-5.4",
+        model="gpt-5.4-mini",
         instructions=original_instructions,
         input=[{"role": "user", "content": "Hello"}],
     )

@@ -60,11 +60,11 @@ The OpenAI adapter (`src/tac/adapters/openai/adapter.py`) supports both Chat Com
 
 **Chat Completions API**:
 - Injects memory as system message at start of messages array
-- Example: `client.chat.completions.create(model="gpt-5.4", messages=[...])`
+- Example: `client.chat.completions.create(model="gpt-5.4-mini", messages=[...])`
 
 **Responses API**:
 - Injects memory by prepending to instructions parameter
-- Example: `client.responses.create(model="gpt-5.4", instructions="...", input=[...])`
+- Example: `client.responses.create(model="gpt-5.4-mini", instructions="...", input=[...])`
 
 Both APIs are fully supported with sync/async variants and streaming support.
 

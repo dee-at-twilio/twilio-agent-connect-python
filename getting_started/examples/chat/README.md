@@ -34,7 +34,7 @@ Example demonstrating ChatChannel integration with Twilio Agent Connect. Uses th
    - `POST /token` — generates Conversations SDK access token
    - `POST /conversation` — Conversation Orchestrator webhook endpoint
    - Routes webhook events to ChatChannel
-   - Calls OpenAI gpt-4o-mini for responses
+   - Calls OpenAI gpt-5.4-mini for responses
    - Sends responses via Conversation Orchestrator Send API
 
 ## Architecture

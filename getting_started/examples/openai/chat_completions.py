@@ -19,8 +19,8 @@ from openai.types.chat import (
 
 from tac import TAC, TACConfig
 from tac.adapters.openai import with_tac_memory
-from tac.channels.sms import SMSChannel
-from tac.channels.voice import VoiceChannel
+from tac.channels.sms import SMSChannel, SMSChannelConfig
+from tac.channels.voice import VoiceChannel, VoiceChannelConfig
 from tac.core.logging import get_logger
 from tac.models.session import ConversationSession
 from tac.models.tac import TACMemoryResponse
@@ -34,8 +34,8 @@ logger = get_logger(__name__)
 tac = TAC(config=TACConfig.from_env())
 
 # Create channel handlers for Voice and SMS
-voice_channel = VoiceChannel(tac)
-sms_channel = SMSChannel(tac)
+voice_channel = VoiceChannel(tac, config=VoiceChannelConfig(auto_retrieve_memory=True))
+sms_channel = SMSChannel(tac, config=SMSChannelConfig(auto_retrieve_memory=True))
 
 # Initialize OpenAI client
 openai_client = AsyncOpenAI(api_key=os.environ.get("TWILIO_TAC_OPENAI_API_KEY"))
@@ -81,7 +81,7 @@ async def handle_message_ready(
 
         # Call OpenAI Chat Completions API - memory is automatically injected
         response = await client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-5.4-mini",
             messages=conversation_history[conv_id],
         )
 

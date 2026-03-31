@@ -111,7 +111,7 @@ async def handle_message_ready(user_message, context, memory_response):
     client = with_tac_memory(openai_client, memory_response, context)
 
     response = await client.responses.create(
-        model="gpt-4o",
+        model="gpt-5.4-mini",
         instructions=SYSTEM_INSTRUCTIONS,
         input=conversation_history[conv_id]
     )
