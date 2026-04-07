@@ -28,7 +28,8 @@ src/tac/
 ├── core/           # TAC class, TACConfig, context models
 ├── context/        # API clients: MemoryClient, ConversationClient, KnowledgeClient
 ├── models/         # Pydantic models (memory, conversation, session, voice, knowledge, intelligence)
-├── channels/       # SMS and Voice channel implementations (base, sms, voice)
+├── channels/       # Communication channels (base, sms, chat, messaging, voice/)
+│   └── voice/      # Voice channel (channel.py, twiml.py, config.py)
 ├── intelligence/   # Conversation Intelligence webhook processing
 ├── tools/          # LLM tool integration (@function_tool decorator, TACTool)
 ├── adapters/       # Runtime adapters (OpenAI memory injection, prompt builder)

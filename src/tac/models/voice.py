@@ -10,10 +10,10 @@ class CustomParameters(BaseModel):
     Custom parameters for ConversationRelay TwiML.
 
     Supports well-known TAC parameters plus arbitrary custom fields.
-    conversation_id is required, all other fields are optional.
+    All fields are optional since ConversationRelay handles conversation creation automatically.
     """
 
-    conversation_id: str = Field(..., alias="conversationId")
+    conversation_id: Optional[str] = Field(None, alias="conversationId")
     profile_id: Optional[str] = Field(None, alias="profileId")
     customer_participant_id: Optional[str] = Field(None, alias="customerParticipantId")
     ai_agent_participant_id: Optional[str] = Field(None, alias="aiAgentParticipantId")
@@ -28,7 +28,7 @@ class SetupMessage(BaseModel):
     """
     Setup message sent when WebSocket connection is established.
 
-    Contains call metadata and custom parameters from TwiML.
+    Contains call metadata from Twilio.
     """
 
     type: Literal["setup"] = "setup"
@@ -43,7 +43,6 @@ class SetupMessage(BaseModel):
     call_type: Optional[str] = Field(None, alias="callType", description="Call type (e.g., PSTN)")
     call_status: Optional[str] = Field(None, alias="callStatus", description="Call status")
     account_sid: Optional[str] = Field(None, alias="accountSid")
-    custom_parameters: CustomParameters = Field(..., alias="customParameters")
 
     model_config = {"populate_by_name": True}
 
@@ -148,6 +147,11 @@ class TwiMLOptions(BaseModel):
     action_url: Optional[str] = Field(
         None,
         description="URL for Twilio to request when call ends",
+    )
+    conversation_configuration: Optional[str] = Field(
+        None,
+        description="Conversation Service SID for ConversationRelay to automatically "
+        "manage conversation creation and participants.",
     )
 
     model_config = {"populate_by_name": True}

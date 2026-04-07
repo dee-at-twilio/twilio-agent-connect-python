@@ -2,13 +2,13 @@
 
 import asyncio
 from typing import Optional
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from tac import TAC
-from tac.channels.voice import VoiceChannel
-from tac.models.conversation import ConversationResponse, ParticipantResponse
+from tac.channels.voice import VoiceChannel, generate_twiml
+from tac.models.conversation import ConversationResponse
 from tac.models.memory import MemoryRetrievalResponse
 from tac.models.session import ConversationSession
 from tac.models.tac import TACMemoryResponse
@@ -16,7 +16,6 @@ from tac.models.voice import (
     CustomParameters,
     InterruptMessage,
     PromptMessage,
-    SetupMessage,
     TwiMLOptions,
 )
 
@@ -51,27 +50,6 @@ class TestVoiceChannel:
         channel = VoiceChannel(tac)
 
         assert channel.get_channel_name() == "voice"
-
-    @pytest.mark.asyncio
-    async def test_handle_setup_message(self) -> None:
-        """Test handling setup message initializes conversation."""
-        tac = TAC(get_test_config())
-        channel = VoiceChannel(tac)
-
-        # Create setup message
-        setup_msg = SetupMessage(
-            type="setup",
-            conversationId="CALL123",
-            customParameters={"conversationId": "CALL123"},
-        )
-
-        # Call handler directly (not async)
-        channel._handle_setup(setup_msg)
-
-        # Verify conversation was started
-        assert "CALL123" in channel._conversations
-        assert channel._conversations["CALL123"].profile_id is None
-        assert channel._conversations["CALL123"].channel == "voice"
 
     @pytest.mark.asyncio
     async def test_handle_prompt_message_without_memory_retrieval(self) -> None:
@@ -161,19 +139,6 @@ class TestVoiceChannel:
         channel._handle_interrupt("CALL123", interrupt_msg)
 
         # Test passes if no exception is raised
-
-    @pytest.mark.asyncio
-    async def test_handle_message_without_conversation_id(self) -> None:
-        """Test that creating setup message without customParameters raises ValidationError."""
-        from pydantic import ValidationError
-
-        # Attempting to create SetupMessage without required customParameters
-        # should raise ValidationError
-        with pytest.raises(ValidationError) as exc_info:
-            SetupMessage(type="setup")
-
-        # Verify error mentions the missing field
-        assert "customParameters" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_send_response(self) -> None:
@@ -293,54 +258,29 @@ class TestVoiceChannel:
 
     @pytest.mark.asyncio
     async def test_handle_incoming_call(self) -> None:
-        """Test handle_incoming_call generates valid TwiML."""
+        """Test handle_incoming_call generates valid TwiML with conversation_configuration."""
         tac = TAC(get_test_config())
         channel = VoiceChannel(tac)
 
-        # Mock conversation creation and participant addition
-        with (
-            patch.object(
-                tac.maestro_client, "create_conversation", new_callable=AsyncMock
-            ) as mock_create,
-            patch.object(
-                tac.maestro_client, "add_participant", new_callable=AsyncMock
-            ) as mock_add_participant,
-        ):
-            mock_create.return_value = ConversationResponse(
-                id="CONV123",
-                account_id="ACtest123",
-                service_id="IStest123",
-            )
-            mock_add_participant.return_value = ParticipantResponse(
-                id="PART123",
-                conversation_id="CONV123",
-                account_id="ACtest123",
-                service_id="IStest123",
-                name="participant",
-            )
+        # Generate TwiML (no need to mock - Maestro handles conversation creation)
+        twiml = await channel.handle_incoming_call(
+            options={
+                "websocket_url": "wss://example.ngrok.io/ws",
+                "action_url": "https://example.ngrok.io/flex_handoff",
+                "welcome_greeting": "Welcome!",
+            },
+        )
 
-            # Generate TwiML
-            twiml = await channel.handle_incoming_call(
-                to_number="+15551234567",
-                from_number="+15559999999",
-                options={
-                    "websocket_url": "wss://example.ngrok.io/ws",
-                    "action_url": "https://example.ngrok.io/flex_handoff",
-                    "welcome_greeting": "Welcome!",
-                },
-            )
-
-            # Verify TwiML contains expected elements
-            assert '<?xml version="1.0" encoding="UTF-8"?>' in twiml
-            assert "<Response>" in twiml
-            assert '<Connect action="https://example.ngrok.io/flex_handoff">' in twiml
-            assert "<ConversationRelay" in twiml
-            assert 'url="wss://example.ngrok.io/ws"' in twiml
-            assert 'welcomeGreeting="Welcome!"' in twiml
-            assert '<Parameter name="conversationId" value="CONV123" />' in twiml
-            assert "</ConversationRelay>" in twiml
-            assert "</Connect>" in twiml
-            assert "</Response>" in twiml
+        # Verify TwiML contains expected elements
+        assert '<?xml version="1.0" encoding="UTF-8"?>' in twiml
+        assert "<Response>" in twiml
+        assert '<Connect action="https://example.ngrok.io/flex_handoff">' in twiml
+        assert "<ConversationRelay" in twiml
+        assert 'url="wss://example.ngrok.io/ws"' in twiml
+        assert 'welcomeGreeting="Welcome!"' in twiml
+        assert 'conversationConfiguration="IStest123"' in twiml
+        assert "</Connect>" in twiml
+        assert "</Response>" in twiml
 
     @pytest.mark.asyncio
     async def test_handle_incoming_call_default_greeting(self) -> None:
@@ -348,73 +288,17 @@ class TestVoiceChannel:
         tac = TAC(get_test_config())
         channel = VoiceChannel(tac)
 
-        # Mock conversation creation and participant addition
-        with (
-            patch.object(
-                tac.maestro_client, "create_conversation", new_callable=AsyncMock
-            ) as mock_create,
-            patch.object(
-                tac.maestro_client, "add_participant", new_callable=AsyncMock
-            ) as mock_add_participant,
-        ):
-            mock_create.return_value = ConversationResponse(
-                id="CONV456",
-                account_id="ACtest123",
-                service_id="IStest123",
-            )
-            mock_add_participant.return_value = ParticipantResponse(
-                id="PART456",
-                conversation_id="CONV456",
-                account_id="ACtest123",
-                service_id="IStest123",
-                name="participant",
-            )
-
-            # Generate TwiML without custom greeting (uses default)
-            twiml = await channel.handle_incoming_call(
-                to_number="+15551111111",
-                from_number="+15559876543",
-                options={
-                    "websocket_url": "wss://test.ngrok.io/ws",
-                    "action_url": "https://example.ngrok.io/flex_handoff",
-                },
-            )
-
-            # Verify default greeting is used
-            assert 'welcomeGreeting="Hello! How can I assist you today?"' in twiml
-
-    @pytest.mark.asyncio
-    async def test_setup_with_custom_parameters_profile_id(self) -> None:
-        """Test setup message extracts profile_id from custom parameters."""
-        tac = TAC(get_test_config())
-        channel = VoiceChannel(tac)
-
-        # Create setup message with profile_id
-        setup_msg = SetupMessage(
-            type="setup",
-            conversationId="CONV123",
-            customParameters={"conversationId": "CONV123", "profileId": "USER_PROFILE_789"},
+        # Generate TwiML without custom greeting (uses default)
+        twiml = await channel.handle_incoming_call(
+            options={
+                "websocket_url": "wss://test.ngrok.io/ws",
+                "action_url": "https://example.ngrok.io/flex_handoff",
+            },
         )
 
-        # Call handler directly (not async)
-        channel._handle_setup(setup_msg)
-
-        # Verify conversation was started with correct profile_id
-        assert "CONV123" in channel._conversations
-        assert channel._conversations["CONV123"].profile_id == "USER_PROFILE_789"
-
-    @pytest.mark.asyncio
-    async def test_setup_without_conversation_id_raises_error(self) -> None:
-        """Test that creating setup message without required fields raises ValidationError."""
-        from pydantic import ValidationError
-
-        # Attempting to create SetupMessage without required customParameters
-        # should raise ValidationError
-        with pytest.raises(ValidationError) as exc_info:
-            SetupMessage(type="setup")
-
-        # Verify error is about missing required field
-        assert "Field required" in str(exc_info.value)
+        # Verify default greeting is used
+        assert 'welcomeGreeting="Hello! How can I assist you today?"' in twiml
+        assert 'conversationConfiguration="IStest123"' in twiml
 
     @pytest.mark.asyncio
     async def test_prompt_with_empty_voice_prompt(self) -> None:
@@ -634,258 +518,6 @@ class TestVoiceChannel:
 
         # Verify still only one websocket tracked
         assert len(channel._websocket_manager) == 1
-
-    @pytest.mark.asyncio
-    async def test_active_hydration_setup(self) -> None:
-        """Test that active hydration setup populates author_info and ai_agent_info."""
-        config = get_test_config()
-        config["enable_voice_active_hydration"] = True
-        tac = TAC(config)
-        channel = VoiceChannel(tac)
-
-        # Create setup message with all required fields for active hydration
-        setup_msg = SetupMessage(
-            type="setup",
-            conversationId="CONV123",
-            from_number="+15551234567",
-            to_number="+15559876543",
-            customParameters={
-                "conversationId": "CONV123",
-                "customerParticipantId": "PART_CUSTOMER_123",
-                "aiAgentParticipantId": "PART_AGENT_456",
-            },
-        )
-
-        # Call handler directly (not async)
-        channel._handle_setup(setup_msg)
-
-        # Verify conversation was started with author and AI agent info
-        assert "CONV123" in channel._conversations
-        session = channel._conversations["CONV123"]
-        assert session.author_info is not None
-        assert session.author_info.address == "+15551234567"
-        assert session.author_info.participant_id == "PART_CUSTOMER_123"
-        assert session.ai_agent_info is not None
-        assert session.ai_agent_info.address == "+15559876543"
-        assert session.ai_agent_info.participant_id == "PART_AGENT_456"
-
-    @pytest.mark.asyncio
-    async def test_active_hydration_disabled(self) -> None:
-        """Test that author_info and ai_agent_info are not set when active hydration is disabled."""
-        config = get_test_config()
-        config["enable_voice_active_hydration"] = False
-        tac = TAC(config)
-        channel = VoiceChannel(tac)
-
-        # Create setup message with all fields
-        setup_msg = SetupMessage(
-            type="setup",
-            conversationId="CONV456",
-            from_number="+15551234567",
-            to_number="+15559876543",
-            customParameters={
-                "conversationId": "CONV456",
-                "customerParticipantId": "PART_CUSTOMER_123",
-                "aiAgentParticipantId": "PART_AGENT_456",
-            },
-        )
-
-        # Call handler directly (not async)
-        channel._handle_setup(setup_msg)
-
-        # Verify conversation was started but without author/AI agent info
-        assert "CONV456" in channel._conversations
-        session = channel._conversations["CONV456"]
-        assert session.author_info is None
-        assert session.ai_agent_info is None
-
-    @pytest.mark.asyncio
-    async def test_create_communication_with_optional_params(self) -> None:
-        """Test _create_communication with optional participant IDs."""
-        config = get_test_config()
-        config["enable_voice_active_hydration"] = True
-        tac = TAC(config)
-        channel = VoiceChannel(tac)
-
-        # Mock the maestro client's create_communication method
-        with patch.object(
-            tac.maestro_client, "create_communication", new_callable=AsyncMock
-        ) as mock_add_comm:
-            # Call _create_communication with optional parameters
-            await channel._create_communication(
-                conversation_id="CONV123",
-                message_content="Hello world",
-                author_address="+15551234567",
-                recipient_address="+15559876543",
-                author_participant_id="PART_AUTHOR",
-                recipient_participant_id="PART_RECIPIENT",
-            )
-
-            # Verify create_communication was called
-            assert mock_add_comm.call_count == 1
-
-            # Verify the request structure
-            call_args = mock_add_comm.call_args
-            assert call_args[0][0] == "CONV123"  # conversation_id
-            comm_request = call_args[0][1]  # CommunicationRequest
-            assert comm_request.author.address == "+15551234567"
-            assert comm_request.author.participant_id == "PART_AUTHOR"
-            assert comm_request.content.text == "Hello world"
-            assert len(comm_request.recipients) == 1
-            assert comm_request.recipients[0].address == "+15559876543"
-            assert comm_request.recipients[0].participant_id == "PART_RECIPIENT"
-
-    @pytest.mark.asyncio
-    async def test_send_response_skips_communication_without_participant_ids(self) -> None:
-        """Test send_response skips _create_communication when participant IDs are missing."""
-        config = get_test_config()
-        config["enable_voice_active_hydration"] = True
-        tac = TAC(config)
-        channel = VoiceChannel(tac)
-
-        # Start conversation
-        channel._start_conversation("CALL789", "profile_test")
-
-        # Set up author and AI agent info WITHOUT participant IDs
-        from tac.models.session import AuthorInfo
-
-        channel._conversations["CALL789"].author_info = AuthorInfo(
-            address="+15551234567",
-            participant_id=None,  # Missing participant ID
-        )
-        channel._conversations["CALL789"].ai_agent_info = AuthorInfo(
-            address="+15559876543",
-            participant_id=None,  # Missing participant ID
-        )
-
-        # Mock websocket and create_communication
-        mock_websocket = AsyncMock()
-        channel._websocket_manager.add_websocket("CALL789", mock_websocket)
-
-        with patch.object(
-            tac.maestro_client, "create_communication", new_callable=AsyncMock
-        ) as mock_add_comm:
-            # Send response - should skip communication creation due to missing participant IDs
-            await channel.send_response("CALL789", "Test response")
-
-            # Verify websocket was called but create_communication was NOT called
-            assert mock_websocket.send_text.call_count == 1
-            assert mock_add_comm.call_count == 0
-
-    @pytest.mark.asyncio
-    async def test_send_response_with_active_hydration(self) -> None:
-        """Test send_response triggers _create_communication when active hydration is enabled."""
-        config = get_test_config()
-        config["enable_voice_active_hydration"] = True
-        tac = TAC(config)
-        channel = VoiceChannel(tac)
-
-        # Start conversation
-        channel._start_conversation("CALL789", "profile_test")
-
-        # Set up author and AI agent info
-        from tac.models.session import AuthorInfo
-
-        channel._conversations["CALL789"].author_info = AuthorInfo(
-            address="+15551234567", participant_id="PART_CUSTOMER"
-        )
-        channel._conversations["CALL789"].ai_agent_info = AuthorInfo(
-            address="+15559876543", participant_id="PART_AGENT"
-        )
-
-        # Mock websocket and create_communication
-        mock_websocket = AsyncMock()
-        channel._websocket_manager.add_websocket("CALL789", mock_websocket)
-
-        with patch.object(
-            tac.maestro_client, "create_communication", new_callable=AsyncMock
-        ) as mock_add_comm:
-            # Send response
-            await channel.send_response("CALL789", "Agent response")
-
-            # Verify websocket was called
-            assert mock_websocket.send_text.call_count == 1
-
-            # Verify create_communication was called for active hydration
-            assert mock_add_comm.call_count == 1
-
-            # Verify the communication request
-            call_args = mock_add_comm.call_args
-            assert call_args[0][0] == "CALL789"
-            comm_request = call_args[0][1]
-            assert comm_request.author.address == "+15559876543"  # AI agent
-            assert comm_request.recipients[0].address == "+15551234567"  # Customer
-
-    @pytest.mark.asyncio
-    async def test_handle_prompt_with_active_hydration(self) -> None:
-        """Test _handle_prompt triggers _create_communication when active hydration is enabled."""
-        config = get_test_config()
-        config["enable_voice_active_hydration"] = True
-        tac = TAC(config)
-        channel = VoiceChannel(tac)
-
-        # Start conversation
-        channel._start_conversation("CALL999", "profile_test")
-
-        # Set up author and AI agent info
-        from tac.models.session import AuthorInfo
-
-        channel._conversations["CALL999"].author_info = AuthorInfo(
-            address="+15551234567", participant_id="PART_CUSTOMER"
-        )
-        channel._conversations["CALL999"].ai_agent_info = AuthorInfo(
-            address="+15559876543", participant_id="PART_AGENT"
-        )
-
-        # Create prompt message
-        prompt_msg = PromptMessage(
-            type="prompt",
-            conversationId="CALL999",
-            voicePrompt="Customer message",
-        )
-
-        with patch.object(
-            tac.maestro_client, "create_communication", new_callable=AsyncMock
-        ) as mock_add_comm:
-            # Handle prompt
-            await channel._handle_prompt("CALL999", prompt_msg)
-
-            # Verify create_communication was called for active hydration
-            assert mock_add_comm.call_count == 1
-
-            # Verify the communication request
-            call_args = mock_add_comm.call_args
-            assert call_args[0][0] == "CALL999"
-            comm_request = call_args[0][1]
-            assert comm_request.author.address == "+15551234567"  # Customer
-            assert comm_request.recipients[0].address == "+15559876543"  # AI agent
-
-    @pytest.mark.asyncio
-    async def test_active_hydration_skipped_when_missing_info(self) -> None:
-        """Test that active hydration is skipped when author_info or ai_agent_info is missing."""
-        config = get_test_config()
-        config["enable_voice_active_hydration"] = True
-        tac = TAC(config)
-        channel = VoiceChannel(tac)
-
-        # Start conversation without setting author/AI agent info
-        channel._start_conversation("CALL_NO_INFO", "profile_test")
-
-        # Mock websocket
-        mock_websocket = AsyncMock()
-        channel._websocket_manager.add_websocket("CALL_NO_INFO", mock_websocket)
-
-        with patch.object(
-            tac.maestro_client, "create_communication", new_callable=AsyncMock
-        ) as mock_add_comm:
-            # Send response
-            await channel.send_response("CALL_NO_INFO", "Response")
-
-            # Verify websocket was called
-            assert mock_websocket.send_text.call_count == 1
-
-            # Verify create_communication was NOT called (missing info)
-            assert mock_add_comm.call_count == 0
 
     @pytest.mark.asyncio
     async def test_send_response_with_invalid_type_raises_error(self) -> None:
@@ -1162,10 +794,7 @@ class TestVoiceChannel:
 
     def test_generate_twiml_minimal(self) -> None:
         """Test TwiML generation with only websocket URL."""
-        tac = TAC(get_test_config())
-        channel = VoiceChannel(tac)
-
-        twiml = channel.generate_twiml(TwiMLOptions(websocket_url="wss://example.com/voice"))
+        twiml = generate_twiml(TwiMLOptions(websocket_url="wss://example.com/voice"))
 
         assert '<?xml version="1.0" encoding="UTF-8"?>' in twiml
         assert "<Response>" in twiml
@@ -1178,10 +807,7 @@ class TestVoiceChannel:
 
     def test_generate_twiml_with_welcome_greeting(self) -> None:
         """Test TwiML generation with welcome greeting."""
-        tac = TAC(get_test_config())
-        channel = VoiceChannel(tac)
-
-        twiml = channel.generate_twiml(
+        twiml = generate_twiml(
             TwiMLOptions(
                 websocket_url="wss://example.com/voice",
                 welcome_greeting="Hello! How can I help you?",
@@ -1192,10 +818,7 @@ class TestVoiceChannel:
 
     def test_generate_twiml_with_action_url(self) -> None:
         """Test TwiML generation with action URL."""
-        tac = TAC(get_test_config())
-        channel = VoiceChannel(tac)
-
-        twiml = channel.generate_twiml(
+        twiml = generate_twiml(
             TwiMLOptions(
                 websocket_url="wss://example.com/voice",
                 action_url="https://example.com/callback",
@@ -1206,10 +829,7 @@ class TestVoiceChannel:
 
     def test_generate_twiml_with_standard_custom_parameters(self) -> None:
         """Test TwiML generation with standard TAC custom parameters."""
-        tac = TAC(get_test_config())
-        channel = VoiceChannel(tac)
-
-        twiml = channel.generate_twiml(
+        twiml = generate_twiml(
             TwiMLOptions(
                 websocket_url="wss://example.com/voice",
                 custom_parameters={
@@ -1228,10 +848,7 @@ class TestVoiceChannel:
 
     def test_generate_twiml_with_arbitrary_custom_parameters(self) -> None:
         """Test TwiML generation with arbitrary custom parameters."""
-        tac = TAC(get_test_config())
-        channel = VoiceChannel(tac)
-
-        twiml = channel.generate_twiml(
+        twiml = generate_twiml(
             TwiMLOptions(
                 websocket_url="wss://example.com/voice",
                 custom_parameters={
@@ -1248,12 +865,9 @@ class TestVoiceChannel:
 
     def test_generate_twiml_with_pydantic_model(self) -> None:
         """Test TwiML generation using Pydantic CustomParameters model."""
-        tac = TAC(get_test_config())
-        channel = VoiceChannel(tac)
-
         custom_params = CustomParameters(conversationId="CH123", profileId="mem_profile_123")
 
-        twiml = channel.generate_twiml(
+        twiml = generate_twiml(
             TwiMLOptions(
                 websocket_url="wss://example.com/voice",
                 custom_parameters=custom_params,
@@ -1266,10 +880,7 @@ class TestVoiceChannel:
 
     def test_generate_twiml_with_dict_options(self) -> None:
         """Test TwiML generation accepting plain dict instead of TwiMLOptions."""
-        tac = TAC(get_test_config())
-        channel = VoiceChannel(tac)
-
-        twiml = channel.generate_twiml(
+        twiml = generate_twiml(
             {
                 "websocket_url": "wss://example.com/voice",
                 "custom_parameters": {"key": "value"},
@@ -1283,10 +894,7 @@ class TestVoiceChannel:
 
     def test_generate_twiml_filters_none_values(self) -> None:
         """Test that None values are excluded from parameters."""
-        tac = TAC(get_test_config())
-        channel = VoiceChannel(tac)
-
-        twiml = channel.generate_twiml(
+        twiml = generate_twiml(
             TwiMLOptions(
                 websocket_url="wss://example.com/voice",
                 custom_parameters={
@@ -1303,10 +911,7 @@ class TestVoiceChannel:
 
     def test_generate_twiml_escapes_xml_special_chars(self) -> None:
         """Test XML character escaping in parameter values."""
-        tac = TAC(get_test_config())
-        channel = VoiceChannel(tac)
-
-        twiml = channel.generate_twiml(
+        twiml = generate_twiml(
             TwiMLOptions(
                 websocket_url="wss://example.com/voice",
                 custom_parameters={
@@ -1326,10 +931,7 @@ class TestVoiceChannel:
 
     def test_generate_twiml_complete_example(self) -> None:
         """Test complete TwiML generation with all options."""
-        tac = TAC(get_test_config())
-        channel = VoiceChannel(tac)
-
-        twiml = channel.generate_twiml(
+        twiml = generate_twiml(
             TwiMLOptions(
                 websocket_url="wss://example.ngrok.io/voice",
                 custom_parameters={
@@ -1351,112 +953,75 @@ class TestVoiceChannel:
         assert '<Parameter name="profileId" value="mem_profile_xyz" />' in twiml
         assert '<Parameter name="customField" value="customValue" />' in twiml
 
+    def test_generate_twiml_with_conversation_configuration(self) -> None:
+        """Test TwiML generation with conversation_configuration."""
+        twiml = generate_twiml(
+            TwiMLOptions(
+                websocket_url="wss://example.com/voice",
+                conversation_configuration="IStest_conversation_service_123",
+            )
+        )
+
+        assert 'conversationConfiguration="IStest_conversation_service_123"' in twiml
+        assert 'url="wss://example.com/voice"' in twiml
+
+    def test_generate_twiml_without_conversation_configuration(self) -> None:
+        """Test TwiML generation without conversation_configuration."""
+        twiml = generate_twiml(
+            TwiMLOptions(
+                websocket_url="wss://example.com/voice",
+            )
+        )
+
+        # Should not have conversation_configuration in output
+        assert "conversationConfiguration" not in twiml
+
     @pytest.mark.asyncio
     async def test_handle_incoming_call_with_additional_parameters(self) -> None:
         """Test handle_incoming_call includes additional custom parameters."""
         tac = TAC(get_test_config())
         channel = VoiceChannel(tac)
 
-        # Mock conversation creation and participant addition
-        with (
-            patch.object(
-                tac.maestro_client, "create_conversation", new_callable=AsyncMock
-            ) as mock_create,
-            patch.object(
-                tac.maestro_client, "add_participant", new_callable=AsyncMock
-            ) as mock_add_participant,
-        ):
-            mock_create.return_value = ConversationResponse(
-                id="CONV999",
-                account_id="ACtest123",
-                service_id="IStest123",
-            )
-            mock_add_participant.side_effect = [
-                ParticipantResponse(
-                    id="PART_CUST",
-                    conversation_id="CONV999",
-                    account_id="ACtest123",
-                    service_id="IStest123",
-                    name="customer",
-                    profile_id="PROFILE123",
-                ),
-                ParticipantResponse(
-                    id="PART_AGENT",
-                    conversation_id="CONV999",
-                    account_id="ACtest123",
-                    service_id="IStest123",
-                    name="agent",
-                ),
-            ]
-
-            # Generate TwiML with additional parameters
-            twiml = await channel.handle_incoming_call(
-                to_number="+15551234567",
-                from_number="+15559999999",
-                options={
-                    "websocket_url": "wss://example.ngrok.io/ws",
-                    "action_url": "https://example.ngrok.io/callback",
-                    "welcome_greeting": "Welcome!",
-                    "custom_parameters": {
-                        "session_id": "sess_abc123",
-                        "user_language": "es",
-                        "priority": "high",
-                    },
+        # Generate TwiML with additional parameters
+        twiml = await channel.handle_incoming_call(
+            options={
+                "websocket_url": "wss://example.ngrok.io/ws",
+                "action_url": "https://example.ngrok.io/callback",
+                "welcome_greeting": "Welcome!",
+                "custom_parameters": {
+                    "session_id": "sess_abc123",
+                    "user_language": "es",
+                    "priority": "high",
                 },
-            )
+            },
+        )
 
-            # Verify standard TAC parameters are present
-            assert '<Parameter name="conversationId" value="CONV999" />' in twiml
-            assert '<Parameter name="profileId" value="PROFILE123" />' in twiml
-            assert '<Parameter name="customerParticipantId" value="PART_CUST" />' in twiml
-            assert '<Parameter name="aiAgentParticipantId" value="PART_AGENT" />' in twiml
+        # Verify conversation_configuration is present
+        assert 'conversationConfiguration="IStest123"' in twiml
 
-            # Verify additional custom parameters are present
-            assert '<Parameter name="session_id" value="sess_abc123" />' in twiml
-            assert '<Parameter name="user_language" value="es" />' in twiml
-            assert '<Parameter name="priority" value="high" />' in twiml
+        # Verify additional custom parameters are present
+        assert '<Parameter name="session_id" value="sess_abc123" />' in twiml
+        assert '<Parameter name="user_language" value="es" />' in twiml
+        assert '<Parameter name="priority" value="high" />' in twiml
 
     @pytest.mark.asyncio
     async def test_handle_incoming_call_without_additional_parameters(self) -> None:
-        """Test handle_incoming_call works without additional parameters (backward compat)."""
+        """Test handle_incoming_call works without additional parameters."""
         tac = TAC(get_test_config())
         channel = VoiceChannel(tac)
 
-        # Mock conversation creation and participant addition
-        with (
-            patch.object(
-                tac.maestro_client, "create_conversation", new_callable=AsyncMock
-            ) as mock_create,
-            patch.object(
-                tac.maestro_client, "add_participant", new_callable=AsyncMock
-            ) as mock_add_participant,
-        ):
-            mock_create.return_value = ConversationResponse(
-                id="CONV888",
-                account_id="ACtest123",
-                service_id="IStest123",
-            )
-            mock_add_participant.return_value = ParticipantResponse(
-                id="PART888",
-                conversation_id="CONV888",
-                account_id="ACtest123",
-                service_id="IStest123",
-                name="participant",
-            )
+        # Generate TwiML without additional parameters
+        twiml = await channel.handle_incoming_call(
+            options={
+                "websocket_url": "wss://example.ngrok.io/ws",
+            },
+        )
 
-            # Generate TwiML without additional parameters
-            twiml = await channel.handle_incoming_call(
-                to_number="+15551234567",
-                from_number="+15559999999",
-                options={
-                    "websocket_url": "wss://example.ngrok.io/ws",
-                },
-            )
-
-            # Verify only standard TAC parameters are present
-            assert '<Parameter name="conversationId" value="CONV888" />' in twiml
-            assert "session_id" not in twiml
-            assert "user_language" not in twiml
+        # Verify conversation_configuration is present
+        assert 'conversationConfiguration="IStest123"' in twiml
+        # Verify no custom parameters
+        assert "session_id" not in twiml
+        assert "user_language" not in twiml
 
 
 class TestHandleConversationRelayCallback:
@@ -1606,3 +1171,326 @@ class TestHandleConversationRelayCallback:
 
         with pytest.raises(ValidationError):
             await channel.handle_conversation_relay_callback({})
+
+
+class TestConversationInitializationFlow:
+    """Test new conversation initialization flow with ConversationRelay."""
+
+    @pytest.mark.asyncio
+    async def test_first_prompt_initializes_conversation_from_relay(self) -> None:
+        """Test first prompt queries Maestro and initializes conversation via websocket flow."""
+        from tac.channels.websocket_protocol import WebSocketDisconnectError
+        from tac.models.conversation import ParticipantAddress, ParticipantResponse
+
+        tac = TAC(get_test_config())
+        channel = VoiceChannel(tac)
+
+        # Track conversation initialization via callback
+        initialized_conversations = []
+
+        async def on_message(user_message, context, memory_response):
+            initialized_conversations.append(context.conversation_id)
+
+        tac.on_message_ready(on_message)
+
+        # Mock Maestro to return a conversation created by ConversationRelay
+        mock_conversation = ConversationResponse(
+            id="CH_relay_123",
+            accountId="ACtest123",
+            configuration_id="IStest123",
+            status="ACTIVE",
+        )
+        tac.maestro_client.list_conversations = AsyncMock(return_value=[mock_conversation])
+
+        # Mock participants list with VOICE channel address
+        mock_participant = ParticipantResponse(
+            id="PA_customer",
+            conversation_id="CH_relay_123",
+            account_id="ACtest123",
+            name="Customer",
+            profile_id="profile_voice_123",
+            addresses=[
+                ParticipantAddress(channel="VOICE", address="+15551234567"),
+            ],
+        )
+        tac.maestro_client.list_participants = AsyncMock(return_value=[mock_participant])
+
+        # Create mock websocket that sends: setup -> prompt -> disconnect
+        mock_websocket = AsyncMock()
+        setup_data = {"type": "setup", "callSid": "CA_test_call", "from": "+15551234567"}
+        prompt_data = {"type": "prompt", "voicePrompt": "Hello"}
+
+        mock_websocket.receive_json = AsyncMock(
+            side_effect=[setup_data, prompt_data, WebSocketDisconnectError()]
+        )
+
+        # Drive the real websocket handler
+        await channel.handle_websocket(mock_websocket)
+
+        # Verify callback was called (conversation initialized successfully)
+        assert initialized_conversations == ["CH_relay_123"]
+
+        # Verify Maestro was queried with correct parameters
+        tac.maestro_client.list_conversations.assert_called_once_with(
+            channel_id="CA_test_call",
+            status=["ACTIVE"],
+        )
+        tac.maestro_client.list_participants.assert_called_once_with("CH_relay_123")
+
+    @pytest.mark.asyncio
+    async def test_profile_id_retrieval_filters_by_voice_channel(self) -> None:
+        """Test that profile_id is retrieved by filtering on VOICE channel and from_number."""
+        from tac.models.conversation import ParticipantAddress, ParticipantResponse
+
+        tac = TAC(get_test_config())
+        from_number = "+15551234567"
+
+        # Mock participants with multiple addresses, only one matches VOICE channel
+        mock_participants = [
+            ParticipantResponse(
+                id="PA_sms",
+                conversation_id="CH_test",
+                account_id="ACtest123",
+                name="SMS Participant",
+                profile_id="profile_sms_wrong",
+                addresses=[
+                    ParticipantAddress(channel="SMS", address="+15551234567"),
+                ],
+            ),
+            ParticipantResponse(
+                id="PA_voice",
+                conversation_id="CH_test",
+                account_id="ACtest123",
+                name="Voice Participant",
+                profile_id="profile_voice_correct",
+                addresses=[
+                    ParticipantAddress(channel="VOICE", address="+15551234567"),
+                ],
+            ),
+            ParticipantResponse(
+                id="PA_other",
+                conversation_id="CH_test",
+                account_id="ACtest123",
+                name="Other Participant",
+                profile_id="profile_other_wrong",
+                addresses=[
+                    ParticipantAddress(channel="VOICE", address="+15559999999"),
+                ],
+            ),
+        ]
+        tac.maestro_client.list_participants = AsyncMock(return_value=mock_participants)
+
+        # Simulate profile_id retrieval logic
+        participants = await tac.maestro_client.list_participants("CH_test")
+        profile_id = None
+        for participant in participants:
+            if from_number and participant.addresses:
+                for address in participant.addresses:
+                    if (
+                        address.channel == "VOICE"
+                        and address.address == from_number
+                        and participant.profile_id
+                    ):
+                        profile_id = participant.profile_id
+                        break
+            if profile_id:
+                break
+
+        # Verify correct profile_id was selected
+        assert profile_id == "profile_voice_correct"
+
+    @pytest.mark.asyncio
+    async def test_error_when_no_conversations_found(self, capsys: pytest.CaptureFixture) -> None:
+        """Test RuntimeError when ConversationRelay creates 0 conversations."""
+        from tac.channels.websocket_protocol import WebSocketDisconnectError
+
+        tac = TAC(get_test_config())
+        channel = VoiceChannel(tac)
+
+        # Mock Maestro to return no conversations
+        tac.maestro_client.list_conversations = AsyncMock(return_value=[])
+
+        # Create mock websocket: setup -> prompt (triggers error)
+        mock_websocket = AsyncMock()
+        setup_data = {"type": "setup", "callSid": "CA_test_call", "from": "+15551234567"}
+        prompt_data = {"type": "prompt", "voicePrompt": "Hello"}
+
+        mock_websocket.receive_json = AsyncMock(
+            side_effect=[setup_data, prompt_data, WebSocketDisconnectError()]
+        )
+
+        # Drive the real websocket handler - error will be caught and logged
+        await channel.handle_websocket(mock_websocket)
+
+        # Capture output
+        captured = capsys.readouterr()
+
+        # Verify error was logged with correct message
+        assert "Expected exactly 1 conversation" in captured.out
+        assert "but found 0" in captured.out
+
+        # Verify Maestro was called
+        tac.maestro_client.list_conversations.assert_called_once_with(
+            channel_id="CA_test_call",
+            status=["ACTIVE"],
+        )
+
+        # Verify no conversation was initialized
+        assert len(channel._conversations) == 0
+
+    @pytest.mark.asyncio
+    async def test_error_when_multiple_conversations_found(
+        self, capsys: pytest.CaptureFixture
+    ) -> None:
+        """Test RuntimeError when ConversationRelay creates 2+ conversations."""
+        from tac.channels.websocket_protocol import WebSocketDisconnectError
+
+        tac = TAC(get_test_config())
+        channel = VoiceChannel(tac)
+
+        # Mock Maestro to return multiple conversations
+        mock_conversations = [
+            ConversationResponse(
+                id="CH_relay_1",
+                accountId="ACtest123",
+                configuration_id="IStest123",
+                status="ACTIVE",
+            ),
+            ConversationResponse(
+                id="CH_relay_2",
+                accountId="ACtest123",
+                configuration_id="IStest123",
+                status="ACTIVE",
+            ),
+        ]
+        tac.maestro_client.list_conversations = AsyncMock(return_value=mock_conversations)
+
+        # Create mock websocket: setup -> prompt (triggers error)
+        mock_websocket = AsyncMock()
+        setup_data = {"type": "setup", "callSid": "CA_test_call", "from": "+15551234567"}
+        prompt_data = {"type": "prompt", "voicePrompt": "Hello"}
+
+        mock_websocket.receive_json = AsyncMock(
+            side_effect=[setup_data, prompt_data, WebSocketDisconnectError()]
+        )
+
+        # Drive the real websocket handler - error will be caught and logged
+        await channel.handle_websocket(mock_websocket)
+
+        # Capture output
+        captured = capsys.readouterr()
+
+        # Verify error was logged with correct message
+        assert "Expected exactly 1 conversation" in captured.out
+        assert "but found 2" in captured.out
+
+        # Verify Maestro was called
+        tac.maestro_client.list_conversations.assert_called_once_with(
+            channel_id="CA_test_call",
+            status=["ACTIVE"],
+        )
+
+        # Verify no conversation was initialized
+        assert len(channel._conversations) == 0
+
+    @pytest.mark.asyncio
+    async def test_setup_message_does_not_initialize_conversation(self) -> None:
+        """Test that setup message stores call_sid but doesn't initialize conversation."""
+        from tac.channels.websocket_protocol import WebSocketDisconnectError
+
+        tac = TAC(get_test_config())
+        channel = VoiceChannel(tac)
+
+        # Mock Maestro (should not be called during setup)
+        tac.maestro_client.list_conversations = AsyncMock()
+        tac.maestro_client.list_participants = AsyncMock()
+
+        # Create mock websocket: setup -> disconnect (no prompt)
+        mock_websocket = AsyncMock()
+        setup_data = {"type": "setup", "callSid": "CA_setup_test", "from": "+15551234567"}
+
+        mock_websocket.receive_json = AsyncMock(
+            side_effect=[setup_data, WebSocketDisconnectError()]
+        )
+
+        # Drive handle_websocket - should process setup but not initialize conversation
+        await channel.handle_websocket(mock_websocket)
+
+        # Verify Maestro was NOT called (initialization only happens on first prompt)
+        tac.maestro_client.list_conversations.assert_not_called()
+        tac.maestro_client.list_participants.assert_not_called()
+
+        # Verify no conversations initialized
+        assert len(channel._conversations) == 0
+
+    @pytest.mark.asyncio
+    async def test_subsequent_prompts_reuse_conversation(self) -> None:
+        """Test second/third prompts use already-initialized conversation via websocket flow."""
+        from tac.channels.websocket_protocol import WebSocketDisconnectError
+        from tac.models.conversation import ParticipantAddress, ParticipantResponse
+
+        tac = TAC(get_test_config())
+        channel = VoiceChannel(tac)
+
+        # Track message callbacks
+        messages_processed = []
+
+        async def on_message(user_message, context, memory_response):
+            messages_processed.append(user_message)
+
+        tac.on_message_ready(on_message)
+
+        # Mock Maestro
+        mock_conversation = ConversationResponse(
+            id="CH_reuse_test",
+            accountId="ACtest123",
+            configuration_id="IStest123",
+            status="ACTIVE",
+        )
+        tac.maestro_client.list_conversations = AsyncMock(return_value=[mock_conversation])
+        mock_participant = ParticipantResponse(
+            id="PA_test",
+            conversation_id="CH_reuse_test",
+            account_id="ACtest123",
+            name="Test Participant",
+            profile_id="profile_reuse",
+            addresses=[
+                ParticipantAddress(channel="VOICE", address="+15551234567"),
+            ],
+        )
+        tac.maestro_client.list_participants = AsyncMock(return_value=[mock_participant])
+
+        # Create mock websocket: setup -> prompt1 -> prompt2 -> prompt3 -> disconnect
+        mock_websocket = AsyncMock()
+        setup_data = {"type": "setup", "callSid": "CA_reuse_test", "from": "+15551234567"}
+        prompt1_data = {"type": "prompt", "voicePrompt": "First message"}
+        prompt2_data = {"type": "prompt", "voicePrompt": "Second message"}
+        prompt3_data = {"type": "prompt", "voicePrompt": "Third message"}
+
+        mock_websocket.receive_json = AsyncMock(
+            side_effect=[
+                setup_data,
+                prompt1_data,
+                prompt2_data,
+                prompt3_data,
+                WebSocketDisconnectError(),
+            ]
+        )
+
+        # Drive the real websocket handler
+        await channel.handle_websocket(mock_websocket)
+
+        # Verify all 3 messages were processed
+        assert len(messages_processed) == 3
+        assert messages_processed == ["First message", "Second message", "Third message"]
+
+        # Verify Maestro was called ONLY ONCE for initialization (on first prompt)
+        assert tac.maestro_client.list_conversations.call_count == 1
+        assert tac.maestro_client.list_participants.call_count == 1
+
+        # Verify the calls used correct parameters
+        tac.maestro_client.list_conversations.assert_called_once_with(
+            channel_id="CA_reuse_test",
+            status=["ACTIVE"],
+        )
+        tac.maestro_client.list_participants.assert_called_once_with("CH_reuse_test")

@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
 try:
     import uvicorn
-    from fastapi import FastAPI, Form, Request, WebSocket, WebSocketDisconnect
+    from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
     from fastapi.responses import JSONResponse, Response
 except ImportError as e:
     raise ImportError(
@@ -122,11 +122,7 @@ class TACFastAPIServer:
                 )
 
             @app.post(config.twiml_path)
-            async def post_twiml(
-                From: str = Form(...),  # noqa: N803
-                To: str = Form(...),  # noqa: N803
-                CallSid: str = Form(...),  # noqa: N803
-            ) -> Response:
+            async def post_twiml() -> Response:
                 """Generate TwiML for incoming voice calls."""
                 websocket_url = f"wss://{config.public_domain}{config.websocket_path}"
                 callback_url = (
@@ -134,14 +130,11 @@ class TACFastAPIServer:
                 )
 
                 twiml = await vc.handle_incoming_call(
-                    to_number=To,
-                    from_number=From,
                     options={
                         "websocket_url": websocket_url,
                         "action_url": callback_url,
                         "welcome_greeting": config.welcome_greeting,
                     },
-                    call_sid=CallSid,
                 )
                 return Response(content=twiml, media_type="application/xml")
 

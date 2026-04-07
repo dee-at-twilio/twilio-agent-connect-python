@@ -1,23 +1,12 @@
 import asyncio
 import json
 from collections.abc import AsyncGenerator
-from datetime import datetime, timezone
 from typing import Any, Optional, Union
-
-from pydantic import BaseModel, Field
-from twilio.twiml.voice_response import VoiceResponse
 
 from tac.channels.base import BaseChannel
 from tac.channels.websocket_manager import WebSocketManager
 from tac.channels.websocket_protocol import WebSocketDisconnectError, WebSocketProtocol
 from tac.core.tac import TAC
-from tac.models.conversation import (
-    CommunicationContent,
-    CommunicationParticipant,
-    CommunicationRequest,
-    ParticipantAddress,
-)
-from tac.models.session import AuthorInfo
 from tac.models.voice import (
     ConversationRelayCallbackPayload,
     InterruptMessage,
@@ -25,83 +14,25 @@ from tac.models.voice import (
     SetupMessage,
     TwiMLOptions,
 )
-from tac.session import SessionManager, SessionState
+from tac.session import SessionState
 
-
-class VoiceChannelConfig(BaseModel):
-    """
-    Configuration for Voice channel.
-
-    Attributes:
-        session_manager: Optional SessionManager for tracking and
-            canceling in-flight streaming tasks. The SessionManager
-            encapsulates the stream_generator for LLM responses.
-            If provided, enables task cancellation on interrupts
-            and new prompts.
-        auto_retrieve_memory: If True, automatically retrieve memory
-            before invoking the on_message_ready callback. Default is False.
-            Set to True to enable automatic memory retrieval.
-    """
-
-    model_config = {"arbitrary_types_allowed": True}
-
-    session_manager: Optional[SessionManager] = Field(
-        default=None,
-        description="SessionManager for tracking and canceling in-flight streaming tasks",
-    )
-    auto_retrieve_memory: bool = Field(
-        default=False,
-        description="Automatically retrieve memory before on_message_ready callback",
-    )
+from . import twiml
+from .config import VoiceChannelConfig
 
 
 class VoiceChannel(BaseChannel):
     """
-    Voice Channel for handling voice-based conversations.
+    Voice Channel for handling voice-based conversations via WebSocket.
 
-    Inherits conversation lifecycle management from BaseChannel and provides
-    voice-specific metadata extraction.
+    Key features:
+    - TwiML generation for incoming calls (see twiml module)
+    - WebSocket connection management for real-time voice streaming
+    - Conversation lifecycle management (inherited from BaseChannel)
+    - ConversationRelay callback webhook handling
 
-    This channel is framework-agnostic: it accepts any WebSocket implementation
+    This channel is framework-agnostic and accepts any WebSocket implementation
     satisfying WebSocketProtocol. For a batteries-included FastAPI server, use
     tac.server.TACFastAPIServer.
-
-    Provides two approaches for TwiML generation:
-
-    1. **High-level** (handle_incoming_call): Automatically creates conversations,
-       adds participants, and generates TwiML with standard TAC parameters
-       (conversationId, profileId, customerParticipantId, aiAgentParticipantId).
-       You can also pass additional custom parameters that get merged with the
-       standard ones. **Recommended for most use cases.**
-
-    2. **Low-level** (generate_twiml): Generate TwiML with complete control over
-       all parameters. Bypasses automatic conversation/participant creation.
-       Use ONLY when you manage conversations outside of TAC or need a completely
-       custom flow.
-
-    Examples:
-        High-level approach (automatic TAC setup + custom params):
-            >>> twiml = await voice_channel.handle_incoming_call(
-            ...     to_number="+15551234567",
-            ...     from_number="+15559876543",
-            ...     options={
-            ...         "websocket_url": "wss://example.com/ws",
-            ...         "custom_parameters": {"session_type": "support", "language": "es"},
-            ...         "welcome_greeting": "Hello!",
-            ...     },
-            ... )
-
-        Low-level approach (manual conversation management):
-            >>> twiml = voice_channel.generate_twiml(
-            ...     {
-            ...         "websocket_url": "wss://example.com/ws",
-            ...         "custom_parameters": {
-            ...             "conversationId": "CH123",
-            ...             "session_id": "custom_session_123",
-            ...         },
-            ...         "welcome_greeting": "¡Hola!",
-            ...     }
-            ... )
     """
 
     def __init__(
@@ -134,36 +65,26 @@ class VoiceChannel(BaseChannel):
 
     async def handle_incoming_call(
         self,
-        to_number: str,
-        from_number: str,
         options: Union[TwiMLOptions, dict[str, Any]],
-        call_sid: Optional[str] = None,
     ) -> str:
         """
         Generate TwiML response for incoming voice calls.
 
-        This method creates a new conversation, adds participants, and returns TwiML
-        that connects the call to a ConversationRelay WebSocket endpoint with standard
-        TAC parameters (conversationId, profileId, customerParticipantId,
-        aiAgentParticipantId) plus any custom parameters from options.
+        ConversationRelay automatically handles conversation creation and participant
+        management via the conversation_configuration parameter.
 
         Args:
-            to_number: Twilio phone number that was called (e.g., '+15551234567')
-            from_number: Caller's phone number (e.g., '+15559876543')
             options: TwiML generation options (TwiMLOptions or dict) containing:
                 - websocket_url (required): WebSocket URL for ConversationRelay
                 - custom_parameters (optional): Additional custom parameters
                 - welcome_greeting (optional): Initial greeting message
                 - action_url (optional): URL for call completion webhook
-            call_sid: Optional Twilio Call SID to associate with participants
 
         Returns:
             TwiML XML string for call connection
 
         Example:
             >>> twiml = await voice_channel.handle_incoming_call(
-            ...     to_number="+15551234567",
-            ...     from_number="+15559876543",
             ...     options={
             ...         "websocket_url": "wss://example.com/ws",
             ...         "custom_parameters": {"session_id": "sess_123"},
@@ -180,144 +101,16 @@ class VoiceChannel(BaseChannel):
         if options.welcome_greeting is None:
             options.welcome_greeting = "Hello! How can I assist you today?"
 
-        # Create a new conversation for each call
-        timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        conversation_name = f"tac-voice-{from_number}-{timestamp}"
-        conversation = await self.tac.maestro_client.create_conversation(name=conversation_name)
-        conversation_id = conversation.id
-
-        self.logger.debug(
-            f"[Voice Channel] Created conversation {conversation_id} for CallSid: {call_sid}"
-        )
-
-        # Add participant with the caller's phone number
-        participant_response = await self.tac.maestro_client.add_participant(
-            conversation_id=conversation_id,
-            addresses=[
-                ParticipantAddress(channel="VOICE", address=from_number, channelId=call_sid)
-            ],
-            participant_type="CUSTOMER",
-        )
-        profile_id = participant_response.profile_id if participant_response else ""
-        customer_participant_id = participant_response.id if participant_response else ""
-
-        ai_agent_participant_response = await self.tac.maestro_client.add_participant(
-            conversation_id=conversation_id,
-            addresses=[ParticipantAddress(channel="VOICE", address=to_number, channelId=call_sid)],
-            participant_type="AI_AGENT",
-        )
-        ai_agent_participant_id = (
-            ai_agent_participant_response.id if ai_agent_participant_response else ""
-        )
-
-        self.logger.debug(
-            f"[Voice Channel] Added participants - "
-            f"customer_id={customer_participant_id}, ai_agent_id={ai_agent_participant_id}, "
-            f"profile_id={profile_id}"
-        )
-
-        # Build standard TAC custom parameters
-        tac_params: dict[str, Any] = {
-            "conversationId": conversation_id,
-            "profileId": profile_id,
-            "customerParticipantId": customer_participant_id,
-            "aiAgentParticipantId": ai_agent_participant_id,
-        }
-
-        # Merge with any custom parameters from options
-        if options.custom_parameters:
-            # Handle both Pydantic model and dict
-            user_params = (
-                options.custom_parameters.model_dump(by_alias=True, exclude_none=True)
-                if isinstance(options.custom_parameters, BaseModel)
-                else options.custom_parameters
-            )
-            tac_params.update(user_params)
-
-        # Use generate_twiml for consistent TwiML generation
-        return self.generate_twiml(
+        # ConversationRelay automatically creates conversation and participants
+        return twiml.generate_twiml(
             TwiMLOptions(
                 websocket_url=options.websocket_url,
-                custom_parameters=tac_params,
+                custom_parameters=options.custom_parameters,
                 welcome_greeting=options.welcome_greeting,
                 action_url=options.action_url,
+                conversation_configuration=self.tac.config.conversation_service_sid,
             )
         )
-
-    def generate_twiml(
-        self,
-        options: Union[TwiMLOptions, dict[str, Any]],
-    ) -> str:
-        """
-        Generate TwiML XML for ConversationRelay with custom parameters.
-
-        This is a low-level method for generating TwiML with arbitrary custom
-        parameters. For automatic conversation creation and participant management,
-        use handle_incoming_call() instead.
-
-        Args:
-            options: TwiML generation options (TwiMLOptions model or dict with:
-                - websocket_url (required): WebSocket URL for ConversationRelay
-                - custom_parameters (optional): Dict of custom parameters
-                - welcome_greeting (optional): Initial greeting message
-                - action_url (optional): URL for call end webhook
-
-        Returns:
-            TwiML XML string ready to return to Twilio
-
-        Example:
-            >>> twiml = voice_channel.generate_twiml(
-            ...     {
-            ...         "websocket_url": "wss://example.com/voice",
-            ...         "custom_parameters": {
-            ...             "conversation_id": "CH123",
-            ...             "custom_field": "custom_value",
-            ...         },
-            ...         "welcome_greeting": "Hello!",
-            ...     }
-            ... )
-        """
-        # Handle dict input (convert to TwiMLOptions)
-        if isinstance(options, dict):
-            options = TwiMLOptions(**options)
-
-        websocket_url = options.websocket_url
-        custom_parameters = options.custom_parameters
-        welcome_greeting = options.welcome_greeting
-        action_url = options.action_url
-
-        # Create VoiceResponse
-        response = VoiceResponse()
-
-        # Create Connect verb with optional action
-        connect_kwargs: dict[str, str] = {}
-        if action_url:
-            connect_kwargs["action"] = action_url
-        connect = response.connect(**connect_kwargs)
-
-        # Build ConversationRelay kwargs
-        relay_kwargs: dict[str, str] = {"url": websocket_url}
-        if welcome_greeting:
-            relay_kwargs["welcome_greeting"] = welcome_greeting
-
-        # Create ConversationRelay
-        relay = connect.conversation_relay(**relay_kwargs)
-
-        # Add custom parameters
-        if custom_parameters:
-            # Handle both Pydantic model and dict
-            params_dict: dict[str, Any] = (
-                custom_parameters.model_dump(by_alias=True, exclude_none=True)
-                if isinstance(custom_parameters, BaseModel)
-                else custom_parameters
-            )
-
-            # Add each parameter as a child element
-            for name, value in params_dict.items():
-                if value is not None:
-                    relay.parameter(name=name, value=str(value))
-
-        return str(response)
 
     async def handle_handoff(self, form_data: dict[str, str]) -> str:
         """
@@ -429,30 +222,76 @@ class VoiceChannel(BaseChannel):
 
         conv_id: Optional[str] = None
         session_state = None
-        handler_task = None
 
         try:
             # First message should be 'setup'
             data = await websocket.receive_json()
             if data.get("type") == "setup":
                 setup_msg = SetupMessage(**data)
-                conv_id = setup_msg.custom_parameters.conversation_id
+                call_sid = setup_msg.call_sid
+                from_number = setup_msg.from_number
 
-                # Store WebSocket in manager BEFORE calling _handle_setup
-                self._websocket_manager.add_websocket(conv_id, websocket)
+                # Don't initialize conversation yet - wait for first prompt
+                # when ConversationRelay has created the conversation
 
-                # Handle setup to initialize conversation
-                self._handle_setup(setup_msg)
+                # Process all subsequent messages
+                while True:
+                    data = await websocket.receive_json()
+                    msg_type = data.get("type")
 
-                # Get or create session state if session manager is available
-                if self.session_manager is not None:
-                    session_state = self.session_manager.get_or_create_session(conv_id)
+                    if msg_type == "prompt":
+                        # First prompt? Initialize conversation from ConversationRelay
+                        if not conv_id and call_sid:
+                            conversations = await self.tac.maestro_client.list_conversations(
+                                channel_id=call_sid,
+                                status=["ACTIVE"],
+                            )
 
-                # Create dedicated task to handle all subsequent messages
-                handler_task = asyncio.create_task(
-                    self._message_handler(websocket, conv_id, session_state)
-                )
-                await handler_task
+                            if len(conversations) != 1:
+                                raise RuntimeError(
+                                    f"Expected exactly 1 conversation for call_sid {call_sid}, "
+                                    f"but found {len(conversations)}. "
+                                    "ConversationRelay should have created exactly one."
+                                )
+
+                            conversation = conversations[0]
+                            conv_id = conversation.id
+
+                            # Get profile_id from participants
+                            participants = await self.tac.maestro_client.list_participants(conv_id)
+                            profile_id = None
+                            for participant in participants:
+                                if from_number and participant.addresses:
+                                    for address in participant.addresses:
+                                        if (
+                                            address.channel == "VOICE"
+                                            and address.address == from_number
+                                            and participant.profile_id
+                                        ):
+                                            profile_id = participant.profile_id
+                                            break
+                                if profile_id:
+                                    break
+
+                            self._websocket_manager.add_websocket(conv_id, websocket)
+                            self._start_conversation(conv_id, profile_id)
+
+                            if self.session_manager is not None:
+                                session_state = self.session_manager.get_or_create_session(conv_id)
+
+                        if conv_id:
+                            await self._handle_prompt_async(conv_id, data, session_state)
+                        else:
+                            self.logger.warning("Received prompt before conversation initialized")
+                    elif msg_type == "interrupt":
+                        if conv_id:
+                            await self._handle_interrupt_async(conv_id, data, session_state)
+                        else:
+                            self.logger.warning(
+                                "Received interrupt before conversation initialized"
+                            )
+                    else:
+                        self.logger.debug(f"Skip message type received: {msg_type}")
             else:
                 self.logger.warning("First message was not 'setup'. Closing connection.")
                 await websocket.close()
@@ -462,52 +301,9 @@ class VoiceChannel(BaseChannel):
         except Exception as e:
             self.logger.error(f"WebSocket error: {str(e)}")
         finally:
-            # Cancel handler task if still running
-            if handler_task and not handler_task.done():
-                handler_task.cancel()
-                try:
-                    await handler_task
-                except asyncio.CancelledError:
-                    pass
-
-            # Clean up conversation and websocket
             if conv_id:
                 self.logger.debug("Cleanup - removing WebSocket", conversation_id=conv_id)
                 await self._cleanup_connection(conv_id)
-
-    async def _message_handler(
-        self,
-        websocket: WebSocketProtocol,
-        conv_id: str,
-        session_state: Optional[SessionState],
-    ) -> None:
-        """
-        Handle all incoming messages for a conversation session.
-
-        Args:
-            websocket: WebSocket connection
-            conv_id: Conversation ID
-            session_state: Session state object (if session_manager provided)
-        """
-        try:
-            while True:
-                data = await websocket.receive_json()
-                msg_type = data.get("type")
-
-                if msg_type == "prompt":
-                    await self._handle_prompt_async(conv_id, data, session_state)
-                elif msg_type == "interrupt":
-                    await self._handle_interrupt_async(conv_id, data, session_state)
-                else:
-                    self.logger.debug(f"Skip message type received: {msg_type}")
-        except WebSocketDisconnectError:
-            self.logger.debug(
-                f"WebSocket disconnected during message handling for conversation {conv_id}"
-            )
-        except Exception as e:
-            self.logger.error(
-                f"Error in message_handler for conversation {conv_id}: {e}", exc_info=True
-            )
 
     async def _handle_prompt_async(
         self,
@@ -662,42 +458,9 @@ class VoiceChannel(BaseChannel):
                     # Let Python's async generator cleanup handle closing the generator
                     raise
             else:
-                # Simple string response
-                full_response = response
                 await websocket.send_text(
                     json.dumps({"type": "text", "token": response, "last": True})
                 )
-
-            # If active hydration is enabled, send agent response to Maestro
-            # Check all required fields are available before creating communication
-            if (
-                self.tac.config.enable_voice_active_hydration
-                and conversation_id in self._conversations
-            ):
-                session = self._conversations[conversation_id]
-
-                if (
-                    session.author_info
-                    and session.ai_agent_info
-                    and session.ai_agent_info.address
-                    and session.ai_agent_info.participant_id
-                    and session.author_info.address
-                    and session.author_info.participant_id
-                ):
-                    # Agent is author, customer is recipient
-                    await self._create_communication(
-                        conversation_id=conversation_id,
-                        message_content=full_response,
-                        author_address=session.ai_agent_info.address,
-                        recipient_address=session.author_info.address,
-                        author_participant_id=session.ai_agent_info.participant_id,
-                        recipient_participant_id=session.author_info.participant_id,
-                    )
-                else:
-                    self.logger.warning(
-                        "[Active Hydration] Skipping communication - missing required fields",
-                        conversation_id=conversation_id,
-                    )
 
         except asyncio.CancelledError:
             # Re-raise to propagate cancellation up the call stack.
@@ -728,31 +491,6 @@ class VoiceChannel(BaseChannel):
         """
         return self._websocket_manager.get_websocket(conversation_id)
 
-    def _handle_setup(self, message: SetupMessage) -> None:
-        """
-        Handle WebSocket setup message.
-
-        Args:
-            message: Parsed SetupMessage containing call metadata
-        """
-        conversation_id = message.custom_parameters.conversation_id
-        profile_id = message.custom_parameters.profile_id
-
-        self._start_conversation(conversation_id, profile_id)
-
-        # If active hydration is enabled, populate author_info and ai_agent_info
-        if self.tac.config.enable_voice_active_hydration:
-            if message.from_number:
-                self._conversations[conversation_id].author_info = AuthorInfo(
-                    address=message.from_number,
-                    participant_id=message.custom_parameters.customer_participant_id,
-                )
-            if message.to_number:
-                self._conversations[conversation_id].ai_agent_info = AuthorInfo(
-                    address=message.to_number,
-                    participant_id=message.custom_parameters.ai_agent_participant_id,
-                )
-
     async def _handle_prompt(self, conv_id: str, message: PromptMessage) -> None:
         """
         Handle incoming voice prompt (user speech).
@@ -764,39 +502,13 @@ class VoiceChannel(BaseChannel):
         if conv_id not in self._conversations:
             self.logger.error(
                 f"Received prompt for unknown conversation {conv_id}. "
-                "Conversation should be initialized in setup message first.",
+                "Conversation should be initialized on first prompt.",
                 conversation_id=conv_id,
             )
             return
 
         message_body = message.voice_prompt or ""
         session = self._conversations[conv_id]
-
-        # If active hydration is enabled, send user message to Maestro
-        # Check all required fields are available before creating communication
-        if self.tac.config.enable_voice_active_hydration:
-            if (
-                session.author_info
-                and session.ai_agent_info
-                and session.author_info.address
-                and session.author_info.participant_id
-                and session.ai_agent_info.address
-                and session.ai_agent_info.participant_id
-            ):
-                # Customer is author, agent is recipient
-                await self._create_communication(
-                    conversation_id=conv_id,
-                    message_content=message_body,
-                    author_address=session.author_info.address,
-                    recipient_address=session.ai_agent_info.address,
-                    author_participant_id=session.author_info.participant_id,
-                    recipient_participant_id=session.ai_agent_info.participant_id,
-                )
-            else:
-                self.logger.warning(
-                    "[Active Hydration] Skipping communication - missing required fields",
-                    conversation_id=conv_id,
-                )
 
         # Retrieve memory if auto_retrieve_memory is enabled and Twilio Memory is configured
         memory_response = await self._retrieve_memory_if_enabled(session, message_body, conv_id)
@@ -852,51 +564,3 @@ class VoiceChannel(BaseChannel):
 
         # Clean up conversation state from BaseChannel
         await self._end_conversation(conv_id)
-
-    async def _create_communication(
-        self,
-        conversation_id: str,
-        message_content: str,
-        author_address: str,
-        recipient_address: str,
-        author_participant_id: str,
-        recipient_participant_id: str,
-    ) -> None:
-        """
-        Add communication to Maestro for active hydration.
-
-        This method creates a communication record in Maestro using the provided participant IDs.
-        Callers must ensure participant IDs are available before invoking this method.
-
-        Args:
-            conversation_id: Conversation ID
-            message_content: Message content
-            author_address: Author's address (phone number)
-            recipient_address: Recipient's address (phone number)
-            author_participant_id: Author's participant ID (required by Maestro API)
-            recipient_participant_id: Recipient's participant ID (required by Maestro API)
-        """
-        try:
-            communication_request = CommunicationRequest(
-                author=CommunicationParticipant(
-                    address=author_address, channel="VOICE", participant_id=author_participant_id
-                ),
-                content=CommunicationContent(type="TEXT", text=message_content),
-                recipients=[
-                    CommunicationParticipant(
-                        address=recipient_address,
-                        channel="VOICE",
-                        participant_id=recipient_participant_id,
-                    )
-                ],
-            )
-
-            await self.tac.maestro_client.create_communication(
-                conversation_id, communication_request
-            )
-        except Exception:
-            self.logger.error(
-                "[Active Hydration] Failed to add communication",
-                conversation_id=conversation_id,
-                exc_info=True,
-            )
