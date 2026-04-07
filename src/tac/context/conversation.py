@@ -22,26 +22,26 @@ from tac.models.conversation import (
 
 
 class ConversationClient:
-    """Client for interacting with Maestro API."""
+    """Client for interacting with Conversation Orchestrator API."""
 
     def __init__(
         self,
         base_url: str,
         api_key: str,
         api_token: str,
-        service_id: str,
+        configuration_id: str,
     ) -> None:
         """
         Initialize the Conversation client.
 
         Args:
-            base_url: Base URL for the Maestro API
+            base_url: Base URL for the Conversation Orchestrator API
             api_key: Twilio API Key SID for authentication
             api_token: Twilio API Key Secret for authentication
-            service_id: Conversation Service SID for API requests
+            configuration_id: Conversation Configuration ID for API requests
         """
         self.base_url = base_url
-        self.service_id = service_id
+        self.configuration_id = configuration_id
         self.api_key = api_key
         self.api_token = api_token
         self.logger = get_logger(__name__)
@@ -206,7 +206,7 @@ class ConversationClient:
         """
         url = f"{self.base_url}/v2/Conversations"
 
-        request_data = ConversationRequest(configuration_id=self.service_id, name=name)
+        request_data = ConversationRequest(configuration_id=self.configuration_id, name=name)
         request_payload = request_data.model_dump(by_alias=True, exclude_none=True)
 
         try:

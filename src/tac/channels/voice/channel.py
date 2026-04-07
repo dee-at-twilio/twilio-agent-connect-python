@@ -108,7 +108,7 @@ class VoiceChannel(BaseChannel):
                 custom_parameters=options.custom_parameters,
                 welcome_greeting=options.welcome_greeting,
                 action_url=options.action_url,
-                conversation_configuration=self.tac.config.conversation_service_sid,
+                conversation_configuration=self.tac.config.conversation_configuration_id,
             )
         )
 
@@ -164,7 +164,7 @@ class VoiceChannel(BaseChannel):
 
         # If call is completed, close associated conversations
         if payload.call_status == "completed":
-            conversations = await self.tac.maestro_client.list_conversations(
+            conversations = await self.tac.conversation_orchestrator_client.list_conversations(
                 channel_id=payload.call_sid, status=["ACTIVE", "INACTIVE"]
             )
 
@@ -177,10 +177,11 @@ class VoiceChannel(BaseChannel):
             for conversation in conversations:
                 try:
                     # Only handle conversations from our configuration
-                    if conversation.configuration_id != self.tac.config.conversation_service_sid:
+                    config_id = self.tac.config.conversation_configuration_id
+                    if conversation.configuration_id != config_id:
                         continue
 
-                    await self.tac.maestro_client.update_conversation(
+                    await self.tac.conversation_orchestrator_client.update_conversation(
                         conversation_id=conversation.id, status="CLOSED"
                     )
 
@@ -242,9 +243,11 @@ class VoiceChannel(BaseChannel):
                     if msg_type == "prompt":
                         # First prompt? Initialize conversation from ConversationRelay
                         if not conv_id and call_sid:
-                            conversations = await self.tac.maestro_client.list_conversations(
-                                channel_id=call_sid,
-                                status=["ACTIVE"],
+                            conversations = (
+                                await self.tac.conversation_orchestrator_client.list_conversations(
+                                    channel_id=call_sid,
+                                    status=["ACTIVE"],
+                                )
                             )
 
                             if len(conversations) != 1:
@@ -258,7 +261,11 @@ class VoiceChannel(BaseChannel):
                             conv_id = conversation.id
 
                             # Get profile_id from participants
-                            participants = await self.tac.maestro_client.list_participants(conv_id)
+                            participants = (
+                                await self.tac.conversation_orchestrator_client.list_participants(
+                                    conv_id
+                                )
+                            )
                             profile_id = None
                             for participant in participants:
                                 if from_number and participant.addresses:
@@ -464,8 +471,9 @@ class VoiceChannel(BaseChannel):
 
         except asyncio.CancelledError:
             # Re-raise to propagate cancellation up the call stack.
-            # Note: Partial responses from interrupted streams are NOT saved to Maestro.
-            # This is intentional - incomplete responses shouldn't be part of conversation history.
+            # Partial responses from interrupted streams are NOT saved to
+            # Conversation Orchestrator. Incomplete responses shouldn't be
+            # part of conversation history.
             raise
         except (WebSocketDisconnectError, RuntimeError):
             self.logger.info(

@@ -8,11 +8,11 @@ from tac.models.conversation import ConversationConfiguration
 
 
 @pytest.fixture(autouse=True)
-def mock_maestro_configuration(request):
+def mock_conversation_configuration(request):
     """
     Mock ConversationClient.get_configuration() for all tests by default.
 
-    TAC initialization requires fetching the Maestro configuration to get
+    TAC initialization requires fetching the Conversation Orchestrator configuration to get
     the memory_store_id. This fixture mocks the API call to prevent actual
     network requests during tests.
 
@@ -28,7 +28,7 @@ def mock_maestro_configuration(request):
         return
 
     mock_config = ConversationConfiguration(
-        id="IS123test",
+        id="conv_configuration_test123",
         memory_store_id="MGtest123",
         display_name="Test Configuration",
         description="Test configuration for unit tests",

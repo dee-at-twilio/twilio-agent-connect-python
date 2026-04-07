@@ -86,7 +86,9 @@ class SMSChannel(MessagingChannel):
             raise TypeError("SMS channel only supports string responses")
 
         try:
-            participants = await self.tac.maestro_client.list_participants(conversation_id)
+            participants = await self.tac.conversation_orchestrator_client.list_participants(
+                conversation_id
+            )
         except Exception as e:
             self.logger.error(
                 "Failed to list participants",
@@ -146,7 +148,9 @@ class SMSChannel(MessagingChannel):
                 ],
             )
 
-            await self.tac.maestro_client.send_communication(conversation_id, send_request)
+            await self.tac.conversation_orchestrator_client.send_communication(
+                conversation_id, send_request
+            )
 
             self.logger.debug(
                 "Sent SMS response via Send API",

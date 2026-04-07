@@ -17,15 +17,15 @@ class TestTACConfig:
             api_key="SK123",
             api_token="test_api_token",
             environment="prod",
-            conversation_service_sid="IS123test",
+            conversation_configuration_id="conv_configuration_test123",
             twilio_phone_number="+15551234567",
         )
         assert config.twilio_auth_token == "test_token_123"
         assert config.api_key == "SK123"
         assert config.api_token == "test_api_token"
-        assert config.memora_base_url == "https://memory.twilio.com"
+        assert config.memory_base_url == "https://memory.twilio.com"
         assert config.environment == "prod"
-        assert config.maestro_base_url == "https://conversations.twilio.com"
+        assert config.conversation_base_url == "https://conversations.twilio.com"
         assert config.log_level == "INFO"  # Default value
         assert config.twilio_memory_config is None  # Optional memory config
 
@@ -35,12 +35,12 @@ class TestTACConfig:
             twilio_auth_token="test_token_123",
             api_key="SK123",
             api_token="test_api_token",
-            conversation_service_sid="IS123test",
+            conversation_configuration_id="conv_configuration_test123",
             twilio_phone_number="+15551234567",
         )
         assert config.environment == "prod"
-        assert config.memora_base_url == "https://memory.twilio.com"
-        assert config.maestro_base_url == "https://conversations.twilio.com"
+        assert config.memory_base_url == "https://memory.twilio.com"
+        assert config.conversation_base_url == "https://conversations.twilio.com"
 
     def test_config_with_custom_log_level(self):
         """Test config with custom log level."""
@@ -49,7 +49,7 @@ class TestTACConfig:
             api_key="SK123",
             api_token="test_api_token",
             environment="dev",
-            conversation_service_sid="IS123test",
+            conversation_configuration_id="conv_configuration_test123",
             twilio_phone_number="+15551234567",
             log_level="DEBUG",
         )
@@ -57,8 +57,8 @@ class TestTACConfig:
         assert config.api_key == "SK123"
         assert config.api_token == "test_api_token"
         assert config.environment == "dev"
-        assert config.memora_base_url == "https://memory.dev.twilio.com"
-        assert config.maestro_base_url == "https://conversations.dev.twilio.com"
+        assert config.memory_base_url == "https://memory.dev.twilio.com"
+        assert config.conversation_base_url == "https://conversations.dev.twilio.com"
         assert config.log_level == "DEBUG"
 
     def test_config_with_memory_enabled(self):
@@ -69,7 +69,7 @@ class TestTACConfig:
             api_key="SK123",
             api_token="test_api_token",
             environment="prod",
-            conversation_service_sid="IS123test",
+            conversation_configuration_id="conv_configuration_test123",
             twilio_phone_number="+15551234567",
             twilio_memory_config=memory_config,
         )
@@ -83,7 +83,7 @@ class TestTACConfig:
             api_key="SK123",
             api_token="test_api_token",
             environment="stage",
-            conversation_service_sid="IS123test",
+            conversation_configuration_id="conv_configuration_test123",
             twilio_phone_number="+15551234567",
             twilio_memory_config=TwilioMemoryConfig(trait_groups=["Contact", "Preferences"]),
         )
@@ -110,7 +110,7 @@ class TestTACConfig:
             "api_key": "SK123",
             "api_token": "test_api_token",
             "environment": "prod",
-            "conversation_service_sid": "IS123test",
+            "conversation_configuration_id": "conv_configuration_test123",
             "twilio_phone_number": "+15551234567",
             "twilio_memory_config": {
                 "trait_groups": ["Contact", "Preferences"],
@@ -120,7 +120,7 @@ class TestTACConfig:
         assert config.twilio_auth_token == "test_token_123"
         assert config.api_key == "SK123"
         assert config.api_token == "test_api_token"
-        assert config.memora_base_url == "https://memory.twilio.com"
+        assert config.memory_base_url == "https://memory.twilio.com"
         assert config.environment == "prod"
         assert config.twilio_memory_config is not None
         assert config.twilio_memory_config.trait_groups == ["Contact", "Preferences"]
@@ -145,7 +145,7 @@ class TestTACConfig:
         required_fields = schema["required"]
         assert "api_key" in required_fields
         assert "api_token" in required_fields
-        assert "conversation_service_sid" in required_fields
+        assert "conversation_configuration_id" in required_fields
         assert "twilio_phone_number" in required_fields
 
         assert "twilio_auth_token" in required_fields
@@ -158,7 +158,7 @@ class TestTACConfig:
             "api_key": "SK123",
             "api_token": "test_api_token",
             "environment": "prod",
-            "conversation_service_sid": "IS123test",
+            "conversation_configuration_id": "conv_configuration_test123",
             "twilio_phone_number": "+15551234567",
         }
         config1 = TACConfig(**base_config)
@@ -193,7 +193,7 @@ class TestTACConfig:
             TACConfig(
                 twilio_auth_token="test_token_123",
                 environment="invalid",  # Invalid environment
-                conversation_service_sid="IS123test",
+                conversation_configuration_id="conv_configuration_test123",
                 twilio_phone_number="+15551234567",
             )
 

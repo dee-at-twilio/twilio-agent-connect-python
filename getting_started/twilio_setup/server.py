@@ -1,7 +1,7 @@
 """
 TAC Quickstart Setup Server
 
-A simple web UI to help users set up Memory (Memora) and Maestro services
+A simple web UI to help users set up Conversation Memory and Conversation Orchestrator services
 required for Twilio Agent Connect.
 """
 
@@ -55,7 +55,7 @@ async def index(request: Request) -> HTMLResponse:
 @app.post("/api/create-memory-store")
 async def create_memory_store(request: Request) -> dict:
     """
-    Create a Memory Store in Memora.
+    Create a Memory Store in Conversation Memory.
 
     Expected payload:
     {
@@ -557,14 +557,14 @@ async def lookup_profile(request: Request) -> dict:
         return {"status": "error", "message": f"Error looking up Profile: {str(e)}"}
 
 
-# Maestro API endpoint
-MAESTRO_API_BASE = "https://conversations.twilio.com/v2/ControlPlane"
+# Conversation Orchestrator API endpoint
+CONVERSATION_API_BASE = "https://conversations.twilio.com/v2/ControlPlane"
 
 
-@app.post("/api/create-maestro-service")
-async def create_maestro_service(request: Request) -> dict:
+@app.post("/api/create-conversation-configuration")
+async def create_conversation_configuration(request: Request) -> dict:
     """
-    Create a Maestro Conversation Configuration.
+    Create a Conversation Orchestrator Configuration.
 
     Expected payload:
     {
@@ -583,16 +583,16 @@ async def create_maestro_service(request: Request) -> dict:
     twilio_phone = data.get("twilio_phone")
     ngrok_domain = data.get("ngrok_domain")
     # Strip values once at the beginning for efficiency
-    maestro_display_name = data.get("maestro_display_name", "").strip()
-    maestro_description = data.get("maestro_description", "").strip()
+    configuration_display_name = data.get("configuration_display_name", "").strip()
+    configuration_description = data.get("configuration_description", "").strip()
 
     if not all([api_key, api_secret, memory_store_id, twilio_phone, ngrok_domain]):
         return {"status": "error", "message": "Missing required fields"}
 
     # Use user's display name as-is, or generate a default
     # displayName must be unique, URL-safe, max 32 characters
-    if maestro_display_name:
-        display_name = maestro_display_name
+    if configuration_display_name:
+        display_name = configuration_display_name
 
         # Validate display name length
         if len(display_name) > 32:
@@ -618,11 +618,11 @@ async def create_maestro_service(request: Request) -> dict:
         display_name = f"tac-quickstart-{unique_suffix}"
 
     # Validate description length only when provided
-    if maestro_description and len(maestro_description) > 128:
+    if configuration_description and len(configuration_description) > 128:
         return {
             "status": "error",
             "message": "Description must not exceed 128 characters",
-            "details": f"Current length: {len(maestro_description)}",
+            "details": f"Current length: {len(configuration_description)}",
         }
 
     # Build webhook URL
@@ -660,13 +660,13 @@ async def create_maestro_service(request: Request) -> dict:
     }
 
     # Add optional description if provided (no default fallback - field is omitted if not provided)
-    if maestro_description:
-        payload["description"] = maestro_description
+    if configuration_description:
+        payload["description"] = configuration_description
 
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(
-                f"{MAESTRO_API_BASE}/Configurations",
+                f"{CONVERSATION_API_BASE}/Configurations",
                 headers={
                     "Content-Type": "application/json",
                     "Authorization": get_basic_auth_header(api_key, api_secret),
@@ -677,24 +677,25 @@ async def create_maestro_service(request: Request) -> dict:
 
             if response.status_code in [200, 201]:
                 result = response.json()
-                logger.info("Maestro configuration created successfully")
+                logger.info("Conversation Orchestrator configuration created successfully")
                 logger.debug(f"  Request displayName: {display_name}")
                 logger.debug(f"  Response displayName: {result.get('displayName')}")
                 return {
                     "status": "success",
-                    "conversation_service_id": result.get("id"),
-                    "message": f"Maestro configuration created: {result.get('id')}",
+                    "conversation_configuration_id": result.get("id"),
+                    "message": "Conversation Orchestrator configuration"
+                    f" created: {result.get('id')}",
                 }
             else:
-                endpoint = f"{MAESTRO_API_BASE}/Configurations"
-                logger.error("Failed to create Maestro configuration")
+                endpoint = f"{CONVERSATION_API_BASE}/Configurations"
+                logger.error("Failed to create Conversation Orchestrator configuration")
                 logger.error(f"  Endpoint: {endpoint}")
                 logger.error(f"  Payload: {json.dumps(payload, indent=2)}")
                 logger.error(f"  Status: {response.status_code}")
                 logger.error(f"  Response: {response.text}")
                 return {
                     "status": "error",
-                    "message": f"Failed to create Maestro configuration: "
+                    "message": f"Failed to create Conversation Orchestrator configuration: "
                     f"{response.status_code} - {response.text}",
                     "endpoint": endpoint,
                     "payload": payload,
@@ -703,17 +704,18 @@ async def create_maestro_service(request: Request) -> dict:
                 }
 
     except httpx.TimeoutException:
-        logger.error("Timeout creating Maestro configuration")
+        logger.error("Timeout creating Conversation Orchestrator configuration")
         return {"status": "error", "message": "Request timed out. Please try again."}
     except Exception as e:
-        logger.exception(f"Error creating Maestro configuration: {str(e)}")
-        return {"status": "error", "message": f"Error creating Maestro configuration: {str(e)}"}
+        logger.exception(f"Error creating Conversation Orchestrator configuration: {str(e)}")
+        msg = f"Error creating Conversation Orchestrator configuration: {e}"
+        return {"status": "error", "message": msg}
 
 
-@app.post("/api/list-maestro-services")
-async def list_maestro_services(request: Request) -> dict:
+@app.post("/api/list-conversation-configurations")
+async def list_conversation_configurations(request: Request) -> dict:
     """
-    List all Maestro Conversation Configurations.
+    List all Conversation Orchestrator Configurations.
 
     Expected payload:
     {
@@ -732,7 +734,7 @@ async def list_maestro_services(request: Request) -> dict:
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get(
-                f"{MAESTRO_API_BASE}/Configurations",
+                f"{CONVERSATION_API_BASE}/Configurations",
                 headers={
                     "Content-Type": "application/json",
                     "Authorization": get_basic_auth_header(api_key, api_secret),
@@ -763,8 +765,8 @@ async def list_maestro_services(request: Request) -> dict:
                 ]
                 return {"status": "success", "configurations": simplified}
             else:
-                endpoint = f"{MAESTRO_API_BASE}/Configurations"
-                logger.error("Failed to list Maestro configurations")
+                endpoint = f"{CONVERSATION_API_BASE}/Configurations"
+                logger.error("Failed to list Conversation Orchestrator configurations")
                 logger.error(f"  Endpoint: {endpoint}")
                 logger.error(f"  Status: {response.status_code}")
                 logger.error(f"  Response: {response.text}")
@@ -778,17 +780,17 @@ async def list_maestro_services(request: Request) -> dict:
                 }
 
     except httpx.TimeoutException:
-        logger.error("Timeout listing Maestro configurations")
+        logger.error("Timeout listing Conversation Orchestrator configurations")
         return {"status": "error", "message": "Request timed out. Please try again."}
     except Exception as e:
-        logger.exception(f"Error listing Maestro configurations: {str(e)}")
+        logger.exception(f"Error listing Conversation Orchestrator configurations: {str(e)}")
         return {"status": "error", "message": f"Error listing configurations: {str(e)}"}
 
 
-@app.post("/api/delete-maestro-service")
-async def delete_maestro_service(request: Request) -> dict:
+@app.post("/api/delete-conversation-configuration")
+async def delete_conversation_configuration(request: Request) -> dict:
     """
-    Delete a Maestro Conversation Configuration.
+    Delete a Conversation Orchestrator Configuration.
 
     Expected payload:
     {
@@ -812,7 +814,7 @@ async def delete_maestro_service(request: Request) -> dict:
     try:
         async with httpx.AsyncClient() as client:
             response = await client.delete(
-                f"{MAESTRO_API_BASE}/Configurations/{configuration_id}",
+                f"{CONVERSATION_API_BASE}/Configurations/{configuration_id}",
                 headers={
                     "Content-Type": "application/json",
                     "Authorization": get_basic_auth_header(api_key, api_secret),
@@ -821,14 +823,14 @@ async def delete_maestro_service(request: Request) -> dict:
             )
 
             if response.status_code in [200, 204]:
-                logger.info(f"Deleted Maestro configuration: {configuration_id}")
+                logger.info(f"Deleted Conversation Orchestrator configuration: {configuration_id}")
                 return {
                     "status": "success",
                     "message": f"Configuration {configuration_id} deleted successfully",
                 }
             else:
-                endpoint = f"{MAESTRO_API_BASE}/Configurations/{configuration_id}"
-                logger.error("Failed to delete Maestro configuration")
+                endpoint = f"{CONVERSATION_API_BASE}/Configurations/{configuration_id}"
+                logger.error("Failed to delete Conversation Orchestrator configuration")
                 logger.error(f"  Endpoint: {endpoint}")
                 logger.error(f"  Status: {response.status_code}")
                 logger.error(f"  Response: {response.text}")
@@ -842,10 +844,10 @@ async def delete_maestro_service(request: Request) -> dict:
                 }
 
     except httpx.TimeoutException:
-        logger.error("Timeout deleting Maestro configuration")
+        logger.error("Timeout deleting Conversation Orchestrator configuration")
         return {"status": "error", "message": "Request timed out. Please try again."}
     except Exception as e:
-        logger.exception(f"Error deleting Maestro configuration: {str(e)}")
+        logger.exception(f"Error deleting Conversation Orchestrator configuration: {str(e)}")
         return {"status": "error", "message": f"Error deleting configuration: {str(e)}"}
 
 

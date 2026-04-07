@@ -87,7 +87,7 @@ def get_test_config_with_trait_groups(trait_groups: list[str] | None = None) -> 
     )
     return TACConfig(
         environment="prod",
-        conversation_service_sid="IStest123",
+        conversation_configuration_id="conv_configuration_test123",
         twilio_auth_token="test_token_123",
         api_key="SK123",
         api_token="test_api_token",
@@ -96,10 +96,10 @@ def get_test_config_with_trait_groups(trait_groups: list[str] | None = None) -> 
     )
 
 
-def create_memora_client(tac: TAC) -> MemoryClient:
-    """Helper to manually create memora_client for tests."""
+def create_memory_client(tac: TAC) -> MemoryClient:
+    """Helper to manually create Conversation Memory client for tests."""
     return MemoryClient(
-        base_url=tac.config.memora_base_url,
+        base_url=tac.config.memory_base_url,
         store_id="MGtest123",
         api_key=tac.config.api_key,
         api_token=tac.config.api_token,
@@ -139,11 +139,11 @@ class TestProfileRetrieval:
         """Test that profile is fetched with configured trait groups."""
         config = get_test_config_with_trait_groups(trait_groups=["Contact", "Preferences"])
         tac = TAC(config)
-        tac.memora_client = create_memora_client(tac)
+        tac.conversation_memory_client = create_memory_client(tac)
 
         mock_profile = get_mock_profile_response()
 
-        tac.memora_client.get_profile = AsyncMock(return_value=mock_profile)
+        tac.conversation_memory_client.get_profile = AsyncMock(return_value=mock_profile)
         profile = await tac.fetch_profile("profile_test_123")
 
         # Verify profile was fetched
@@ -154,7 +154,7 @@ class TestProfileRetrieval:
         assert profile.traits["Contact"]["firstName"] == "John"
 
         # Verify get_profile was called with correct trait_groups
-        tac.memora_client.get_profile.assert_called_once_with(
+        tac.conversation_memory_client.get_profile.assert_called_once_with(
             profile_id="profile_test_123",
             trait_groups=["Contact", "Preferences"],
         )
@@ -164,11 +164,11 @@ class TestProfileRetrieval:
         """Test that profile is fetched without trait_groups when not configured."""
         config = get_test_config_with_trait_groups(trait_groups=None)
         tac = TAC(config)
-        tac.memora_client = create_memora_client(tac)
+        tac.conversation_memory_client = create_memory_client(tac)
 
         mock_profile = get_mock_profile_response()
 
-        tac.memora_client.get_profile = AsyncMock(return_value=mock_profile)
+        tac.conversation_memory_client.get_profile = AsyncMock(return_value=mock_profile)
         profile = await tac.fetch_profile("profile_test_123")
 
         # Verify profile was fetched
@@ -176,7 +176,7 @@ class TestProfileRetrieval:
         assert profile.id == "profile_test_123"
 
         # Verify get_profile was called with trait_groups=None
-        tac.memora_client.get_profile.assert_called_once_with(
+        tac.conversation_memory_client.get_profile.assert_called_once_with(
             profile_id="profile_test_123",
             trait_groups=None,
         )
@@ -186,10 +186,10 @@ class TestProfileRetrieval:
         """Test that profile fetch errors are handled gracefully."""
         config = get_test_config_with_trait_groups()
         tac = TAC(config)
-        tac.memora_client = create_memora_client(tac)
+        tac.conversation_memory_client = create_memory_client(tac)
 
         # Simulate an error during profile fetch
-        tac.memora_client.get_profile = AsyncMock(side_effect=Exception("API Error"))
+        tac.conversation_memory_client.get_profile = AsyncMock(side_effect=Exception("API Error"))
         profile = await tac.fetch_profile("profile_test_123")
 
         # Verify None is returned on error (not raised)
@@ -200,7 +200,7 @@ class TestProfileRetrieval:
         """Test that profile fetch handles empty profile_id gracefully."""
         config = get_test_config_with_trait_groups()
         tac = TAC(config)
-        tac.memora_client = create_memora_client(tac)
+        tac.conversation_memory_client = create_memory_client(tac)
 
         # Test with empty string
         profile = await tac.fetch_profile("")
@@ -215,7 +215,7 @@ class TestProfileInSMSChannel:
         """Test that profile is available in callback context for SMS."""
         config = get_test_config_with_trait_groups(trait_groups=["Contact"])
         tac = TAC(config)
-        tac.memora_client = create_memora_client(tac)
+        tac.conversation_memory_client = create_memory_client(tac)
         channel = SMSChannel(tac, config={"auto_retrieve_memory": True})  # Enable auto retrieval
 
         # Track callback data
@@ -243,14 +243,14 @@ class TestProfileInSMSChannel:
             "CH123456", "MB123", "Hello!", "2025-11-18T00:00:01.000Z"
         )
 
-        tac.memora_client.get_profile = AsyncMock(return_value=mock_profile)
+        tac.conversation_memory_client.get_profile = AsyncMock(return_value=mock_profile)
         empty_memory = MemoryRetrievalResponse(
             observations=[],
             summaries=[],
             sessions=[],
             meta=MemoryRetrievalMeta(queryTime=0),
         )
-        tac.memora_client.retrieve_memory = AsyncMock(return_value=empty_memory)
+        tac.conversation_memory_client.retrieve_memory = AsyncMock(return_value=empty_memory)
 
         # Process participant.added first (stores profile_id)
         await channel.process_webhook(participant_webhook)
@@ -265,7 +265,7 @@ class TestProfileInSMSChannel:
         await channel.process_webhook(message_webhook)
 
         # Verify profile was fetched during message processing
-        tac.memora_client.get_profile.assert_called_once_with(
+        tac.conversation_memory_client.get_profile.assert_called_once_with(
             profile_id="profile_test_123",
             trait_groups=["Contact"],
         )
@@ -282,7 +282,7 @@ class TestProfileInSMSChannel:
 
         config = get_test_config_with_trait_groups(trait_groups=["Contact"])
         tac = TAC(config)
-        tac.memora_client = create_memora_client(tac)
+        tac.conversation_memory_client = create_memory_client(tac)
         channel = SMSChannel(tac)
 
         mock_profile = get_mock_profile_response()
@@ -292,11 +292,11 @@ class TestProfileInSMSChannel:
             "CH123456", "MB123", "profile_test_123", "2025-11-18T00:00:00.000Z"
         )
 
-        tac.memora_client.get_profile = AsyncMock(return_value=mock_profile)
+        tac.conversation_memory_client.get_profile = AsyncMock(return_value=mock_profile)
         await channel.process_webhook(participant_added)
 
         # Verify profile was NOT fetched (lazy behavior)
-        tac.memora_client.get_profile.assert_not_called()
+        tac.conversation_memory_client.get_profile.assert_not_called()
 
         # Verify conversation was created with profile_id but no profile yet
         assert "CH123456" in channel._conversations
@@ -309,7 +309,7 @@ class TestProfileInSMSChannel:
         """Test that profile is fetched once and then cached."""
         config = get_test_config_with_trait_groups()
         tac = TAC(config)
-        tac.memora_client = create_memora_client(tac)
+        tac.conversation_memory_client = create_memory_client(tac)
         channel = SMSChannel(tac, config={"auto_retrieve_memory": True})  # Enable auto retrieval
 
         mock_profile = get_mock_profile_response()
@@ -324,23 +324,23 @@ class TestProfileInSMSChannel:
             "CH123456", "MB123", "First message", "2025-11-18T00:00:01.000Z"
         )
 
-        tac.memora_client.get_profile = AsyncMock(return_value=mock_profile)
+        tac.conversation_memory_client.get_profile = AsyncMock(return_value=mock_profile)
         empty_memory = MemoryRetrievalResponse(
             observations=[],
             summaries=[],
             sessions=[],
             meta=MemoryRetrievalMeta(queryTime=0),
         )
-        tac.memora_client.retrieve_memory = AsyncMock(return_value=empty_memory)
+        tac.conversation_memory_client.retrieve_memory = AsyncMock(return_value=empty_memory)
 
         # Process participant.added (profile NOT fetched, lazy behavior)
         await channel.process_webhook(participant_webhook)
-        first_call_count = tac.memora_client.get_profile.call_count
+        first_call_count = tac.conversation_memory_client.get_profile.call_count
         assert first_call_count == 0  # No fetch on participant.added
 
         # Process first message (profile fetched during retrieve_memory)
         await channel.process_webhook(message_webhook_1)
-        second_call_count = tac.memora_client.get_profile.call_count
+        second_call_count = tac.conversation_memory_client.get_profile.call_count
         assert second_call_count == 1  # First fetch
 
         # Simulate second message
@@ -350,7 +350,7 @@ class TestProfileInSMSChannel:
 
         # Process second message (profile NOT fetched again, cached)
         await channel.process_webhook(message_webhook_2)
-        third_call_count = tac.memora_client.get_profile.call_count
+        third_call_count = tac.conversation_memory_client.get_profile.call_count
 
         # Verify profile was fetched only once (then cached)
         assert second_call_count > first_call_count
@@ -362,7 +362,7 @@ class TestProfileInSMSChannel:
         """Test that profile is cached and persists across messages."""
         config = get_test_config_with_trait_groups()
         tac = TAC(config)
-        tac.memora_client = create_memora_client(tac)
+        tac.conversation_memory_client = create_memory_client(tac)
         channel = SMSChannel(tac, config={"auto_retrieve_memory": True})  # Enable auto retrieval
 
         mock_profile_v1 = ProfileResponse(
@@ -398,7 +398,7 @@ class TestProfileInSMSChannel:
             sessions=[],
             meta=MemoryRetrievalMeta(queryTime=0),
         )
-        tac.memora_client.retrieve_memory = AsyncMock(return_value=empty_memory)
+        tac.conversation_memory_client.retrieve_memory = AsyncMock(return_value=empty_memory)
 
         # Process participant.added (no profile fetch, lazy behavior)
         await channel.process_webhook(participant_webhook)
@@ -406,14 +406,14 @@ class TestProfileInSMSChannel:
         assert session.profile is None  # Profile not fetched yet
 
         # Process first message with profile v1
-        tac.memora_client.get_profile = AsyncMock(return_value=mock_profile_v1)
+        tac.conversation_memory_client.get_profile = AsyncMock(return_value=mock_profile_v1)
         await channel.process_webhook(message_webhook_1)
         session = channel._conversations["CH123456"]
         assert session.profile is not None
         assert session.profile.traits["Contact"]["firstName"] == "John"
 
         # Process second message - profile remains cached (v1), not fetched again
-        tac.memora_client.get_profile = AsyncMock(return_value=mock_profile_v2)
+        tac.conversation_memory_client.get_profile = AsyncMock(return_value=mock_profile_v2)
         await channel.process_webhook(message_webhook_2)
         session = channel._conversations["CH123456"]
         assert session.profile is not None
@@ -470,15 +470,15 @@ class TestProfileLookup:
         """Test profile lookup by phone number."""
         config = get_test_config_with_trait_groups()
         tac = TAC(config)
-        tac.memora_client = create_memora_client(tac)
+        tac.conversation_memory_client = create_memory_client(tac)
 
         mock_lookup_response = ProfileLookupResponse(
             normalizedValue="+13175556789",
             profiles=["mem_profile_00000000000000000000000001"],
         )
 
-        tac.memora_client.lookup_profile = AsyncMock(return_value=mock_lookup_response)
-        response = await tac.memora_client.lookup_profile(
+        tac.conversation_memory_client.lookup_profile = AsyncMock(return_value=mock_lookup_response)
+        response = await tac.conversation_memory_client.lookup_profile(
             id_type="phone", value="+1 (317) 555-6789"
         )
 
@@ -488,7 +488,7 @@ class TestProfileLookup:
         assert response.profiles[0] == "mem_profile_00000000000000000000000001"
 
         # Verify lookup_profile was called with correct parameters
-        tac.memora_client.lookup_profile.assert_called_once_with(
+        tac.conversation_memory_client.lookup_profile.assert_called_once_with(
             id_type="phone", value="+1 (317) 555-6789"
         )
 
@@ -497,15 +497,17 @@ class TestProfileLookup:
         """Test profile lookup by email address."""
         config = get_test_config_with_trait_groups()
         tac = TAC(config)
-        tac.memora_client = create_memora_client(tac)
+        tac.conversation_memory_client = create_memory_client(tac)
 
         mock_lookup_response = ProfileLookupResponse(
             normalizedValue="test@example.com",
             profiles=["mem_profile_00000000000000000000000002"],
         )
 
-        tac.memora_client.lookup_profile = AsyncMock(return_value=mock_lookup_response)
-        response = await tac.memora_client.lookup_profile(id_type="email", value="test@example.com")
+        tac.conversation_memory_client.lookup_profile = AsyncMock(return_value=mock_lookup_response)
+        response = await tac.conversation_memory_client.lookup_profile(
+            id_type="email", value="test@example.com"
+        )
 
         # Verify response
         assert response.normalized_value == "test@example.com"
@@ -517,7 +519,7 @@ class TestProfileLookup:
         """Test profile lookup with multiple matching profiles."""
         config = get_test_config_with_trait_groups()
         tac = TAC(config)
-        tac.memora_client = create_memora_client(tac)
+        tac.conversation_memory_client = create_memory_client(tac)
 
         mock_lookup_response = ProfileLookupResponse(
             normalizedValue="+13175556789",
@@ -527,8 +529,10 @@ class TestProfileLookup:
             ],
         )
 
-        tac.memora_client.lookup_profile = AsyncMock(return_value=mock_lookup_response)
-        response = await tac.memora_client.lookup_profile(id_type="phone", value="+13175556789")
+        tac.conversation_memory_client.lookup_profile = AsyncMock(return_value=mock_lookup_response)
+        response = await tac.conversation_memory_client.lookup_profile(
+            id_type="phone", value="+13175556789"
+        )
 
         # Verify multiple profiles returned
         assert len(response.profiles) == 2
@@ -540,15 +544,17 @@ class TestProfileLookup:
         """Test profile lookup with no matching profiles."""
         config = get_test_config_with_trait_groups()
         tac = TAC(config)
-        tac.memora_client = create_memora_client(tac)
+        tac.conversation_memory_client = create_memory_client(tac)
 
         mock_lookup_response = ProfileLookupResponse(
             normalizedValue="+13175556789",
             profiles=[],
         )
 
-        tac.memora_client.lookup_profile = AsyncMock(return_value=mock_lookup_response)
-        response = await tac.memora_client.lookup_profile(id_type="phone", value="+13175556789")
+        tac.conversation_memory_client.lookup_profile = AsyncMock(return_value=mock_lookup_response)
+        response = await tac.conversation_memory_client.lookup_profile(
+            id_type="phone", value="+13175556789"
+        )
 
         # Verify empty profiles list
         assert len(response.profiles) == 0
@@ -558,12 +564,14 @@ class TestProfileLookup:
         """Test profile lookup error handling."""
         config = get_test_config_with_trait_groups()
         tac = TAC(config)
-        tac.memora_client = create_memora_client(tac)
+        tac.conversation_memory_client = create_memory_client(tac)
 
         # Simulate API error
-        tac.memora_client.lookup_profile = AsyncMock(
+        tac.conversation_memory_client.lookup_profile = AsyncMock(
             side_effect=Exception("Profile lookup API error")
         )
 
         with pytest.raises(Exception, match="Profile lookup API error"):
-            await tac.memora_client.lookup_profile(id_type="phone", value="+13175556789")
+            await tac.conversation_memory_client.lookup_profile(
+                id_type="phone", value="+13175556789"
+            )

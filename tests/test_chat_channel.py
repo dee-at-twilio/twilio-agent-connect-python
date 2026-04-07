@@ -85,7 +85,7 @@ def create_conversation_updated_webhook(
         "data": {
             "id": conversation_id,
             "accountId": "ACtest123",
-            "configurationId": "IStest123",
+            "configurationId": "conv_configuration_test123",
             "serviceId": "IStest123",
             "status": status,
             "name": "Test Chat Conversation",
@@ -101,8 +101,7 @@ def get_test_config() -> dict[str, Any]:
         "api_key": "SK123",
         "api_token": "test_api_token",
         "environment": "prod",
-        "conversation_service_sid": "IStest123",
-        "twilio_account_sid": "ACtest123",
+        "conversation_configuration_id": "conv_configuration_test123",
         "twilio_phone_number": "+15551234567",
     }
 
@@ -353,11 +352,11 @@ class TestChatChannel:
 
         with (
             patch.object(
-                tac.maestro_client,
+                tac.conversation_orchestrator_client,
                 "list_participants",
                 return_value=[mock_agent, mock_customer],
             ),
-            patch.object(tac.maestro_client, "send_communication") as mock_send,
+            patch.object(tac.conversation_orchestrator_client, "send_communication") as mock_send,
         ):
             await channel.send_response("CH123", "Hello from bot!")
 
@@ -419,16 +418,16 @@ class TestChatChannel:
 
         with (
             patch.object(
-                tac.maestro_client,
+                tac.conversation_orchestrator_client,
                 "list_participants",
                 return_value=[mock_customer],  # No AI_AGENT
             ),
             patch.object(
-                tac.maestro_client,
+                tac.conversation_orchestrator_client,
                 "add_participant",
                 return_value=mock_new_agent,
             ) as mock_add,
-            patch.object(tac.maestro_client, "send_communication") as mock_send,
+            patch.object(tac.conversation_orchestrator_client, "send_communication") as mock_send,
         ):
             await channel.send_response("CH123", "Hello!")
 
@@ -491,7 +490,7 @@ class TestChatChannel:
         # First list returns no agent, add_participant fails, retry list finds agent
         with (
             patch.object(
-                tac.maestro_client,
+                tac.conversation_orchestrator_client,
                 "list_participants",
                 side_effect=[
                     [mock_customer],  # First call: no agent
@@ -499,11 +498,11 @@ class TestChatChannel:
                 ],
             ),
             patch.object(
-                tac.maestro_client,
+                tac.conversation_orchestrator_client,
                 "add_participant",
                 side_effect=Exception("409 Conflict"),
             ),
-            patch.object(tac.maestro_client, "send_communication") as mock_send,
+            patch.object(tac.conversation_orchestrator_client, "send_communication") as mock_send,
         ):
             await channel.send_response("CH123", "Hello!")
 
@@ -578,8 +577,8 @@ class TestChatChannel:
         from tac.context.memory import MemoryClient
 
         tac = TAC(get_test_config())
-        tac.memora_client = MemoryClient(
-            base_url=tac.config.memora_base_url,
+        tac.conversation_memory_client = MemoryClient(
+            base_url=tac.config.memory_base_url,
             store_id="MGtest123",
             api_key=tac.config.api_key,
             api_token=tac.config.api_token,
@@ -603,11 +602,11 @@ class TestChatChannel:
         empty_response = MemoryRetrievalResponse(
             observations=[], summaries=[], meta=MemoryRetrievalMeta(queryTime=0)
         )
-        tac.memora_client.retrieve_memory = AsyncMock(return_value=empty_response)
+        tac.conversation_memory_client.retrieve_memory = AsyncMock(return_value=empty_response)
 
         webhook = create_communication_created_webhook(
             "CH123", "PA_USER", "Memory test", "2025-11-18T00:00:02.000Z"
         )
         await channel.process_webhook(webhook)
 
-        tac.memora_client.retrieve_memory.assert_called_once()
+        tac.conversation_memory_client.retrieve_memory.assert_called_once()

@@ -256,7 +256,7 @@ class MessagingChannel(BaseChannel):
         conv_id = conversation_data.id
 
         if (
-            conversation_data.configuration_id == self.tac.config.conversation_service_sid
+            conversation_data.configuration_id == self.tac.config.conversation_configuration_id
             and conversation_data.status == "CLOSED"
             and conv_id in self._conversations
             and self._conversations[conv_id].channel == self.get_channel_name()

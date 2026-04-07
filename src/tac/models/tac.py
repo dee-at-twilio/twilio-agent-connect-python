@@ -15,7 +15,7 @@ from tac.models.memory import (
 
 class TACCommunicationAuthor(BaseModel):
     """
-    Unified author model with all fields from both Memory and Maestro APIs.
+    Unified author model with all fields from both Memory and Conversation Orchestrator APIs.
     """
 
     # Common fields (both APIs)
@@ -24,16 +24,18 @@ class TACCommunicationAuthor(BaseModel):
         ..., description="Channel type"
     )
 
-    # Maestro-only fields
+    # Conversation Orchestrator-only fields
     participant_id: str | None = Field(
-        default=None, alias="participantId", description="Participant ID (Maestro only)"
+        default=None,
+        alias="participantId",
+        description="Participant ID (Conversation Orchestrator only)",
     )
     delivery_status: (
         Literal["INITIATED", "IN_PROGRESS", "DELIVERED", "COMPLETED", "FAILED"] | None
     ) = Field(
         default=None,
         alias="deliveryStatus",
-        description="Delivery status (Maestro recipients only)",
+        description="Delivery status (Conversation Orchestrator recipients only)",
     )
 
     # Memory-only fields
@@ -51,15 +53,18 @@ class TACCommunicationAuthor(BaseModel):
 
 class TACCommunicationContent(BaseModel):
     """
-    Unified content model with all fields from both Memory and Maestro APIs.
+    Unified content model with all fields from both Memory and Conversation Orchestrator APIs.
     """
 
     type: Literal["TEXT", "TRANSCRIPTION"] | None = Field(
-        default=None, description="Content type discriminator (Maestro only)"
+        default=None, description="Content type discriminator (Conversation Orchestrator only)"
     )
     text: str | None = Field(default=None, description="Message text content")
     transcription: Transcription | None = Field(
-        default=None, description="Transcription metadata (Maestro only, when type=TRANSCRIPTION)"
+        default=None,
+        description=(
+            "Transcription metadata (Conversation Orchestrator only, when type=TRANSCRIPTION)"
+        ),
     )
 
     model_config = {"populate_by_name": True}
@@ -67,7 +72,7 @@ class TACCommunicationContent(BaseModel):
 
 class TACCommunication(BaseModel):
     """
-    Unified communication model with all fields from both Memory and Maestro APIs.
+    Unified communication model with all fields from both Memory and Conversation Orchestrator APIs.
 
     Provides complete access to all communication fields regardless of the source.
     Fields not available from a particular API will be None.
@@ -92,12 +97,16 @@ class TACCommunication(BaseModel):
         default=None, alias="updatedAt", description="When communication was last updated"
     )
 
-    # Maestro-only fields
+    # Conversation Orchestrator-only fields
     conversation_id: str | None = Field(
-        default=None, alias="conversationId", description="Conversation ID (Maestro only)"
+        default=None,
+        alias="conversationId",
+        description="Conversation ID (Conversation Orchestrator only)",
     )
     account_id: str | None = Field(
-        default=None, alias="accountId", description="Account ID (Maestro only)"
+        default=None,
+        alias="accountId",
+        description="Account ID (Conversation Orchestrator only)",
     )
 
     model_config = {"populate_by_name": True}
@@ -108,23 +117,25 @@ class TACMemoryResponse:
     Unified response wrapper for TAC.retrieve_memory().
 
     Provides a consistent interface for accessing memory data regardless of whether
-    Memory API is configured or falling back to Maestro Communications API.
+    Memory API is configured or falling back to Conversation Orchestrator Communications API.
 
     Memory configured:
     - observations, summaries, communications all populated
     - communications include Memory-specific fields (author id, name, type, profile_id)
 
-    Maestro fallback:
+    Conversation Orchestrator fallback:
     - observations and summaries are empty lists
-    - communications include Maestro-specific fields (conversation_id, account_id, etc.)
+    - communications include Conversation Orchestrator-specific fields
+      (conversation_id, account_id, etc.)
     """
 
     def __init__(self, data: MemoryRetrievalResponse | list[Communication]):
         """
-        Initialize wrapper with either Memory or Maestro data.
+        Initialize wrapper with either Memory or Conversation Orchestrator data.
 
         Args:
-            data: Either MemoryRetrievalResponse (Memory) or list[Communication] (Maestro)
+            data: Either MemoryRetrievalResponse (Memory) or
+                list[Communication] (Conversation Orchestrator)
         """
         self._data = data
         self._is_memory = isinstance(data, MemoryRetrievalResponse)
@@ -135,8 +146,10 @@ class TACMemoryResponse:
             memory_comms = memory_data.communications or []
             self._communications = [self._convert_communication(comm) for comm in memory_comms]
         else:
-            maestro_comms: list[Communication] = data  # type: ignore[assignment]
-            self._communications = [self._convert_communication(comm) for comm in maestro_comms]
+            orchestrator_comms: list[Communication] = data  # type: ignore[assignment]
+            self._communications = [
+                self._convert_communication(comm) for comm in orchestrator_comms
+            ]
 
     @property
     def observations(self) -> list[ObservationInfo]:
@@ -144,7 +157,8 @@ class TACMemoryResponse:
         Get observation memories.
 
         Returns:
-            List of observations if Memory is configured, empty list for Maestro fallback
+            List of observations if Memory is configured,
+            empty list for Conversation Orchestrator fallback
         """
         if self._is_memory:
             return self._data.observations  # type: ignore[union-attr]
@@ -156,7 +170,8 @@ class TACMemoryResponse:
         Get summary memories.
 
         Returns:
-            List of summaries if Memory is configured, empty list for Maestro fallback
+            List of summaries if Memory is configured,
+            empty list for Conversation Orchestrator fallback
         """
         if self._is_memory:
             return self._data.summaries  # type: ignore[union-attr]
@@ -168,7 +183,8 @@ class TACMemoryResponse:
         Get communications in unified format with all available fields.
 
         Communications are converted to a common format during initialization that includes
-        all fields from both Memory and Maestro APIs. Fields not available from a particular
+        all fields from both Memory and Conversation Orchestrator APIs.
+        Fields not available from a particular
         API will be None.
 
         Returns:
@@ -183,7 +199,7 @@ class TACMemoryResponse:
 
         Returns:
             True if Memory is configured (observations/summaries available),
-            False if using Maestro fallback (only communications available)
+            False if using Conversation Orchestrator fallback (only communications available)
         """
         return self._is_memory
 
@@ -292,7 +308,7 @@ class TACMemoryResponse:
 
     def _convert_communication(self, comm: MemoryCommunication | Communication) -> TACCommunication:
         """
-        Convert Memory or Maestro communication to unified format.
+        Convert Memory or Conversation Orchestrator communication to unified format.
 
         Pydantic automatically handles missing fields by setting them to None.
         """

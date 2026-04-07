@@ -15,7 +15,7 @@ def get_test_config_with_memory() -> TACConfig:
     """Get test configuration with Twilio Memory."""
     return TACConfig(
         environment="prod",
-        conversation_service_sid="conv_configuration_test123",
+        conversation_configuration_id="conv_configuration_test123",
         twilio_auth_token="test_token_123",
         api_key="SK123",
         api_token="test_api_token",
@@ -24,10 +24,10 @@ def get_test_config_with_memory() -> TACConfig:
     )
 
 
-def create_memora_client(tac: TAC) -> MemoryClient:
-    """Helper to manually create memora_client for tests."""
+def create_memory_client(tac: TAC) -> MemoryClient:
+    """Helper to manually create Conversation Memory client for tests."""
     return MemoryClient(
-        base_url=tac.config.memora_base_url,
+        base_url=tac.config.memory_base_url,
         store_id="MGtest123",
         api_key=tac.config.api_key,
         api_token=tac.config.api_token,
@@ -42,7 +42,7 @@ class TestProfileLookupInMemoryRetrieval:
         """Test retrieve_memory works normally when profile_id is provided."""
         config = get_test_config_with_memory()
         tac = TAC(config)
-        tac.memora_client = create_memora_client(tac)
+        tac.conversation_memory_client = create_memory_client(tac)
 
         # Mock memory retrieval
         mock_memory_response = MemoryRetrievalResponse(
@@ -50,7 +50,9 @@ class TestProfileLookupInMemoryRetrieval:
             summaries=[],
             communications=[],
         )
-        tac.memora_client.retrieve_memory = AsyncMock(return_value=mock_memory_response)
+        tac.conversation_memory_client.retrieve_memory = AsyncMock(
+            return_value=mock_memory_response
+        )
 
         # Create conversation session WITH profile_id
         session = ConversationSession(
@@ -67,7 +69,7 @@ class TestProfileLookupInMemoryRetrieval:
 
         assert isinstance(result, TACMemoryResponse)
         assert result.raw_data == mock_memory_response
-        tac.memora_client.retrieve_memory.assert_called_once_with(
+        tac.conversation_memory_client.retrieve_memory.assert_called_once_with(
             profile_id="mem_profile_existing",
             conversation_id="conv_test_123",
             query="test query",
@@ -78,14 +80,14 @@ class TestProfileLookupInMemoryRetrieval:
         """Test retrieve_memory automatically looks up profile when missing."""
         config = get_test_config_with_memory()
         tac = TAC(config)
-        tac.memora_client = create_memora_client(tac)
+        tac.conversation_memory_client = create_memory_client(tac)
 
         # Mock profile lookup
         mock_lookup_response = ProfileLookupResponse(
             normalizedValue="+13175556789",
             profiles=["mem_profile_00000000000000000000000001"],
         )
-        tac.memora_client.lookup_profile = AsyncMock(return_value=mock_lookup_response)
+        tac.conversation_memory_client.lookup_profile = AsyncMock(return_value=mock_lookup_response)
 
         # Mock memory retrieval
         mock_memory_response = MemoryRetrievalResponse(
@@ -93,7 +95,9 @@ class TestProfileLookupInMemoryRetrieval:
             summaries=[],
             communications=[],
         )
-        tac.memora_client.retrieve_memory = AsyncMock(return_value=mock_memory_response)
+        tac.conversation_memory_client.retrieve_memory = AsyncMock(
+            return_value=mock_memory_response
+        )
 
         # Create conversation session WITHOUT profile_id but WITH author_info
         session = ConversationSession(
@@ -110,7 +114,7 @@ class TestProfileLookupInMemoryRetrieval:
         result = await tac.retrieve_memory(session, query="test query")
 
         # Verify profile was looked up
-        tac.memora_client.lookup_profile.assert_called_once_with(
+        tac.conversation_memory_client.lookup_profile.assert_called_once_with(
             id_type="phone",
             value="+1 (317) 555-6789",
         )
@@ -119,7 +123,7 @@ class TestProfileLookupInMemoryRetrieval:
         assert session.profile_id == "mem_profile_00000000000000000000000001"
 
         # Verify memory was retrieved with the looked up profile_id
-        tac.memora_client.retrieve_memory.assert_called_once_with(
+        tac.conversation_memory_client.retrieve_memory.assert_called_once_with(
             profile_id="mem_profile_00000000000000000000000001",
             conversation_id="conv_test_123",
             query="test query",
@@ -136,7 +140,7 @@ class TestProfileLookupInMemoryRetrieval:
         """Test that first profile is used when multiple profiles are found."""
         config = get_test_config_with_memory()
         tac = TAC(config)
-        tac.memora_client = create_memora_client(tac)
+        tac.conversation_memory_client = create_memory_client(tac)
 
         # Mock profile lookup with multiple profiles
         mock_lookup_response = ProfileLookupResponse(
@@ -147,11 +151,13 @@ class TestProfileLookupInMemoryRetrieval:
                 "mem_profile_00000000000000000000000003",
             ],
         )
-        tac.memora_client.lookup_profile = AsyncMock(return_value=mock_lookup_response)
+        tac.conversation_memory_client.lookup_profile = AsyncMock(return_value=mock_lookup_response)
 
         # Mock memory retrieval
         mock_memory_response = MemoryRetrievalResponse()
-        tac.memora_client.retrieve_memory = AsyncMock(return_value=mock_memory_response)
+        tac.conversation_memory_client.retrieve_memory = AsyncMock(
+            return_value=mock_memory_response
+        )
 
         # Create conversation session WITHOUT profile_id
         session = ConversationSession(
@@ -166,7 +172,7 @@ class TestProfileLookupInMemoryRetrieval:
 
         # Verify first profile was used
         assert session.profile_id == "mem_profile_00000000000000000000000001"
-        tac.memora_client.retrieve_memory.assert_called_once_with(
+        tac.conversation_memory_client.retrieve_memory.assert_called_once_with(
             profile_id="mem_profile_00000000000000000000000001",
             conversation_id="conv_test_123",
             query=None,
@@ -174,12 +180,13 @@ class TestProfileLookupInMemoryRetrieval:
 
     @pytest.mark.asyncio
     async def test_retrieve_memory_no_author_info_error(self) -> None:
-        """Test retrieve_memory falls back to Maestro without profile_id or author_info."""
+        """Test retrieve_memory falls back to Conversation Orchestrator
+        without profile_id or author_info."""
         config = get_test_config_with_memory()
         tac = TAC(config)
-        tac.memora_client = create_memora_client(tac)
+        tac.conversation_memory_client = create_memory_client(tac)
 
-        # Mock Maestro fallback (since profile_id is unavailable)
+        # Mock Conversation Orchestrator fallback (since profile_id is unavailable)
         from tac.models.conversation import (
             Communication,
             CommunicationContent,
@@ -208,7 +215,9 @@ class TestProfileLookupInMemoryRetrieval:
                 updatedAt="2025-01-01T00:00:00.000Z",
             )
         ]
-        tac.maestro_client.list_communications = AsyncMock(return_value=mock_communications)
+        tac.conversation_orchestrator_client.list_communications = AsyncMock(
+            return_value=mock_communications
+        )
 
         # Create conversation session WITHOUT profile_id and WITHOUT author_info
         session = ConversationSession(
@@ -218,22 +227,22 @@ class TestProfileLookupInMemoryRetrieval:
             author_info=None,  # No author info
         )
 
-        # Should complete without raising exception (falls back to Maestro)
+        # Should complete without raising exception (falls back to Conversation Orchestrator)
         result = await tac.retrieve_memory(session)
 
-        # Should return valid response from Maestro fallback
+        # Should return valid response from Conversation Orchestrator fallback
         assert result is not None
         assert len(result.communications) > 0
         assert session.profile_id is None  # No profile lookup performed
 
     @pytest.mark.asyncio
     async def test_retrieve_memory_no_address_error(self) -> None:
-        """Test retrieve_memory falls back to Maestro when address is missing."""
+        """Test retrieve_memory falls back to Conversation Orchestrator when address is missing."""
         config = get_test_config_with_memory()
         tac = TAC(config)
-        tac.memora_client = create_memora_client(tac)
+        tac.conversation_memory_client = create_memory_client(tac)
 
-        # Mock Maestro fallback (since profile_id is unavailable)
+        # Mock Conversation Orchestrator fallback (since profile_id is unavailable)
         from tac.models.conversation import (
             Communication,
             CommunicationContent,
@@ -262,7 +271,9 @@ class TestProfileLookupInMemoryRetrieval:
                 updatedAt="2025-01-01T00:00:00.000Z",
             )
         ]
-        tac.maestro_client.list_communications = AsyncMock(return_value=mock_communications)
+        tac.conversation_orchestrator_client.list_communications = AsyncMock(
+            return_value=mock_communications
+        )
 
         # Create conversation session WITHOUT profile_id and WITHOUT address
         session = ConversationSession(
@@ -275,29 +286,30 @@ class TestProfileLookupInMemoryRetrieval:
             ),
         )
 
-        # Should complete without raising exception (falls back to Maestro)
+        # Should complete without raising exception (falls back to Conversation Orchestrator)
         result = await tac.retrieve_memory(session)
 
-        # Should return valid response from Maestro fallback
+        # Should return valid response from Conversation Orchestrator fallback
         assert result is not None
         assert len(result.communications) > 0
         assert session.profile_id is None  # No profile lookup performed
 
     @pytest.mark.asyncio
     async def test_retrieve_memory_no_profiles_found_error(self) -> None:
-        """Test retrieve_memory falls back to Maestro when profile lookup returns no profiles."""
+        """Test retrieve_memory falls back to Conversation Orchestrator
+        when profile lookup returns no profiles."""
         config = get_test_config_with_memory()
         tac = TAC(config)
-        tac.memora_client = create_memora_client(tac)
+        tac.conversation_memory_client = create_memory_client(tac)
 
         # Mock profile lookup with empty profiles list
         mock_lookup_response = ProfileLookupResponse(
             normalizedValue="+13175556789",
             profiles=[],  # No profiles found
         )
-        tac.memora_client.lookup_profile = AsyncMock(return_value=mock_lookup_response)
+        tac.conversation_memory_client.lookup_profile = AsyncMock(return_value=mock_lookup_response)
 
-        # Mock Maestro fallback (since profile lookup returned empty)
+        # Mock Conversation Orchestrator fallback (since profile lookup returned empty)
         from tac.models.conversation import (
             Communication,
             CommunicationContent,
@@ -326,7 +338,9 @@ class TestProfileLookupInMemoryRetrieval:
                 updatedAt="2025-01-01T00:00:00.000Z",
             )
         ]
-        tac.maestro_client.list_communications = AsyncMock(return_value=mock_communications)
+        tac.conversation_orchestrator_client.list_communications = AsyncMock(
+            return_value=mock_communications
+        )
 
         # Create conversation session WITHOUT profile_id
         session = ConversationSession(
@@ -336,27 +350,28 @@ class TestProfileLookupInMemoryRetrieval:
             author_info=AuthorInfo(address="+13175556789"),
         )
 
-        # Should complete without raising exception (falls back to Maestro)
+        # Should complete without raising exception (falls back to Conversation Orchestrator)
         result = await tac.retrieve_memory(session)
 
-        # Should return valid response from Maestro fallback
+        # Should return valid response from Conversation Orchestrator fallback
         assert result is not None
         assert len(result.communications) > 0
         assert session.profile_id is None  # Profile lookup found nothing
 
     @pytest.mark.asyncio
     async def test_retrieve_memory_lookup_api_error(self) -> None:
-        """Test that retrieve_memory falls back to Maestro when profile lookup API fails."""
+        """Test that retrieve_memory falls back to Conversation
+        Orchestrator when profile lookup API fails."""
         config = get_test_config_with_memory()
         tac = TAC(config)
-        tac.memora_client = create_memora_client(tac)
+        tac.conversation_memory_client = create_memory_client(tac)
 
         # Mock profile lookup to raise an exception
-        tac.memora_client.lookup_profile = AsyncMock(
+        tac.conversation_memory_client.lookup_profile = AsyncMock(
             side_effect=Exception("Profile lookup API error")
         )
 
-        # Mock Maestro fallback (since profile lookup failed)
+        # Mock Conversation Orchestrator fallback (since profile lookup failed)
         from tac.models.conversation import (
             Communication,
             CommunicationContent,
@@ -385,7 +400,9 @@ class TestProfileLookupInMemoryRetrieval:
                 updatedAt="2025-01-01T00:00:00.000Z",
             )
         ]
-        tac.maestro_client.list_communications = AsyncMock(return_value=mock_communications)
+        tac.conversation_orchestrator_client.list_communications = AsyncMock(
+            return_value=mock_communications
+        )
 
         # Create conversation session WITHOUT profile_id
         session = ConversationSession(
@@ -395,10 +412,10 @@ class TestProfileLookupInMemoryRetrieval:
             author_info=AuthorInfo(address="+13175556789"),
         )
 
-        # Should complete without raising exception (falls back to Maestro)
+        # Should complete without raising exception (falls back to Conversation Orchestrator)
         result = await tac.retrieve_memory(session)
 
-        # Should return valid response from Maestro fallback
+        # Should return valid response from Conversation Orchestrator fallback
         assert result is not None
         assert len(result.communications) > 0
         assert session.profile_id is None  # Profile lookup failed
@@ -408,17 +425,19 @@ class TestProfileLookupInMemoryRetrieval:
         """Test that profile lookup modifies the original session object."""
         config = get_test_config_with_memory()
         tac = TAC(config)
-        tac.memora_client = create_memora_client(tac)
+        tac.conversation_memory_client = create_memory_client(tac)
 
         # Mock profile lookup
         mock_lookup_response = ProfileLookupResponse(
             normalizedValue="+13175556789",
             profiles=["mem_profile_looked_up"],
         )
-        tac.memora_client.lookup_profile = AsyncMock(return_value=mock_lookup_response)
+        tac.conversation_memory_client.lookup_profile = AsyncMock(return_value=mock_lookup_response)
 
         # Mock memory retrieval
-        tac.memora_client.retrieve_memory = AsyncMock(return_value=MemoryRetrievalResponse())
+        tac.conversation_memory_client.retrieve_memory = AsyncMock(
+            return_value=MemoryRetrievalResponse()
+        )
 
         # Create conversation session
         session = ConversationSession(
@@ -442,17 +461,19 @@ class TestProfileLookupInMemoryRetrieval:
         """Test that phone numbers are normalized during lookup."""
         config = get_test_config_with_memory()
         tac = TAC(config)
-        tac.memora_client = create_memora_client(tac)
+        tac.conversation_memory_client = create_memory_client(tac)
 
         # Mock profile lookup (simulating normalization)
         mock_lookup_response = ProfileLookupResponse(
             normalizedValue="+13175556789",  # Normalized format
             profiles=["mem_profile_normalized"],
         )
-        tac.memora_client.lookup_profile = AsyncMock(return_value=mock_lookup_response)
+        tac.conversation_memory_client.lookup_profile = AsyncMock(return_value=mock_lookup_response)
 
         # Mock memory retrieval
-        tac.memora_client.retrieve_memory = AsyncMock(return_value=MemoryRetrievalResponse())
+        tac.conversation_memory_client.retrieve_memory = AsyncMock(
+            return_value=MemoryRetrievalResponse()
+        )
 
         # Create conversation session with formatted phone number
         session = ConversationSession(
@@ -468,7 +489,7 @@ class TestProfileLookupInMemoryRetrieval:
         await tac.retrieve_memory(session)
 
         # Verify lookup was called with the formatted input
-        tac.memora_client.lookup_profile.assert_called_once_with(
+        tac.conversation_memory_client.lookup_profile.assert_called_once_with(
             id_type="phone",
             value="+1 (317) 555-6789",
         )

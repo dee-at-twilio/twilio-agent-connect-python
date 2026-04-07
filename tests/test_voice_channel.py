@@ -26,7 +26,7 @@ def get_test_config() -> dict:
         "api_key": "SK123",
         "api_token": "test_api_token",
         "environment": "prod",
-        "conversation_service_sid": "IStest123",
+        "conversation_configuration_id": "conv_configuration_test123",
         "twilio_phone_number": "+15551234567",
     }
 
@@ -81,11 +81,11 @@ class TestVoiceChannel:
         config["twilio_memory_config"] = TwilioMemoryConfig(trait_groups=["Contact"])
         tac = TAC(config)
 
-        # Manually create memora_client for this test
+        # Manually create memory_client for this test
         from tac.context.memory import MemoryClient
 
-        tac.memora_client = MemoryClient(
-            base_url=tac.config.memora_base_url,
+        tac.conversation_memory_client = MemoryClient(
+            base_url=tac.config.memory_base_url,
             store_id="MGtest123",
             api_key=tac.config.api_key,
             api_token=tac.config.api_token,
@@ -97,7 +97,9 @@ class TestVoiceChannel:
             summaries=[],
             communications=[],
         )
-        tac.memora_client.retrieve_memory = AsyncMock(return_value=mock_memory_response)
+        tac.conversation_memory_client.retrieve_memory = AsyncMock(
+            return_value=mock_memory_response
+        )
 
         # Create channel with auto_retrieve_memory enabled (default is False)
         channel = VoiceChannel(tac, config={"auto_retrieve_memory": True})
@@ -116,7 +118,7 @@ class TestVoiceChannel:
         await channel._handle_prompt("CALL123", prompt_msg)
 
         # Verify memory retrieval was called
-        tac.memora_client.retrieve_memory.assert_called_once()
+        tac.conversation_memory_client.retrieve_memory.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_handle_interrupt_message(self) -> None:
@@ -261,7 +263,7 @@ class TestVoiceChannel:
         tac = TAC(get_test_config())
         channel = VoiceChannel(tac)
 
-        # Generate TwiML (no need to mock - Maestro handles conversation creation)
+        # Generate TwiML (no need to mock - ConversationRelay handles conversation creation)
         twiml = await channel.handle_incoming_call(
             options={
                 "websocket_url": "wss://example.ngrok.io/ws",
@@ -277,7 +279,7 @@ class TestVoiceChannel:
         assert "<ConversationRelay" in twiml
         assert 'url="wss://example.ngrok.io/ws"' in twiml
         assert 'welcomeGreeting="Welcome!"' in twiml
-        assert 'conversationConfiguration="IStest123"' in twiml
+        assert 'conversationConfiguration="conv_configuration_test123"' in twiml
         assert "</Connect>" in twiml
         assert "</Response>" in twiml
 
@@ -297,7 +299,7 @@ class TestVoiceChannel:
 
         # Verify default greeting is used
         assert 'welcomeGreeting="Hello! How can I assist you today?"' in twiml
-        assert 'conversationConfiguration="IStest123"' in twiml
+        assert 'conversationConfiguration="conv_configuration_test123"' in twiml
 
     @pytest.mark.asyncio
     async def test_prompt_with_empty_voice_prompt(self) -> None:
@@ -957,11 +959,11 @@ class TestVoiceChannel:
         twiml = generate_twiml(
             TwiMLOptions(
                 websocket_url="wss://example.com/voice",
-                conversation_configuration="IStest_conversation_service_123",
+                conversation_configuration="conv_configuration_test_service_123",
             )
         )
 
-        assert 'conversationConfiguration="IStest_conversation_service_123"' in twiml
+        assert 'conversationConfiguration="conv_configuration_test_service_123"' in twiml
         assert 'url="wss://example.com/voice"' in twiml
 
     def test_generate_twiml_without_conversation_configuration(self) -> None:
@@ -996,7 +998,7 @@ class TestVoiceChannel:
         )
 
         # Verify conversation_configuration is present
-        assert 'conversationConfiguration="IStest123"' in twiml
+        assert 'conversationConfiguration="conv_configuration_test123"' in twiml
 
         # Verify additional custom parameters are present
         assert '<Parameter name="session_id" value="sess_abc123" />' in twiml
@@ -1017,7 +1019,7 @@ class TestVoiceChannel:
         )
 
         # Verify conversation_configuration is present
-        assert 'conversationConfiguration="IStest123"' in twiml
+        assert 'conversationConfiguration="conv_configuration_test123"' in twiml
         # Verify no custom parameters
         assert "session_id" not in twiml
         assert "user_language" not in twiml
@@ -1110,20 +1112,22 @@ class TestHandleConversationRelayCallback:
         mock_conversation = ConversationResponse(
             id="conv123",
             accountId="ACtest123",
-            configuration_id="IStest123",
+            configuration_id="conv_configuration_test123",
             status="ACTIVE",
         )
-        tac.maestro_client.list_conversations = AsyncMock(return_value=[mock_conversation])
-        tac.maestro_client.update_conversation = AsyncMock()
+        tac.conversation_orchestrator_client.list_conversations = AsyncMock(
+            return_value=[mock_conversation]
+        )
+        tac.conversation_orchestrator_client.update_conversation = AsyncMock()
 
         payload = self._make_payload(CallStatus="completed")
         result = await channel.handle_conversation_relay_callback(payload)
 
         assert result is None
-        tac.maestro_client.list_conversations.assert_called_once_with(
+        tac.conversation_orchestrator_client.list_conversations.assert_called_once_with(
             channel_id="CA123", status=["ACTIVE", "INACTIVE"]
         )
-        tac.maestro_client.update_conversation.assert_called_once_with(
+        tac.conversation_orchestrator_client.update_conversation.assert_called_once_with(
             conversation_id="conv123", status="CLOSED"
         )
         assert "conv123" not in channel._conversations
@@ -1137,17 +1141,19 @@ class TestHandleConversationRelayCallback:
         mock_conversation = ConversationResponse(
             id="conv456",
             accountId="ACtest123",
-            configuration_id="ISother999",
+            configuration_id="conv_configuration_other999",
             status="ACTIVE",
         )
-        tac.maestro_client.list_conversations = AsyncMock(return_value=[mock_conversation])
-        tac.maestro_client.update_conversation = AsyncMock()
+        tac.conversation_orchestrator_client.list_conversations = AsyncMock(
+            return_value=[mock_conversation]
+        )
+        tac.conversation_orchestrator_client.update_conversation = AsyncMock()
 
         payload = self._make_payload(CallStatus="completed")
         result = await channel.handle_conversation_relay_callback(payload)
 
         assert result is None
-        tac.maestro_client.update_conversation.assert_not_called()
+        tac.conversation_orchestrator_client.update_conversation.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_other_status_returns_none(self) -> None:
@@ -1177,7 +1183,7 @@ class TestConversationInitializationFlow:
 
     @pytest.mark.asyncio
     async def test_first_prompt_initializes_conversation_from_relay(self) -> None:
-        """Test first prompt queries Maestro and initializes conversation via websocket flow."""
+        """Test first prompt queries CO and initializes conversation via websocket flow."""
         from tac.channels.websocket_protocol import WebSocketDisconnectError
         from tac.models.conversation import ParticipantAddress, ParticipantResponse
 
@@ -1192,14 +1198,15 @@ class TestConversationInitializationFlow:
 
         tac.on_message_ready(on_message)
 
-        # Mock Maestro to return a conversation created by ConversationRelay
+        # Mock Conversation Orchestrator to return a conversation created by ConversationRelay
         mock_conversation = ConversationResponse(
             id="CH_relay_123",
             accountId="ACtest123",
-            configuration_id="IStest123",
+            configuration_id="conv_configuration_test123",
             status="ACTIVE",
         )
-        tac.maestro_client.list_conversations = AsyncMock(return_value=[mock_conversation])
+        co_client = tac.conversation_orchestrator_client
+        co_client.list_conversations = AsyncMock(return_value=[mock_conversation])
 
         # Mock participants list with VOICE channel address
         mock_participant = ParticipantResponse(
@@ -1212,7 +1219,7 @@ class TestConversationInitializationFlow:
                 ParticipantAddress(channel="VOICE", address="+15551234567"),
             ],
         )
-        tac.maestro_client.list_participants = AsyncMock(return_value=[mock_participant])
+        co_client.list_participants = AsyncMock(return_value=[mock_participant])
 
         # Create mock websocket that sends: setup -> prompt -> disconnect
         mock_websocket = AsyncMock()
@@ -1229,12 +1236,12 @@ class TestConversationInitializationFlow:
         # Verify callback was called (conversation initialized successfully)
         assert initialized_conversations == ["CH_relay_123"]
 
-        # Verify Maestro was queried with correct parameters
-        tac.maestro_client.list_conversations.assert_called_once_with(
+        # Verify CO was queried with correct parameters
+        co_client.list_conversations.assert_called_once_with(
             channel_id="CA_test_call",
             status=["ACTIVE"],
         )
-        tac.maestro_client.list_participants.assert_called_once_with("CH_relay_123")
+        co_client.list_participants.assert_called_once_with("CH_relay_123")
 
     @pytest.mark.asyncio
     async def test_profile_id_retrieval_filters_by_voice_channel(self) -> None:
@@ -1277,10 +1284,11 @@ class TestConversationInitializationFlow:
                 ],
             ),
         ]
-        tac.maestro_client.list_participants = AsyncMock(return_value=mock_participants)
+        co_client = tac.conversation_orchestrator_client
+        co_client.list_participants = AsyncMock(return_value=mock_participants)
 
         # Simulate profile_id retrieval logic
-        participants = await tac.maestro_client.list_participants("CH_test")
+        participants = await co_client.list_participants("CH_test")
         profile_id = None
         for participant in participants:
             if from_number and participant.addresses:
@@ -1306,8 +1314,8 @@ class TestConversationInitializationFlow:
         tac = TAC(get_test_config())
         channel = VoiceChannel(tac)
 
-        # Mock Maestro to return no conversations
-        tac.maestro_client.list_conversations = AsyncMock(return_value=[])
+        # Mock Conversation Orchestrator to return no conversations
+        tac.conversation_orchestrator_client.list_conversations = AsyncMock(return_value=[])
 
         # Create mock websocket: setup -> prompt (triggers error)
         mock_websocket = AsyncMock()
@@ -1328,8 +1336,8 @@ class TestConversationInitializationFlow:
         assert "Expected exactly 1 conversation" in captured.out
         assert "but found 0" in captured.out
 
-        # Verify Maestro was called
-        tac.maestro_client.list_conversations.assert_called_once_with(
+        # Verify Conversation Orchestrator was called
+        tac.conversation_orchestrator_client.list_conversations.assert_called_once_with(
             channel_id="CA_test_call",
             status=["ACTIVE"],
         )
@@ -1347,22 +1355,23 @@ class TestConversationInitializationFlow:
         tac = TAC(get_test_config())
         channel = VoiceChannel(tac)
 
-        # Mock Maestro to return multiple conversations
+        # Mock Conversation Orchestrator to return multiple conversations
         mock_conversations = [
             ConversationResponse(
                 id="CH_relay_1",
                 accountId="ACtest123",
-                configuration_id="IStest123",
+                configuration_id="conv_configuration_test123",
                 status="ACTIVE",
             ),
             ConversationResponse(
                 id="CH_relay_2",
                 accountId="ACtest123",
-                configuration_id="IStest123",
+                configuration_id="conv_configuration_test123",
                 status="ACTIVE",
             ),
         ]
-        tac.maestro_client.list_conversations = AsyncMock(return_value=mock_conversations)
+        co_client = tac.conversation_orchestrator_client
+        co_client.list_conversations = AsyncMock(return_value=mock_conversations)
 
         # Create mock websocket: setup -> prompt (triggers error)
         mock_websocket = AsyncMock()
@@ -1383,8 +1392,8 @@ class TestConversationInitializationFlow:
         assert "Expected exactly 1 conversation" in captured.out
         assert "but found 2" in captured.out
 
-        # Verify Maestro was called
-        tac.maestro_client.list_conversations.assert_called_once_with(
+        # Verify CO was called
+        co_client.list_conversations.assert_called_once_with(
             channel_id="CA_test_call",
             status=["ACTIVE"],
         )
@@ -1400,9 +1409,9 @@ class TestConversationInitializationFlow:
         tac = TAC(get_test_config())
         channel = VoiceChannel(tac)
 
-        # Mock Maestro (should not be called during setup)
-        tac.maestro_client.list_conversations = AsyncMock()
-        tac.maestro_client.list_participants = AsyncMock()
+        # Mock Conversation Orchestrator (should not be called during setup)
+        tac.conversation_orchestrator_client.list_conversations = AsyncMock()
+        tac.conversation_orchestrator_client.list_participants = AsyncMock()
 
         # Create mock websocket: setup -> disconnect (no prompt)
         mock_websocket = AsyncMock()
@@ -1415,9 +1424,9 @@ class TestConversationInitializationFlow:
         # Drive handle_websocket - should process setup but not initialize conversation
         await channel.handle_websocket(mock_websocket)
 
-        # Verify Maestro was NOT called (initialization only happens on first prompt)
-        tac.maestro_client.list_conversations.assert_not_called()
-        tac.maestro_client.list_participants.assert_not_called()
+        # Verify CO was NOT called (initialization only on first prompt)
+        tac.conversation_orchestrator_client.list_conversations.assert_not_called()
+        tac.conversation_orchestrator_client.list_participants.assert_not_called()
 
         # Verify no conversations initialized
         assert len(channel._conversations) == 0
@@ -1439,14 +1448,15 @@ class TestConversationInitializationFlow:
 
         tac.on_message_ready(on_message)
 
-        # Mock Maestro
+        # Mock Conversation Orchestrator
         mock_conversation = ConversationResponse(
             id="CH_reuse_test",
             accountId="ACtest123",
-            configuration_id="IStest123",
+            configuration_id="conv_configuration_test123",
             status="ACTIVE",
         )
-        tac.maestro_client.list_conversations = AsyncMock(return_value=[mock_conversation])
+        co_client = tac.conversation_orchestrator_client
+        co_client.list_conversations = AsyncMock(return_value=[mock_conversation])
         mock_participant = ParticipantResponse(
             id="PA_test",
             conversation_id="CH_reuse_test",
@@ -1457,7 +1467,7 @@ class TestConversationInitializationFlow:
                 ParticipantAddress(channel="VOICE", address="+15551234567"),
             ],
         )
-        tac.maestro_client.list_participants = AsyncMock(return_value=[mock_participant])
+        co_client.list_participants = AsyncMock(return_value=[mock_participant])
 
         # Create mock websocket: setup -> prompt1 -> prompt2 -> prompt3 -> disconnect
         mock_websocket = AsyncMock()
@@ -1483,13 +1493,13 @@ class TestConversationInitializationFlow:
         assert len(messages_processed) == 3
         assert messages_processed == ["First message", "Second message", "Third message"]
 
-        # Verify Maestro was called ONLY ONCE for initialization (on first prompt)
-        assert tac.maestro_client.list_conversations.call_count == 1
-        assert tac.maestro_client.list_participants.call_count == 1
+        # Verify CO was called ONLY ONCE for initialization (on first prompt)
+        assert co_client.list_conversations.call_count == 1
+        assert co_client.list_participants.call_count == 1
 
         # Verify the calls used correct parameters
-        tac.maestro_client.list_conversations.assert_called_once_with(
+        co_client.list_conversations.assert_called_once_with(
             channel_id="CA_reuse_test",
             status=["ACTIVE"],
         )
-        tac.maestro_client.list_participants.assert_called_once_with("CH_reuse_test")
+        co_client.list_participants.assert_called_once_with("CH_reuse_test")

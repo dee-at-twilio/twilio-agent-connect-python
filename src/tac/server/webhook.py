@@ -27,7 +27,7 @@ def validate_twilio_webhook(
     Args:
         request: FastAPI Request object containing headers and URL info.
         auth_token: Twilio Auth Token used for signature validation.
-        body: Request body - pass str for JSON bodies (SMS webhooks from Maestro,
+        body: Request body - pass str for JSON bodies (SMS webhooks from Conversation Orchestrator,
               where signature is computed with empty POST params), or pass a mapping
               for form-encoded bodies (Voice webhooks, where params are included).
               Accepts dict, FormData, or any Mapping[str, str].

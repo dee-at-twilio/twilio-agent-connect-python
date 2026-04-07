@@ -103,7 +103,7 @@ def create_conversation_updated_webhook(
         "data": {
             "id": conversation_id,
             "accountId": "ACtest123",
-            "configurationId": "IStest123",
+            "configurationId": "conv_configuration_test123",
             "serviceId": "IStest123",
             "status": status,
             "name": "Test Conversation",
@@ -121,7 +121,7 @@ def get_test_config(with_memory=True):
         "api_key": "SK123",
         "api_token": "test_api_token",
         "environment": "prod",
-        "conversation_service_sid": "IStest123",
+        "conversation_configuration_id": "conv_configuration_test123",
         "twilio_phone_number": "+15551234567",
     }
     if with_memory:
@@ -129,10 +129,10 @@ def get_test_config(with_memory=True):
     return config
 
 
-def create_memora_client(tac: TAC) -> MemoryClient:
-    """Helper to manually create memora_client for tests."""
+def create_memory_client(tac: TAC) -> MemoryClient:
+    """Helper to manually create Conversation Memory client for tests."""
     return MemoryClient(
-        base_url=tac.config.memora_base_url,
+        base_url=tac.config.memory_base_url,
         store_id="MGtest123",
         api_key=tac.config.api_key,
         api_token=tac.config.api_token,
@@ -175,7 +175,7 @@ class TestTACIntegration:
         """Test complete SMS channel workflow from webhook to callback."""
 
         tac = TAC(get_test_config())
-        tac.memora_client = create_memora_client(tac)
+        tac.conversation_memory_client = create_memory_client(tac)
         channel = SMSChannel(
             tac, config={"auto_retrieve_memory": True}
         )  # Enable memory retrieval for test
@@ -218,12 +218,12 @@ class TestTACIntegration:
             summaries=[],
             meta=MemoryRetrievalMeta(queryTime=0),
         )
-        tac.memora_client.retrieve_memory = AsyncMock(return_value=empty_response)
+        tac.conversation_memory_client.retrieve_memory = AsyncMock(return_value=empty_response)
 
         await channel.process_webhook(message_webhook)
 
         # Verify memory retrieval was called
-        tac.memora_client.retrieve_memory.assert_called_once()
+        tac.conversation_memory_client.retrieve_memory.assert_called_once()
 
         # Verify callback was invoked with correct data
         assert callback_invoked
@@ -242,7 +242,7 @@ class TestTACIntegration:
     async def test_sms_channel_auto_initialize_conversation(self):
         """Test SMS channel auto-initializes conversation on first message."""
         tac = TAC(get_test_config())
-        tac.memora_client = create_memora_client(tac)
+        tac.conversation_memory_client = create_memory_client(tac)
         channel = SMSChannel(tac)
 
         callback_invoked = False
@@ -271,7 +271,7 @@ class TestTACIntegration:
             summaries=[],
             meta=MemoryRetrievalMeta(queryTime=0),
         )
-        tac.memora_client.retrieve_memory = AsyncMock(return_value=empty_response)
+        tac.conversation_memory_client.retrieve_memory = AsyncMock(return_value=empty_response)
 
         await channel.process_webhook(message_webhook)
 
@@ -284,7 +284,7 @@ class TestTACIntegration:
         """Test SMS channel ignores empty/whitespace messages."""
 
         tac = TAC(get_test_config())
-        tac.memora_client = create_memora_client(tac)
+        tac.conversation_memory_client = create_memory_client(tac)
         channel = SMSChannel(tac)
 
         callback_invoked = False
@@ -309,9 +309,9 @@ class TestTACIntegration:
             "CH111", "MB111", "", "2025-11-18T00:00:01.000Z", author_address="+11111111111"
         )
 
-        tac.memora_client.retrieve_memory = AsyncMock()
+        tac.conversation_memory_client.retrieve_memory = AsyncMock()
         await channel.process_webhook(empty_message)
-        tac.memora_client.retrieve_memory.assert_not_called()
+        tac.conversation_memory_client.retrieve_memory.assert_not_called()
         assert not callback_invoked
 
         # Test whitespace message
@@ -323,9 +323,9 @@ class TestTACIntegration:
             author_address="+11111111111",
         )
 
-        tac.memora_client.retrieve_memory = AsyncMock()
+        tac.conversation_memory_client.retrieve_memory = AsyncMock()
         await channel.process_webhook(whitespace_message)
-        tac.memora_client.retrieve_memory.assert_not_called()
+        tac.conversation_memory_client.retrieve_memory.assert_not_called()
         assert not callback_invoked
 
     @pytest.mark.asyncio
@@ -354,7 +354,7 @@ class TestTACIntegration:
         """Test SMS channel handles multiple concurrent conversations."""
 
         tac = TAC(get_test_config())
-        tac.memora_client = create_memora_client(tac)
+        tac.conversation_memory_client = create_memory_client(tac)
         channel = SMSChannel(tac)
 
         callback_count = 0
@@ -388,7 +388,7 @@ class TestTACIntegration:
             summaries=[],
             meta=MemoryRetrievalMeta(queryTime=0),
         )
-        tac.memora_client.retrieve_memory = AsyncMock(return_value=empty_response)
+        tac.conversation_memory_client.retrieve_memory = AsyncMock(return_value=empty_response)
 
         for i in range(3):
             conv_id = f"CH{i:06d}"
@@ -410,7 +410,7 @@ class TestTACIntegration:
     async def test_sms_channel_real_world_webhook_scenario(self):
         """Test SMS channel with real-world webhook data including all fields."""
         tac = TAC(get_test_config())
-        tac.memora_client = create_memora_client(tac)
+        tac.conversation_memory_client = create_memory_client(tac)
         channel = SMSChannel(tac)
 
         callback_invoked = False
@@ -441,7 +441,7 @@ class TestTACIntegration:
             summaries=[],
             meta=MemoryRetrievalMeta(queryTime=0),
         )
-        tac.memora_client.retrieve_memory = AsyncMock(return_value=empty_response)
+        tac.conversation_memory_client.retrieve_memory = AsyncMock(return_value=empty_response)
 
         await channel.process_webhook(real_webhook)
 

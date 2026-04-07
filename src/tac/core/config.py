@@ -64,11 +64,11 @@ class ConversationIntelligenceConfig(BaseModel):
 
 class TwilioMemoryConfig(BaseModel):
     """
-    Configuration for Twilio Memory Service integration.
+    Configuration for Twilio Memory Store integration.
 
     Note: Memory client is always initialized automatically by fetching memory_store_id
-    from the Maestro configuration. This config only controls optional memory settings
-    like which trait groups to include when fetching profiles.
+    from the Conversation Orchestrator configuration. This config only controls optional memory
+    settings like which trait groups to include when fetching profiles.
     """
 
     trait_groups: list[str] | None = Field(
@@ -120,7 +120,7 @@ class TACConfig(BaseModel):
     """Configuration model for Twilio Agent Connect settings."""
 
     environment: str = Field(default="prod", description="TAC environment (dev, stage, or prod)")
-    conversation_service_sid: str = Field(description="Twilio Conversation Service SID")
+    conversation_configuration_id: str = Field(description="Twilio Conversation Configuration ID")
 
     @field_validator("environment")
     @classmethod
@@ -136,7 +136,8 @@ class TACConfig(BaseModel):
         default=None,
         description="Optional Twilio Memory configuration for controlling which trait groups "
         "to include when fetching profiles. Note: Memory client is always initialized "
-        "automatically from Maestro configuration - this only configures trait group filtering.",
+        "automatically from Conversation Orchestrator configuration - "
+        "this only configures trait group filtering.",
     )
 
     twilio_auth_token: str = Field(description="Twilio Auth Token")
@@ -165,8 +166,8 @@ class TACConfig(BaseModel):
 
     @computed_field  # type: ignore[prop-decorator]
     @property
-    def memora_base_url(self) -> str:
-        """Return the Memory Service base URL based on the environment."""
+    def memory_base_url(self) -> str:
+        """Return the Conversation Memory base URL based on the environment."""
         memory_urls = {
             "dev": "https://memory.dev.twilio.com",
             "stage": "https://memory.stage.twilio.com",
@@ -176,14 +177,14 @@ class TACConfig(BaseModel):
 
     @computed_field  # type: ignore[prop-decorator]
     @property
-    def maestro_base_url(self) -> str:
-        """Return the Maestro base URL based on the environment."""
-        maestro_urls = {
+    def conversation_base_url(self) -> str:
+        """Return the Conversation Orchestrator base URL based on the environment."""
+        conversation_urls = {
             "dev": "https://conversations.dev.twilio.com",
             "stage": "https://conversations.stage.twilio.com",
             "prod": "https://conversations.twilio.com",
         }
-        return maestro_urls[self.environment]
+        return conversation_urls[self.environment]
 
     @computed_field  # type: ignore[prop-decorator]
     @property
@@ -201,7 +202,7 @@ class TACConfig(BaseModel):
         json_schema_extra={
             "example": {
                 "environment": "prod",
-                "conversation_service_sid": "conv_configuration_xxxxxxxxxxxxxxxxxx",
+                "conversation_configuration_id": "conv_configuration_xxxxxxxxxxxxxxxxxx",
                 "twilio_auth_token": "your_auth_token_here",
                 "api_key": "SKxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
                 "api_token": "your_api_token_here",
@@ -225,7 +226,7 @@ class TACConfig(BaseModel):
 
         Loads configuration from the following environment variables:
         - TWILIO_TAC_ENVIRONMENT: TAC environment (dev, stage, or prod) (optional, defaults to prod)
-        - TWILIO_TAC_CONVERSATION_SERVICE_SID: Twilio Conversation Service SID
+        - TWILIO_TAC_CONVERSATION_CONFIGURATION_ID: Twilio Conversation Configuration ID
         - TWILIO_TAC_API_KEY: Twilio API Key SID (starts with SK)
         - TWILIO_TAC_API_TOKEN: Twilio API Key Secret
         - TWILIO_TAC_PHONE_NUMBER: Twilio Phone Number for Voice and SMS channels
@@ -268,7 +269,7 @@ class TACConfig(BaseModel):
 
         return cls(
             environment=os.environ.get("TWILIO_TAC_ENVIRONMENT", "prod"),
-            conversation_service_sid=os.environ["TWILIO_TAC_CONVERSATION_SERVICE_SID"],
+            conversation_configuration_id=os.environ["TWILIO_TAC_CONVERSATION_CONFIGURATION_ID"],
             twilio_auth_token=os.environ["TWILIO_TAC_AUTH_TOKEN"],
             api_key=os.environ["TWILIO_TAC_API_KEY"],
             api_token=os.environ["TWILIO_TAC_API_TOKEN"],

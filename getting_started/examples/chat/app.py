@@ -2,9 +2,12 @@
 Chat Server for Twilio Agent Connect
 
 Example demonstrating ChatChannel with the Twilio Conversations JS SDK.
-Messages flow through Maestro's infrastructure:
+Messages flow through Twilio's infrastructure:
 
-    Browser (Conversations JS SDK) -> Maestro -> webhook -> server -> AI -> Maestro Send API -> SDK
+    Browser (Conversations JS SDK) -> Twilio Conversations ->
+    Conversation Orchestrator -> webhook -> server -> AI ->
+    Conversation Orchestrator Send API -> Twilio Conversations ->
+    Browser (Conversations JS SDK)
 
 Usage:
     uv run python getting_started/examples/chat/app.py

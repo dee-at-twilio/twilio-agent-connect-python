@@ -68,28 +68,28 @@ class TAC:
         setup_logging(log_level=self.config.log_level, log_format="console")
         self.logger = get_logger(__name__)
 
-        self.maestro_client = ConversationClient(
-            base_url=self.config.maestro_base_url,
+        self.conversation_orchestrator_client = ConversationClient(
+            base_url=self.config.conversation_base_url,
             api_key=self.config.api_key,
             api_token=self.config.api_token,
-            service_id=self.config.conversation_service_sid,
+            configuration_id=self.config.conversation_configuration_id,
         )
 
         try:
-            configuration = self.maestro_client.get_configuration(
-                self.config.conversation_service_sid
+            configuration = self.conversation_orchestrator_client.get_configuration(
+                self.config.conversation_configuration_id
             )
         except Exception as e:
             raise ValueError(
-                f"Failed to fetch Maestro configuration: {e}. "
-                "TAC initialization requires a valid Maestro configuration. "
-                "Please check your conversation_service_sid and credentials."
+                f"Failed to fetch Conversation Orchestrator configuration: {e}. "
+                "TAC initialization requires a valid Conversation Orchestrator configuration. "
+                "Please check your conversation_configuration_id and credentials."
             ) from e
 
-        # Initialize Memory client using memory_store_id from Maestro configuration
+        # Initialize Memory client using memory_store_id from CO configuration
         # Memory is always available - twilio_memory_config only configures trait groups
-        self.memora_client = MemoryClient(
-            base_url=self.config.memora_base_url,
+        self.conversation_memory_client = MemoryClient(
+            base_url=self.config.memory_base_url,
             store_id=configuration.memory_store_id,
             api_key=self.config.api_key,
             api_token=self.config.api_token,
@@ -108,7 +108,7 @@ class TAC:
         self.ci_processor: OperatorResultProcessor | None = None
         if self.config.conversation_intelligence_config:
             self.ci_processor = OperatorResultProcessor(
-                memory_client=self.memora_client,
+                conversation_memory_client=self.conversation_memory_client,
                 config=self.config.conversation_intelligence_config,
             )
             self.logger.info("Conversation Intelligence processor initialized")
@@ -140,13 +140,14 @@ class TAC:
         query: str | None = None,
     ) -> TACMemoryResponse:
         """
-        Retrieve memories from Memory Service or fallback to Maestro Communications API.
+        Retrieve memories from Memory Store or fallback to
+        Conversation Orchestrator Communications API.
 
         This method attempts to retrieve memory using the following strategy:
         1. Try to get profile_id (via lookup if missing)
         2. Try to fetch profile data
-        3. Try to retrieve memory from Memory Service
-        If any step fails, falls back to Maestro Communications API.
+        3. Try to retrieve memory from Memory Store
+        If any step fails, falls back to Conversation Orchestrator Communications API.
 
         Args:
             conversation_context: Conversation context containing conversation_id, profile_id,
@@ -161,13 +162,13 @@ class TAC:
             - observations, summaries, and communications with full metadata
             - communications include author name, type, and participant details
 
-            When falling back to Maestro:
+            When falling back to Conversation Orchestrator:
             - observations and summaries are empty lists
             - communications have basic fields only (no author metadata)
 
         Note:
-            All failures in memory retrieval are handled gracefully and fall back to Maestro.
-            This ensures the system continues to function even when Memory Service is unavailable.
+            Failures in Memory Store retrieval fall back to Conversation Orchestrator's
+            list_communications API. If the fallback also fails, the exception propagates.
         """
         try:
             # Try to get profile_id if not already available
@@ -180,7 +181,7 @@ class TAC:
                     address = conversation_context.author_info.address
                     id_type = "email" if "@" in address else "phone"
                     lookup_response: ProfileLookupResponse = (
-                        await self.memora_client.lookup_profile(
+                        await self.conversation_memory_client.lookup_profile(
                             id_type=id_type,
                             value=address,
                         )
@@ -204,8 +205,8 @@ class TAC:
                     conversation_context.profile_id
                 )
 
-            # Retrieve memory from Memory Service
-            memory_response = await self.memora_client.retrieve_memory(
+            # Retrieve memory from Memory Store
+            memory_response = await self.conversation_memory_client.retrieve_memory(
                 profile_id=conversation_context.profile_id,
                 conversation_id=conversation_context.conversation_id,
                 query=query,
@@ -213,11 +214,12 @@ class TAC:
             return TACMemoryResponse(memory_response)
 
         except Exception as e:
-            # Fall back to Maestro Communications API for any failure
+            # Fall back to Conversation Orchestrator Communications API for any failure
             self.logger.warning(
-                f"Memory retrieval failed: {e}. Falling back to Maestro Communications API."
+                f"Memory retrieval failed: {e}. "
+                "Falling back to Conversation Orchestrator Communications API."
             )
-            communications = await self.maestro_client.list_communications(
+            communications = await self.conversation_orchestrator_client.list_communications(
                 conversation_id=conversation_context.conversation_id
             )
             return TACMemoryResponse(communications)
@@ -250,7 +252,7 @@ class TAC:
             )
 
             # Fetch profile
-            profile_response = await self.memora_client.get_profile(
+            profile_response = await self.conversation_memory_client.get_profile(
                 profile_id=profile_id,
                 trait_groups=trait_groups,
             )
@@ -544,7 +546,7 @@ class TAC:
 
         This method delegates to the internal CI processor to handle incoming
         CI webhook payloads, validate them, and create observations or summaries
-        in Memora based on operator results.
+        in Conversation Memory based on operator results.
 
         Args:
             payload: The raw webhook payload dictionary from Twilio CI

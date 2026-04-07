@@ -11,7 +11,7 @@ This guide will walk you through setting up and running your first TAC applicati
 
 ## Step 1: Set Up Twilio Services
 
-You need to create Twilio Conversation and Memory services before using TAC.
+You need to create a Twilio Conversation Configuration and Memory Store before using TAC.
 
 **Option 1: Use the Setup Wizard**
 
@@ -23,7 +23,7 @@ make setup
 ```
 
 The wizard will:
-- Create Twilio Conversation and Memory services
+- Create a Twilio Conversation Configuration and Memory Store
 - Generate a `.env` file with all required credentials
 
 **Option 2: Manual Setup**
@@ -105,7 +105,7 @@ See `examples/.env.example` for all available configuration options. Key variabl
 - `TWILIO_TAC_API_KEY`: Twilio API key SID (starts with SK)
 - `TWILIO_TAC_API_TOKEN`: Twilio API key secret
 - `TWILIO_TAC_PHONE_NUMBER`: Your Twilio phone number
-- `TWILIO_TAC_CONVERSATION_SERVICE_SID`: Conversation service ID
+- `TWILIO_TAC_CONVERSATION_CONFIGURATION_ID`: Conversation Configuration ID
 
 ### Optional (Voice Channel)
 - `TWILIO_TAC_VOICE_PUBLIC_DOMAIN`: Your ngrok domain (required for voice)

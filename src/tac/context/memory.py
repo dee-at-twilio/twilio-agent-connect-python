@@ -13,7 +13,7 @@ from tac.models.memory import (
 
 
 class MemoryClient:
-    """Client for interacting with Twilio Memora data plane API."""
+    """Client for interacting with Twilio Conversation Memory data plane API."""
 
     def __init__(
         self,
@@ -26,10 +26,10 @@ class MemoryClient:
         Initialize the Memory client.
 
         Args:
-            base_url: Base URL for the Memora data plane API.
-            store_id: Memory store ID (starts with mem_service_).
-            api_key: API Key for Memora authentication.
-            api_token: API Token for Memora authentication.
+            base_url: Base URL for the Conversation Memory data plane API.
+            store_id: Memory store ID (starts with mem_store_).
+            api_key: API Key for Conversation Memory authentication.
+            api_token: API Token for Conversation Memory authentication.
         """
         self.base_url = base_url
         self.store_id = store_id
@@ -103,7 +103,7 @@ class MemoryClient:
                 else "No response"
             )
             self.logger.error(
-                f"Failed to retrieve context from Memora: {e}\n"
+                f"Failed to retrieve context from Conversation Memory: {e}\n"
                 f"URL: {url}\n"
                 f"Request body: {request_payload}\n"
                 f"Response: {response_text}"
@@ -112,7 +112,7 @@ class MemoryClient:
             return MemoryRetrievalResponse()
 
         except Exception as e:
-            self.logger.error(f"Failed to parse Memora response: {e}")
+            self.logger.error(f"Failed to parse Conversation Memory response: {e}")
             # Return empty response on parsing errors
             return MemoryRetrievalResponse()
 
@@ -158,14 +158,14 @@ class MemoryClient:
                 else "No response"
             )
             self.logger.error(
-                f"Failed to retrieve profile from Memora: {e}\n"
+                f"Failed to retrieve profile from Conversation Memory: {e}\n"
                 f"URL: {url}\n"
                 f"Query params: {params}\n"
                 f"Response: {response_text}"
             )
             raise
         except Exception as e:
-            self.logger.error(f"Failed to generate Memora profile response: {e}")
+            self.logger.error(f"Failed to generate Conversation Memory profile response: {e}")
             raise
 
     async def lookup_profile(
@@ -218,14 +218,14 @@ class MemoryClient:
                 else "No response"
             )
             self.logger.error(
-                f"Failed to lookup profile from Memora: {e}\n"
+                f"Failed to lookup profile from Conversation Memory: {e}\n"
                 f"URL: {url}\n"
                 f"Request body: {request_payload}\n"
                 f"Response: {response_text}"
             )
             raise
         except Exception as e:
-            self.logger.error(f"Failed to parse Memora lookup response: {e}")
+            self.logger.error(f"Failed to parse Conversation Memory lookup response: {e}")
             raise
 
     async def create_observation(
@@ -237,7 +237,7 @@ class MemoryClient:
         occurred_at: str | None = None,
     ) -> dict[str, Any]:
         """
-        Create a new observation in Memora.
+        Create a new observation in Conversation Memory.
 
         Args:
             profile_id: Profile ID to associate observation with
@@ -291,7 +291,7 @@ class MemoryClient:
         summaries: list[dict[str, Any]],
     ) -> dict[str, str]:
         """
-        Create conversation summaries in Memora.
+        Create conversation summaries in Conversation Memory.
 
         Args:
             profile_id: Profile ID to associate summaries with

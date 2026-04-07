@@ -71,38 +71,38 @@
                             </div>
                         </div>
 
-                        <!-- Conversation Service -->
+                        <!-- Conversation Configuration -->
                         <div class="mb-3 pt-3 border-t border-slate-100">
                             <h3 class="text-xs font-semibold text-slate-700 uppercase tracking-wide mb-2 flex items-center gap-2">
                                 <span class="w-1 h-3 bg-blue-500 rounded"></span>
-                                Conversation Service
+                                Conversation Configuration
                             </h3>
                             <div class="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label class="block text-xs font-medium text-slate-700 mb-1" for="maestro_display_name">
+                                    <label class="block text-xs font-medium text-slate-700 mb-1" for="configuration_display_name">
                                         Display Name
                                     </label>
-                                    <input type="text" id="maestro_display_name" name="maestro_display_name" placeholder="my conversation service" maxlength="32" required
+                                    <input type="text" id="configuration_display_name" name="configuration_display_name" placeholder="my conversation configuration" maxlength="32" required
                                         pattern="^[a-zA-Z0-9\-_ ]+$" title="Letters, numbers, spaces, hyphens, and underscores only, max 32 characters"
                                         class="w-full px-2.5 py-1.5 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                                     <p class="mt-0.5 text-xs text-slate-500">Letters, numbers, spaces, hyphens, underscores only</p>
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-medium text-slate-700 mb-1" for="maestro_description">
+                                    <label class="block text-xs font-medium text-slate-700 mb-1" for="configuration_description">
                                         Description
                                     </label>
-                                    <input type="text" id="maestro_description" name="maestro_description" placeholder="Conversation service description" maxlength="128" required
+                                    <input type="text" id="configuration_description" name="configuration_description" placeholder="Conversation configuration description" maxlength="128" required
                                         class="w-full px-2.5 py-1.5 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                                     <p class="mt-0.5 text-xs text-slate-500">Max 128 characters</p>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Memory Service -->
+                        <!-- Memory Store -->
                         <div class="mb-3 pt-3 border-t border-slate-100">
                             <h3 class="text-xs font-semibold text-slate-700 uppercase tracking-wide mb-2 flex items-center gap-2">
                                 <span class="w-1 h-3 bg-blue-500 rounded"></span>
-                                Memory Service
+                                Memory Store
                             </h3>
                             <div class="grid grid-cols-2 gap-3">
                                 <div>
@@ -208,17 +208,17 @@
                                     </div>
                                 </div>
 
-                                <!-- Step 3: Conversation Service -->
-                                <div id="step-maestro" class="flex-1">
+                                <!-- Step 3: Conversation Configuration -->
+                                <div id="step-configuration" class="flex-1">
                                     <div class="flex items-center">
                                         <div class="h-0.5 flex-1 bg-slate-200 mr-2"></div>
-                                        <div id="step-maestro-icon" class="w-7 h-7 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center text-xs font-semibold flex-shrink-0 relative">
+                                        <div id="step-configuration-icon" class="w-7 h-7 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center text-xs font-semibold flex-shrink-0 relative">
                                             3
                                         </div>
                                     </div>
                                     <div class="mt-1.5 text-right">
                                         <div class="text-xs font-medium text-slate-800">Conversation</div>
-                                        <div id="step-maestro-status" class="text-xs text-slate-500 mt-0.5">Waiting...</div>
+                                        <div id="step-configuration-status" class="text-xs text-slate-500 mt-0.5">Waiting...</div>
                                     </div>
                                 </div>
                             </div>
@@ -250,7 +250,7 @@
                     <div class="flex-1 flex flex-col min-h-0 p-6 pb-3 basis-0">
                         <div class="flex items-center justify-between mb-3 flex-shrink-0">
                             <h3 class="text-xs font-semibold text-slate-600 uppercase tracking-wide">Existing Configurations</h3>
-                            <button onclick="loadMaestroConfigurations()" id="refreshConfigsBtn"
+                            <button onclick="loadConversationConfigurations()" id="refreshConfigsBtn"
                                 class="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">
                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
@@ -299,7 +299,7 @@
         let memoryStoreId = null;
         let memoryStoreName = null;
         let profileId = null;
-        let conversationServiceId = null;
+        let conversationConfigurationId = null;
 
         function logError(operation, result, requestPayload = null) {
             // Log to console
@@ -671,12 +671,12 @@
             return false;
         }
 
-        async function createMaestroService(credentials, maxRetries = 3) {
-            updateStep('step-maestro', 'loading', 'Creating Conversation Service...');
+        async function createConversationConfiguration(credentials, maxRetries = 3) {
+            updateStep('step-configuration', 'loading', 'Creating Conversation Configuration...');
 
             for (let retry = 0; retry < maxRetries; retry++) {
                 try {
-                    const response = await fetch('/api/create-maestro-service', {
+                    const response = await fetch('/api/create-conversation-configuration', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -685,37 +685,37 @@
                             memory_store_id: memoryStoreId,
                             twilio_phone: credentials.twilio_phone,
                             ngrok_domain: credentials.ngrok_domain,
-                            maestro_display_name: document.getElementById('maestro_display_name').value.trim(),
-                            maestro_description: document.getElementById('maestro_description').value.trim()
+                            configuration_display_name: document.getElementById('configuration_display_name').value.trim(),
+                            configuration_description: document.getElementById('configuration_description').value.trim()
                         })
                     });
 
                     const result = await response.json();
 
                     if (result.status === 'success') {
-                        conversationServiceId = result.conversation_service_id;
-                        updateStep('step-maestro', 'success', 'Created');
+                        conversationConfigurationId = result.conversation_configuration_id;
+                        updateStep('step-configuration', 'success', 'Created');
                         // Refresh the configurations list
-                        loadMaestroConfigurations();
+                        loadConversationConfigurations();
                         return true;
                     } else {
                         if (retry < maxRetries - 1) {
-                            logError(`Create Maestro Service (retry ${retry + 1}/${maxRetries})`, result);
-                            updateStep('step-maestro', 'loading', `Retrying... (${retry + 1}/${maxRetries})`);
+                            logError(`Create Conversation Configuration (retry ${retry + 1}/${maxRetries})`, result);
+                            updateStep('step-configuration', 'loading', `Retrying... (${retry + 1}/${maxRetries})`);
                             await new Promise(resolve => setTimeout(resolve, 3000));
                         } else {
-                            logError('Create Maestro Service', result);
-                            updateStep('step-maestro', 'error', formatErrorForUI(result));
+                            logError('Create Conversation Configuration', result);
+                            updateStep('step-configuration', 'error', formatErrorForUI(result));
                             return false;
                         }
                     }
                 } catch (error) {
-                    console.error('Network error creating Maestro service:', error);
+                    console.error('Network error creating Conversation Configuration:', error);
                     if (retry < maxRetries - 1) {
-                        updateStep('step-maestro', 'loading', `Network error, retrying... (${retry + 1}/${maxRetries})`);
+                        updateStep('step-configuration', 'loading', `Network error, retrying... (${retry + 1}/${maxRetries})`);
                         await new Promise(resolve => setTimeout(resolve, 3000));
                     } else {
-                        updateStep('step-maestro', 'error', 'Network error: ' + error.message);
+                        updateStep('step-configuration', 'error', 'Network error: ' + error.message);
                         return false;
                     }
                 }
@@ -723,8 +723,8 @@
             return false;
         }
 
-        // Maestro Configurations Management
-        async function loadMaestroConfigurations() {
+        // Conversation Configurations Management
+        async function loadConversationConfigurations() {
             const apiKey = document.getElementById('api_key').value;
             const apiSecret = document.getElementById('api_secret').value;
             const configsList = document.getElementById('configsList');
@@ -740,7 +740,7 @@
             configsList.innerHTML = '<div class="text-xs text-slate-400 text-center py-4">Loading...</div>';
 
             try {
-                const response = await fetch('/api/list-maestro-services', {
+                const response = await fetch('/api/list-conversation-configurations', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -813,7 +813,7 @@
                                                 ` : ''}
                                             </div>
                                         </div>
-                                        <button onclick="deleteMaestroConfiguration('${escapeHtml(config.id)}', '${escapeHtml(config.displayName)}')"
+                                        <button onclick="deleteConversationConfiguration('${escapeHtml(config.id)}', '${escapeHtml(config.displayName)}')"
                                             class="text-xs text-red-500 hover:text-red-700 font-medium px-2 py-1 hover:bg-red-50 rounded flex-shrink-0">
                                             Delete
                                         </button>
@@ -919,7 +919,7 @@
             }
         }
 
-        async function deleteMaestroConfiguration(configId, displayName) {
+        async function deleteConversationConfiguration(configId, displayName) {
             if (!confirm(`Are you sure you want to delete "${displayName}"?\n\nID: ${configId}`)) {
                 return;
             }
@@ -942,7 +942,7 @@
             }
 
             try {
-                const response = await fetch('/api/delete-maestro-service', {
+                const response = await fetch('/api/delete-conversation-configuration', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -1044,7 +1044,7 @@ TWILIO_TAC_AUTH_TOKEN=${credentials.auth_token || 'your_auth_token_here'}
 TWILIO_TAC_API_KEY=${credentials.api_key || 'SKxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'}
 TWILIO_TAC_API_TOKEN=${credentials.api_secret || 'your_api_token_here'}
 TWILIO_TAC_PHONE_NUMBER=${credentials.twilio_phone || '+1xxxxxxxxxx'}
-TWILIO_TAC_CONVERSATION_SERVICE_SID=${conversationServiceId || 'conv_configuration_xxxxxxxxxxxxxxxxxxxxxxxxxx'}
+TWILIO_TAC_CONVERSATION_CONFIGURATION_ID=${conversationConfigurationId || 'conv_configuration_xxxxxxxxxxxxxxxxxxxxxxxxxx'}
 
 # Optional - Voice Channel (ngrok domain without https://)
 TWILIO_TAC_VOICE_PUBLIC_DOMAIN=${credentials.ngrok_domain || 'your-domain.ngrok.app'}
@@ -1117,7 +1117,7 @@ TWILIO_TAC_OPENAI_API_KEY=${credentials.openai_api_key || 'sk-proj-xxxxxxxxxxxxx
         const STORAGE_KEY = 'tac_quickstart_form';
 
         // Fields to save (excluding secrets: auth_token, api_secret, openai_api_key)
-        const fieldsToSave = ['account_sid', 'api_key', 'email', 'phone', 'first_name', 'twilio_phone', 'ngrok_domain', 'memory_display_name', 'memory_description', 'maestro_display_name', 'maestro_description'];
+        const fieldsToSave = ['account_sid', 'api_key', 'email', 'phone', 'first_name', 'twilio_phone', 'ngrok_domain', 'memory_display_name', 'memory_description', 'configuration_display_name', 'configuration_description'];
 
         // Load saved values on page load
         function loadSavedValues() {
@@ -1296,7 +1296,7 @@ TWILIO_TAC_OPENAI_API_KEY=${credentials.openai_api_key || 'sk-proj-xxxxxxxxxxxxx
             // Reset steps
             updateStep('step-memory', 'pending', 'Waiting...');
             updateStep('step-profile', 'pending', 'Waiting...');
-            updateStep('step-maestro', 'pending', 'Waiting...');
+            updateStep('step-configuration', 'pending', 'Waiting...');
 
             // Strip protocol from ngrok domain before collecting credentials
             const ngrokInput = document.getElementById('ngrok_domain');
@@ -1325,8 +1325,8 @@ TWILIO_TAC_OPENAI_API_KEY=${credentials.openai_api_key || 'sk-proj-xxxxxxxxxxxxx
                 const profileSuccess = await createProfile(credentials);
 
                 if (profileSuccess) {
-                    const maestroSuccess = await createMaestroService(credentials);
-                    showResults(memorySuccess && profileSuccess && maestroSuccess, credentials);
+                    const configurationSuccess = await createConversationConfiguration(credentials);
+                    showResults(memorySuccess && profileSuccess && configurationSuccess, credentials);
                 } else {
                     showResults(false, credentials);
                 }

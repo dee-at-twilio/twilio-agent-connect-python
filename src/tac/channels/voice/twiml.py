@@ -39,7 +39,7 @@ def generate_twiml(
         ...             "user_language": "es",
         ...         },
         ...         "welcome_greeting": "Hello!",
-        ...         "conversation_configuration": "ISxxxxx",
+        ...         "conversation_configuration": "conv_configuration_xxxx",
         ...     }
         ... )
     """

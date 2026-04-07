@@ -1,4 +1,4 @@
-"""Pydantic models for Twilio Maestro Conversation API."""
+"""Pydantic models for Twilio Conversation Orchestrator API."""
 
 from typing import Literal
 

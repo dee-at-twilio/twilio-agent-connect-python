@@ -15,23 +15,6 @@ from tac.models.intelligence import (
 )
 
 
-def _extract_store_id_from_friendly_name(friendly_name: str) -> str | None:
-    """
-    Extract store ID from the IntelligenceConfiguration.friendlyName.
-
-    Format expected: "MEMORA_#{MEMORY_STORE_TTID}"
-
-    Args:
-        friendly_name: The intelligence configuration friendly name
-
-    Returns:
-        The extracted store ID or None
-    """
-    if not friendly_name.startswith("MEMORA_"):
-        return None
-    return friendly_name[7:]  # Strip "MEMORA_" prefix
-
-
 def _extract_profile_ids(operator_result: "OperatorResult") -> list[str]:
     """
     Extract valid profile IDs from operator result participants.
@@ -178,10 +161,9 @@ class OperatorResultProcessor:
     """Processor for Conversation Intelligence webhook events.
 
     This processor handles incoming CI webhook payloads, validates them,
-    and creates observations or summaries in Memora based on the event type.
+    and creates observations or summaries in Conversation Memory based on the event type.
 
     Events are filtered by:
-    - MEMORA_ prefix in intelligence configuration friendly name
     - Configuration ID matching the provided config
     - Operator SID matching observation or summary operator SID in config
 
@@ -191,13 +173,13 @@ class OperatorResultProcessor:
         from tac.core.config import ConversationIntelligenceConfig
         from tac.intelligence import OperatorResultProcessor
 
-        memory_client = MemoryClient(...)
+        conversation_memory_client = MemoryClient(...)
         config = ConversationIntelligenceConfig(
             configuration_id="GA...",
             observation_operator_sid="LY...",
             summary_operator_sid="LY...",
         )
-        processor = OperatorResultProcessor(memory_client, config)
+        processor = OperatorResultProcessor(conversation_memory_client, config)
 
         result = await processor.process_event(webhook_payload)
         if result.success:
@@ -211,18 +193,18 @@ class OperatorResultProcessor:
 
     def __init__(
         self,
-        memory_client: MemoryClient,
+        conversation_memory_client: MemoryClient,
         config: ConversationIntelligenceConfig,
     ) -> None:
         """
         Initialize the CI event processor.
 
         Args:
-            memory_client: MemoryClient instance for creating observations/summaries
+            conversation_memory_client: MemoryClient instance for creating observations/summaries
             config: ConversationIntelligenceConfig for filtering events by configuration
                 ID and operator SIDs
         """
-        self.memory_client = memory_client
+        self.conversation_memory_client = conversation_memory_client
         self.config = config
         self.logger = get_logger(__name__)
 
@@ -235,7 +217,7 @@ class OperatorResultProcessor:
         2. Applies filtering logic based on intelligence configuration ID and operator SIDs
         3. Iterates over operator_results array
         4. For each operator result: extracts profile IDs, generates content
-        5. Creates observations or summaries in Memora
+        5. Creates observations or summaries in Conversation Memory
 
         Args:
             payload: The raw webhook payload dictionary
@@ -398,7 +380,7 @@ class OperatorResultProcessor:
         profile_ids: list[str],
     ) -> OperatorProcessingResult:
         """
-        Process an observation event by creating observations in Memora.
+        Process an observation event by creating observations in Conversation Memory.
 
         Args:
             event: The parent webhook event (for conversation_id)
@@ -428,7 +410,7 @@ class OperatorResultProcessor:
         for profile_id in profile_ids:
             for obs_content in observation_contents:
                 try:
-                    await self.memory_client.create_observation(
+                    await self.conversation_memory_client.create_observation(
                         profile_id=profile_id,
                         content=obs_content,
                         source="conversation-intelligence",
@@ -465,7 +447,7 @@ class OperatorResultProcessor:
         profile_ids: list[str],
     ) -> OperatorProcessingResult:
         """
-        Process a summary event by creating conversation summaries in Memora.
+        Process a summary event by creating conversation summaries in Conversation Memory.
 
         Args:
             event: The parent webhook event (for conversation_id)
@@ -506,7 +488,7 @@ class OperatorResultProcessor:
                 )
 
             try:
-                await self.memory_client.create_conversation_summaries(
+                await self.conversation_memory_client.create_conversation_summaries(
                     profile_id=profile_id,
                     summaries=summaries_payload,
                 )

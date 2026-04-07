@@ -520,8 +520,8 @@ class TestMemoryTools:
         # Tools share the same tool name and raw implementation but have different injected args
         assert tool1.name == tool2.name  # Same tool name
         assert tool1._raw_implementation == tool2._raw_implementation  # Same raw function
-        client1 = tool1._injected_args["memory_client"]
-        client2 = tool2._injected_args["memory_client"]
+        client1 = tool1._injected_args["conversation_memory_client"]
+        client2 = tool2._injected_args["conversation_memory_client"]
         assert client1 != client2
         assert tool1._injected_args["profile_id"] == "prof_1"
         assert tool2._injected_args["profile_id"] == "prof_2"
@@ -547,7 +547,7 @@ class TestMemoryTools:
 
         # Only query should be in schema, not the injected params
         assert "query" in memory_tool.params_json_schema["properties"]
-        assert "memory_client" not in memory_tool.params_json_schema["properties"]
+        assert "conversation_memory_client" not in memory_tool.params_json_schema["properties"]
         assert "profile_id" not in memory_tool.params_json_schema["properties"]
 
         # Verify tool still works

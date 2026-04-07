@@ -29,7 +29,7 @@ class TestConversationModels:
         response_data = {
             "id": "CH123456",
             "account_id": "AC123456",
-            "configuration_id": "IS123456",
+            "configuration_id": "conv_configuration_test123",
             "status": "ACTIVE",
             "name": "Test Conversation",
             "created_at": "2025-01-01T00:00:00Z",
@@ -40,7 +40,7 @@ class TestConversationModels:
 
         assert conversation.id == "CH123456"
         assert conversation.account_id == "AC123456"
-        assert conversation.configuration_id == "IS123456"
+        assert conversation.configuration_id == "conv_configuration_test123"
         assert conversation.status == "ACTIVE"
         assert conversation.name == "Test Conversation"
         assert conversation.created_at == "2025-01-01T00:00:00Z"
@@ -66,20 +66,20 @@ class TestConversationModels:
     def test_conversation_request_model(self):
         """Test ConversationRequest model with all fields."""
         request_data = {
-            "configuration_id": "IS123456",
+            "configuration_id": "conv_configuration_test123",
             "name": "Test Conversation",
         }
 
         request = ConversationRequest(**request_data)
 
-        assert request.configuration_id == "IS123456"
+        assert request.configuration_id == "conv_configuration_test123"
         assert request.name == "Test Conversation"
 
     def test_conversation_request_minimal(self):
         """Test ConversationRequest with only required fields."""
-        request = ConversationRequest(configuration_id="IS123456")
+        request = ConversationRequest(configuration_id="conv_configuration_test123")
 
-        assert request.configuration_id == "IS123456"
+        assert request.configuration_id == "conv_configuration_test123"
         assert request.name is None
 
     def test_participant_request_model(self):
@@ -270,14 +270,14 @@ class TestConversationClient:
     def test_client_initialization(self):
         """Test ConversationClient initialization."""
         client = ConversationClient(
-            base_url="https://maestro.twilio.com",
+            base_url="https://conversations.twilio.com",
             api_key="SK123456",
             api_token="test_token",
-            service_id="IS123456",
+            configuration_id="conv_configuration_test123",
         )
 
-        assert client.base_url == "https://maestro.twilio.com"
-        assert client.service_id == "IS123456"
+        assert client.base_url == "https://conversations.twilio.com"
+        assert client.configuration_id == "conv_configuration_test123"
         assert client.api_key == "SK123456"
         assert client.api_token == "test_token"
 
@@ -289,7 +289,7 @@ class TestConversationClient:
         mock_response.json.return_value = {
             "id": "CH123456",
             "accountId": "AC123456",
-            "configurationId": "IS123456",
+            "configurationId": "conv_configuration_test123",
             "status": "ACTIVE",
         }
         mock_response.raise_for_status = Mock()
@@ -299,18 +299,18 @@ class TestConversationClient:
         mock_async_client_class.return_value.__aenter__.return_value = mock_client
 
         client = ConversationClient(
-            base_url="https://maestro.twilio.com",
+            base_url="https://conversations.twilio.com",
             api_key="SK123456",
             api_token="test_token",
-            service_id="IS123456",
+            configuration_id="conv_configuration_test123",
         )
 
         result = await client.create_conversation()
 
         # Verify API call
         mock_client.post.assert_called_once_with(
-            "https://maestro.twilio.com/v2/Conversations",
-            json={"configurationId": "IS123456"},
+            "https://conversations.twilio.com/v2/Conversations",
+            json={"configurationId": "conv_configuration_test123"},
         )
 
         # Verify response
@@ -326,7 +326,7 @@ class TestConversationClient:
         mock_response.json.return_value = {
             "id": "CH123456",
             "accountId": "AC123456",
-            "configurationId": "IS123456",
+            "configurationId": "conv_configuration_test123",
             "name": "Customer Support",
             "status": "ACTIVE",
         }
@@ -337,18 +337,18 @@ class TestConversationClient:
         mock_async_client_class.return_value.__aenter__.return_value = mock_client
 
         client = ConversationClient(
-            base_url="https://maestro.twilio.com",
+            base_url="https://conversations.twilio.com",
             api_key="SK123456",
             api_token="test_token",
-            service_id="IS123456",
+            configuration_id="conv_configuration_test123",
         )
 
         result = await client.create_conversation(name="Customer Support")
 
         # Verify API call includes all parameters
         mock_client.post.assert_called_once_with(
-            "https://maestro.twilio.com/v2/Conversations",
-            json={"configurationId": "IS123456", "name": "Customer Support"},
+            "https://conversations.twilio.com/v2/Conversations",
+            json={"configurationId": "conv_configuration_test123", "name": "Customer Support"},
         )
 
         # Verify response
@@ -365,10 +365,10 @@ class TestConversationClient:
         mock_async_client_class.return_value.__aenter__.return_value = mock_client
 
         client = ConversationClient(
-            base_url="https://maestro.twilio.com",
+            base_url="https://conversations.twilio.com",
             api_key="SK123456",
             api_token="test_token",
-            service_id="IS123456",
+            configuration_id="conv_configuration_test123",
         )
 
         with pytest.raises(httpx.HTTPError, match="API Error"):
@@ -397,10 +397,10 @@ class TestConversationClient:
         mock_async_client_class.return_value.__aenter__.return_value = mock_client
 
         client = ConversationClient(
-            base_url="https://maestro.twilio.com",
+            base_url="https://conversations.twilio.com",
             api_key="SK123456",
             api_token="test_token",
-            service_id="IS123456",
+            configuration_id="conv_configuration_test123",
         )
 
         result = await client.add_participant(
@@ -408,7 +408,7 @@ class TestConversationClient:
         )
 
         # Verify API call
-        expected_url = "https://maestro.twilio.com/v2/Conversations/CH123456/Participants"
+        expected_url = "https://conversations.twilio.com/v2/Conversations/CH123456/Participants"
         mock_client.post.assert_called_once_with(
             expected_url,
             json={"type": "CUSTOMER"},
@@ -443,10 +443,10 @@ class TestConversationClient:
         mock_async_client_class.return_value.__aenter__.return_value = mock_client
 
         client = ConversationClient(
-            base_url="https://maestro.twilio.com",
+            base_url="https://conversations.twilio.com",
             api_key="SK123456",
             api_token="test_token",
-            service_id="IS123456",
+            configuration_id="conv_configuration_test123",
         )
 
         result = await client.add_participant(
@@ -469,10 +469,10 @@ class TestConversationClient:
         mock_async_client_class.return_value.__aenter__.return_value = mock_client
 
         client = ConversationClient(
-            base_url="https://maestro.twilio.com",
+            base_url="https://conversations.twilio.com",
             api_key="SK123456",
             api_token="test_token",
-            service_id="IS123456",
+            configuration_id="conv_configuration_test123",
         )
 
         with pytest.raises(httpx.HTTPError, match="API Error"):
@@ -484,10 +484,10 @@ class TestConversationClient:
         """Test that ConversationClient stores authentication credentials."""
         # Credentials are stored as instance variables and passed to httpx.AsyncClient
         client = ConversationClient(
-            base_url="https://maestro.twilio.com",
+            base_url="https://conversations.twilio.com",
             api_key="SK123456",
             api_token="test_token",
-            service_id="IS123456",
+            configuration_id="conv_configuration_test123",
         )
 
         # Verify credentials are stored
@@ -511,15 +511,17 @@ class TestConversationClient:
         mock_async_client_class.return_value.__aenter__.return_value = mock_client
 
         client = ConversationClient(
-            base_url="https://maestro.twilio.com",
+            base_url="https://conversations.twilio.com",
             api_key="SK123456",
             api_token="test_token",
-            service_id="IS999999",
+            configuration_id="conv_configuration_test999",
         )
 
         # Test create_conversation URL
         await client.create_conversation()
-        assert mock_client.post.call_args[0][0] == "https://maestro.twilio.com/v2/Conversations"
+        assert (
+            mock_client.post.call_args[0][0] == "https://conversations.twilio.com/v2/Conversations"
+        )
 
         # Test add_participant URL
         mock_response.json.return_value = {
@@ -536,7 +538,7 @@ class TestConversationClient:
 
         await client.add_participant(conversation_id="CH123456")
 
-        expected_url = "https://maestro.twilio.com/v2/Conversations/CH123456/Participants"
+        expected_url = "https://conversations.twilio.com/v2/Conversations/CH123456/Participants"
         assert mock_client.post.call_args[0][0] == expected_url
 
     @pytest.mark.asyncio
@@ -573,10 +575,10 @@ class TestConversationClient:
         mock_async_client_class.return_value.__aenter__.return_value = mock_client
 
         client = ConversationClient(
-            base_url="https://maestro.twilio.com",
+            base_url="https://conversations.twilio.com",
             api_key="SK123456",
             api_token="test_token",
-            service_id="IS123456",
+            configuration_id="conv_configuration_test123",
         )
 
         # Create communication request
@@ -594,7 +596,7 @@ class TestConversationClient:
         )
 
         # Verify API call
-        expected_url = "https://maestro.twilio.com/v2/Conversations/CH123456/Communications"
+        expected_url = "https://conversations.twilio.com/v2/Conversations/CH123456/Communications"
         mock_client.post.assert_called_once()
         assert mock_client.post.call_args[0][0] == expected_url
 
@@ -619,10 +621,10 @@ class TestConversationClient:
         mock_async_client_class.return_value.__aenter__.return_value = mock_client
 
         client = ConversationClient(
-            base_url="https://maestro.twilio.com",
+            base_url="https://conversations.twilio.com",
             api_key="SK123456",
             api_token="test_token",
-            service_id="IS123456",
+            configuration_id="conv_configuration_test123",
         )
 
         # Create communication request
@@ -704,16 +706,16 @@ class TestConversationClient:
         mock_async_client_class.return_value.__aenter__.return_value = mock_client
 
         client = ConversationClient(
-            base_url="https://maestro.twilio.com",
+            base_url="https://conversations.twilio.com",
             api_key="SK123456",
             api_token="test_token",
-            service_id="IS123456",
+            configuration_id="conv_configuration_test123",
         )
 
         result = await client.list_communications(conversation_id="CH123456")
 
         # Verify API call
-        expected_url = "https://maestro.twilio.com/v2/Conversations/CH123456/Communications"
+        expected_url = "https://conversations.twilio.com/v2/Conversations/CH123456/Communications"
         mock_client.get.assert_called_once_with(expected_url, params={})
 
         # Verify response
@@ -744,10 +746,10 @@ class TestConversationClient:
         mock_async_client_class.return_value.__aenter__.return_value = mock_client
 
         client = ConversationClient(
-            base_url="https://maestro.twilio.com",
+            base_url="https://conversations.twilio.com",
             api_key="SK123456",
             api_token="test_token",
-            service_id="IS123456",
+            configuration_id="conv_configuration_test123",
         )
 
         result = await client.list_communications(
@@ -758,7 +760,7 @@ class TestConversationClient:
         )
 
         # Verify API call includes query parameters
-        expected_url = "https://maestro.twilio.com/v2/Conversations/CH123456/Communications"
+        expected_url = "https://conversations.twilio.com/v2/Conversations/CH123456/Communications"
         expected_params = {
             "channelId": "SM123456",
             "pageSize": 50,
@@ -779,10 +781,10 @@ class TestConversationClient:
         mock_async_client_class.return_value.__aenter__.return_value = mock_client
 
         client = ConversationClient(
-            base_url="https://maestro.twilio.com",
+            base_url="https://conversations.twilio.com",
             api_key="SK123456",
             api_token="test_token",
-            service_id="IS123456",
+            configuration_id="conv_configuration_test123",
         )
 
         with pytest.raises(httpx.HTTPError, match="API Error"):
@@ -806,10 +808,10 @@ class TestConversationClient:
         mock_async_client_class.return_value.__aenter__.return_value = mock_client
 
         client = ConversationClient(
-            base_url="https://maestro.twilio.com",
+            base_url="https://conversations.twilio.com",
             api_key="SK123456",
             api_token="test_token",
-            service_id="IS123456",
+            configuration_id="conv_configuration_test123",
         )
 
         # Create send request
@@ -827,7 +829,7 @@ class TestConversationClient:
         result = await client.send_communication(conversation_id="CH123456", request=send_request)
 
         # Verify API call
-        expected_url = "https://maestro.twilio.com/v2/Communications"
+        expected_url = "https://conversations.twilio.com/v2/Communications"
         mock_client.post.assert_called_once()
         assert mock_client.post.call_args[0][0] == expected_url
 
@@ -859,10 +861,10 @@ class TestConversationClient:
         mock_async_client_class.return_value.__aenter__.return_value = mock_client
 
         client = ConversationClient(
-            base_url="https://maestro.twilio.com",
+            base_url="https://conversations.twilio.com",
             api_key="SK123456",
             api_token="test_token",
-            service_id="IS123456",
+            configuration_id="conv_configuration_test123",
         )
 
         # Create send request
@@ -887,7 +889,7 @@ class TestConversationClient:
 
         mock_response = Mock()
         mock_response.json.return_value = {
-            "id": "IS123456",
+            "id": "conv_configuration_test123",
             "memoryStoreId": "MGtest123",
             "displayName": "Test Configuration",
             "description": "Test configuration description",
@@ -901,22 +903,22 @@ class TestConversationClient:
         mock_client.__exit__ = Mock(return_value=False)
 
         client = ConversationClient(
-            base_url="https://maestro.twilio.com",
+            base_url="https://conversations.twilio.com",
             api_key="SK123456",
             api_token="test_token",
-            service_id="IS123456",
+            configuration_id="conv_configuration_test123",
         )
 
         with patch.object(client, "_get_sync_client", return_value=mock_client):
-            result = client.get_configuration(configuration_id="IS123456")
+            result = client.get_configuration(configuration_id="conv_configuration_test123")
 
         # Verify API call
-        expected_url = "https://maestro.twilio.com/v2/ControlPlane/Configurations/IS123456"
+        expected_url = "https://conversations.twilio.com/v2/ControlPlane/Configurations/conv_configuration_test123"
         mock_client.get.assert_called_once_with(expected_url)
 
         # Verify response
         assert isinstance(result, ConversationConfiguration)
-        assert result.id == "IS123456"
+        assert result.id == "conv_configuration_test123"
         assert result.memory_store_id == "MGtest123"
         assert result.display_name == "Test Configuration"
 
@@ -938,15 +940,15 @@ class TestConversationClient:
         mock_client.__exit__ = Mock(return_value=False)
 
         client = ConversationClient(
-            base_url="https://maestro.twilio.com",
+            base_url="https://conversations.twilio.com",
             api_key="SK123456",
             api_token="test_token",
-            service_id="IS123456",
+            configuration_id="conv_configuration_test123",
         )
 
         with patch.object(client, "_get_sync_client", return_value=mock_client):
             with pytest.raises(httpx.HTTPStatusError, match="401 Unauthorized"):
-                client.get_configuration(configuration_id="IS123456")
+                client.get_configuration(configuration_id="conv_configuration_test123")
 
     @pytest.mark.no_auto_mock
     def test_get_configuration_validation_error(self):
@@ -954,14 +956,14 @@ class TestConversationClient:
         mock_response = Mock()
         # Missing required field 'description'
         mock_response.json.return_value = {
-            "id": "IS123456",
+            "id": "conv_configuration_test123",
             "memoryStoreId": "MGtest123",
             "displayName": "Test Configuration",
             # Missing 'description' - required field
             "conversationGroupingType": "GROUP_BY_PARTICIPANT_ADDRESSES_AND_CHANNEL_TYPE",
         }
         mock_response.raise_for_status = Mock()
-        mock_response.text = '{"id":"IS123456","memoryStoreId":"MGtest123"}'
+        mock_response.text = '{"id":"conv_configuration_test123","memoryStoreId":"MGtest123"}'
 
         mock_client = Mock()
         mock_client.get = Mock(return_value=mock_response)
@@ -969,15 +971,15 @@ class TestConversationClient:
         mock_client.__exit__ = Mock(return_value=False)
 
         client = ConversationClient(
-            base_url="https://maestro.twilio.com",
+            base_url="https://conversations.twilio.com",
             api_key="SK123456",
             api_token="test_token",
-            service_id="IS123456",
+            configuration_id="conv_configuration_test123",
         )
 
         with patch.object(client, "_get_sync_client", return_value=mock_client):
             with pytest.raises(ValueError, match="Invalid configuration response schema"):
-                client.get_configuration(configuration_id="IS123456")
+                client.get_configuration(configuration_id="conv_configuration_test123")
 
     @pytest.mark.no_auto_mock
     def test_get_configuration_network_error(self):
@@ -988,12 +990,12 @@ class TestConversationClient:
         mock_client.__exit__ = Mock(return_value=False)
 
         client = ConversationClient(
-            base_url="https://maestro.twilio.com",
+            base_url="https://conversations.twilio.com",
             api_key="SK123456",
             api_token="test_token",
-            service_id="IS123456",
+            configuration_id="conv_configuration_test123",
         )
 
         with patch.object(client, "_get_sync_client", return_value=mock_client):
             with pytest.raises(httpx.NetworkError, match="Connection failed"):
-                client.get_configuration(configuration_id="IS123456")
+                client.get_configuration(configuration_id="conv_configuration_test123")

@@ -32,7 +32,7 @@ def get_test_config_without_memory():
         "api_key": "SK123",
         "api_token": "test_api_token",
         "environment": "prod",
-        "conversation_service_sid": "IS123test",
+        "conversation_configuration_id": "conv_configuration_test123",
         "twilio_phone_number": "+15551234567",
     }
 
@@ -44,10 +44,10 @@ def get_test_config_with_memory():
     return config
 
 
-def create_memora_client(tac: TAC) -> MemoryClient:
-    """Helper to manually create memora_client for tests."""
+def create_memory_client(tac: TAC) -> MemoryClient:
+    """Helper to manually create Conversation Memory client for tests."""
     return MemoryClient(
-        base_url=tac.config.memora_base_url,
+        base_url=tac.config.memory_base_url,
         store_id="MGtest123",
         api_key=tac.config.api_key,
         api_token=tac.config.api_token,
@@ -55,26 +55,26 @@ def create_memora_client(tac: TAC) -> MemoryClient:
 
 
 class TestMemoryFallback:
-    """Test memory retrieval fallback to Maestro Communications API."""
+    """Test memory retrieval fallback to Conversation Orchestrator Communications API."""
 
     @pytest.mark.asyncio
-    async def test_retrieve_memory_with_memora_configured(self):
-        """Test retrieve_memory uses Memora when configured."""
+    async def test_retrieve_memory_with_memory_configured(self):
+        """Test retrieve_memory uses Conversation Memory when configured."""
         # Setup
         config = TACConfig(**get_test_config_with_memory())
         tac = TAC(config)
 
-        # Manually create memora_client for testing (auto-init will fail with mock credentials)
+        # Manually create memory_client for testing (auto-init will fail with mock credentials)
         from tac.context.memory import MemoryClient
 
-        tac.memora_client = MemoryClient(
-            base_url=config.memora_base_url,
+        tac.conversation_memory_client = MemoryClient(
+            base_url=config.memory_base_url,
             store_id="MGtest123",
             api_key=config.api_key,
             api_token=config.api_token,
         )
 
-        tac.memora_client.retrieve_memory = AsyncMock(
+        tac.conversation_memory_client.retrieve_memory = AsyncMock(
             return_value=MemoryRetrievalResponse(
                 observations=[],
                 summaries=[],
@@ -93,7 +93,7 @@ class TestMemoryFallback:
         result = await tac.retrieve_memory(context, query="test query")
 
         # Verify
-        tac.memora_client.retrieve_memory.assert_called_once_with(
+        tac.conversation_memory_client.retrieve_memory.assert_called_once_with(
             profile_id="profile_123",
             conversation_id="CH123",
             query="test query",
@@ -108,13 +108,14 @@ class TestMemoryFallback:
         assert result.raw_data.meta.query_time == 100
 
     @pytest.mark.asyncio
-    async def test_retrieve_memory_memora_configured_without_profile_id_raises(self):
-        """Test retrieve_memory falls back to Maestro when profile_id is missing."""
+    async def test_retrieve_memory_memory_configured_without_profile_id_falls_back(self):
+        """Test retrieve_memory falls back to Conversation Orchestrator
+        when profile_id is missing."""
         # Setup
         config = TACConfig(**get_test_config_with_memory())
         tac = TAC(config)
 
-        # Mock Maestro fallback (since profile_id is unavailable)
+        # Mock Conversation Orchestrator fallback (since profile_id is unavailable)
         from unittest.mock import AsyncMock
 
         from tac.models.conversation import (
@@ -145,7 +146,9 @@ class TestMemoryFallback:
                 updatedAt="2025-01-01T00:00:00.000Z",
             )
         ]
-        tac.maestro_client.list_communications = AsyncMock(return_value=mock_communications)
+        tac.conversation_orchestrator_client.list_communications = AsyncMock(
+            return_value=mock_communications
+        )
 
         context = ConversationSession(
             conversation_id="CH123",
@@ -153,25 +156,27 @@ class TestMemoryFallback:
             channel="SMS",
         )
 
-        # Execute - should complete without raising exception (falls back to Maestro)
+        # Execute - should complete without raising exception
+        # (falls back to Conversation Orchestrator)
         result = await tac.retrieve_memory(context)
 
-        # Verify - returns Maestro fallback data
+        # Verify - returns Conversation Orchestrator fallback data
         assert result is not None
         assert len(result.communications) > 0
         assert context.profile_id is None  # No profile lookup performed
 
     @pytest.mark.asyncio
-    async def test_retrieve_memory_fallback_to_maestro(self):
-        """Test retrieve_memory falls back to Maestro when Memora not configured."""
+    async def test_retrieve_memory_fallback_to_conversation_orchestrator(self):
+        """Test retrieve_memory falls back to Conversation Orchestrator
+        when Conversation Memory not configured."""
         # Setup
         config = TACConfig(**get_test_config_without_memory())
         tac = TAC(config)
 
-        # Mock Maestro communications response
+        # Mock Conversation Orchestrator communications response
         from unittest.mock import AsyncMock
 
-        tac.maestro_client.list_communications = AsyncMock(
+        tac.conversation_orchestrator_client.list_communications = AsyncMock(
             return_value=[
                 Communication(
                     id="comm_123",
@@ -206,14 +211,16 @@ class TestMemoryFallback:
         result = await tac.retrieve_memory(context, query="test query")
 
         # Verify
-        tac.maestro_client.list_communications.assert_called_once_with(conversation_id="CH123")
+        tac.conversation_orchestrator_client.list_communications.assert_called_once_with(
+            conversation_id="CH123"
+        )
 
         # Check response structure - should be TACMemoryResponse wrapper
         from tac.models.tac import TACMemoryResponse
 
         assert isinstance(result, TACMemoryResponse)
 
-        # Maestro fallback - observations and summaries should be empty
+        # Conversation Orchestrator fallback - observations and summaries should be empty
         assert len(result.observations) == 0
         assert len(result.summaries) == 0
         assert not result.has_memory_features
@@ -234,7 +241,7 @@ class TestMemoryFallback:
 
         from unittest.mock import AsyncMock
 
-        tac.maestro_client.list_communications = AsyncMock(return_value=[])
+        tac.conversation_orchestrator_client.list_communications = AsyncMock(return_value=[])
 
         context = ConversationSession(
             conversation_id="CH123",
@@ -265,8 +272,8 @@ class TestMemoryFallback:
 
         import httpx
 
-        tac.maestro_client.list_communications = AsyncMock(
-            side_effect=httpx.HTTPError("Maestro API Error")
+        tac.conversation_orchestrator_client.list_communications = AsyncMock(
+            side_effect=httpx.HTTPError("Conversation Orchestrator API Error")
         )
 
         context = ConversationSession(
@@ -276,7 +283,7 @@ class TestMemoryFallback:
         )
 
         # Execute & Verify
-        with pytest.raises(httpx.HTTPError, match="Maestro API Error"):
+        with pytest.raises(httpx.HTTPError, match="Conversation Orchestrator API Error"):
             await tac.retrieve_memory(context)
 
     @pytest.mark.asyncio
@@ -288,7 +295,7 @@ class TestMemoryFallback:
 
         from unittest.mock import AsyncMock
 
-        tac.maestro_client.list_communications = AsyncMock(
+        tac.conversation_orchestrator_client.list_communications = AsyncMock(
             return_value=[
                 Communication(
                     id=f"comm_{i}",
@@ -385,7 +392,7 @@ class TestTACCommunicationConversion:
         assert comm.author.type == "CUSTOMER"
         assert comm.author.profile_id == "profile_456"
 
-        # Check Maestro-only fields are None
+        # Check Conversation Orchestrator-only fields are None
         assert comm.author.participant_id is None
         assert comm.author.delivery_status is None
         assert comm.conversation_id is None
@@ -400,10 +407,12 @@ class TestTACCommunicationConversion:
         assert comm.created_at == "2025-01-15T10:15:30Z"
         assert comm.updated_at == "2025-01-15T10:20:30Z"
 
-    def test_convert_maestro_communication_populates_maestro_fields(self):
-        """Test that Maestro communications populate Maestro-only fields correctly."""
-        # Create a Maestro communication with Maestro-only fields
-        maestro_comm = Communication(
+    def test_convert_orchestrator_communication_populates_orchestrator_fields(self):
+        """Test that Conversation Orchestrator communications populate
+        Conversation Orchestrator-only fields correctly."""
+        # Create a Conversation Orchestrator communication with
+        # Conversation Orchestrator-only fields
+        orchestrator_comm = Communication(
             id="comm_789",
             conversationId="CONV123",
             accountId="AC456",
@@ -412,7 +421,7 @@ class TestTACCommunicationConversion:
                 channel="SMS",
                 participantId="part_customer",
             ),
-            content=CommunicationContent(type="TEXT", text="Hello from Maestro"),
+            content=CommunicationContent(type="TEXT", text="Hello from Conversation Orchestrator"),
             recipients=[
                 CommunicationParticipant(
                     address="+15559876543",
@@ -427,13 +436,13 @@ class TestTACCommunicationConversion:
         )
 
         # Wrap in TACMemoryResponse to trigger conversion
-        tac_response = TACMemoryResponse([maestro_comm])
+        tac_response = TACMemoryResponse([orchestrator_comm])
 
         # Verify conversion
         assert len(tac_response.communications) == 1
         comm = tac_response.communications[0]
 
-        # Check Maestro-only fields are populated
+        # Check Conversation Orchestrator-only fields are populated
         assert comm.conversation_id == "CONV123"
         assert comm.account_id == "AC456"
         assert comm.author.participant_id == "part_customer"
@@ -449,12 +458,13 @@ class TestTACCommunicationConversion:
         # Check common fields
         assert comm.id == "comm_789"
         assert comm.author.address == "+15551234567"
-        assert comm.content.text == "Hello from Maestro"
+        assert comm.content.text == "Hello from Conversation Orchestrator"
         assert comm.channel_id == "SM456"
 
-    def test_convert_maestro_transcription_communication(self):
-        """Test Maestro TRANSCRIPTION communications with nested transcription parsing."""
-        # Create a Maestro TRANSCRIPTION communication
+    def test_convert_orchestrator_transcription_communication(self):
+        """Test Conversation Orchestrator TRANSCRIPTION communications
+        with nested transcription parsing."""
+        # Create a Conversation Orchestrator TRANSCRIPTION communication
         transcription_comm = Communication(
             id="comm_voice_123",
             conversationId="CONV_VOICE",
@@ -529,7 +539,7 @@ class TestTACCommunicationConversion:
 
     def test_convert_communication_with_optional_fields_missing(self):
         """Test conversion handles optional fields gracefully when missing."""
-        # Create minimal Maestro communication with optional fields missing
+        # Create minimal Conversation Orchestrator communication with optional fields missing
         minimal_comm = Communication(
             id="comm_minimal",
             conversationId="CONV_MIN",

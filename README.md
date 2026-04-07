@@ -2,7 +2,7 @@
 
 Twilio Agent Connect (TAC) is a powerful Python library designed to simplify the development of intelligent,
 context-aware applications using Twilio's communication technologies. TAC provides seamless integration with Twilio's
-Memory and Conversation services, enabling you to build LLM-powered agents with persistent memory and conversation context.
+Memory Store and Conversation Configuration, enabling you to build LLM-powered agents with persistent memory and conversation context.
 
 > [!NOTE]
 > Looking for the JavaScript/TypeScript version? Check out [TAC SDK JS/TS](https://github.com/twilio-innovation/twilio-agent-connect-typescript).
@@ -52,7 +52,7 @@ pip install "git+https://github.com/twilio-innovation/twilio-agent-connect-pytho
 
 **Option 1: Use the Setup Wizard**
 
-Use the [Twilio Setup Wizard](getting_started/twilio_setup/) to automatically create Memory and Conversation services and generate your `.env` file:
+Use the [Twilio Setup Wizard](getting_started/twilio_setup/) to automatically create a Memory Store and Conversation Configuration and generate your `.env` file:
 
 ```bash
 git clone https://github.com/twilio-innovation/twilio-agent-connect-python.git
@@ -62,7 +62,7 @@ make setup  # Open http://localhost:8080
 
 **Option 2: Manual Setup**
 
-You can also create Memory and Conversation services manually through the [Twilio Console](https://1console.twilio.com).
+You can also create a Memory Store and Conversation Configuration manually through the [Twilio Console](https://1console.twilio.com).
 
 ---
 

@@ -107,7 +107,9 @@ class ChatChannel(MessagingChannel):
             return
 
         try:
-            participants = await self.tac.maestro_client.list_participants(conversation_id)
+            participants = await self.tac.conversation_orchestrator_client.list_participants(
+                conversation_id
+            )
         except Exception as e:
             self.logger.error(
                 "Failed to list participants",
@@ -129,7 +131,7 @@ class ChatChannel(MessagingChannel):
                 agent_address=self.agent_address,
             )
             try:
-                agent_participant = await self.tac.maestro_client.add_participant(
+                agent_participant = await self.tac.conversation_orchestrator_client.add_participant(
                     conversation_id,
                     addresses=[
                         ParticipantAddress(
@@ -152,7 +154,9 @@ class ChatChannel(MessagingChannel):
                     conversation_id=conversation_id,
                 )
                 try:
-                    retried = await self.tac.maestro_client.list_participants(conversation_id)
+                    retried = await self.tac.conversation_orchestrator_client.list_participants(
+                        conversation_id
+                    )
                     agent_participant = next(
                         (p for p in retried if p.type == "AI_AGENT"),
                         None,
@@ -190,7 +194,9 @@ class ChatChannel(MessagingChannel):
                 channel_id=chat_channel_sid,
             )
 
-            await self.tac.maestro_client.send_communication(conversation_id, send_request)
+            await self.tac.conversation_orchestrator_client.send_communication(
+                conversation_id, send_request
+            )
 
             self.logger.debug(
                 "Sent chat response via Send API",

@@ -101,7 +101,7 @@ def create_conversation_updated_webhook(
         "data": {
             "id": conversation_id,
             "accountId": "ACtest123",
-            "configurationId": "IStest123",
+            "configurationId": "conv_configuration_test123",
             "serviceId": "IStest123",
             "status": status,
             "name": "Test Conversation",
@@ -119,7 +119,7 @@ def get_test_config(with_memory: bool = True) -> dict[str, Any]:
         "api_key": "SK123",
         "api_token": "test_api_token",
         "environment": "prod",
-        "conversation_service_sid": "IStest123",
+        "conversation_configuration_id": "conv_configuration_test123",
         "twilio_phone_number": "+15551234567",
     }
     if with_memory:
@@ -169,11 +169,11 @@ class TestSMSChannel:
         """Test processing message auto-initializes conversation if not started."""
         tac = TAC(get_test_config())
 
-        # Manually create memora_client for this test
+        # Manually create memory_client for this test
         from tac.context.memory import MemoryClient
 
-        tac.memora_client = MemoryClient(
-            base_url=tac.config.memora_base_url,
+        tac.conversation_memory_client = MemoryClient(
+            base_url=tac.config.memory_base_url,
             store_id="MGtest123",
             api_key=tac.config.api_key,
             api_token=tac.config.api_token,
@@ -205,7 +205,7 @@ class TestSMSChannel:
             summaries=[],
             meta=MemoryRetrievalMeta(queryTime=0),
         )
-        tac.memora_client.retrieve_memory = AsyncMock(return_value=empty_response)
+        tac.conversation_memory_client.retrieve_memory = AsyncMock(return_value=empty_response)
 
         await channel.process_webhook(webhook_data)
 
@@ -221,11 +221,11 @@ class TestSMSChannel:
         """Test processing message with pre-existing conversation."""
         tac = TAC(get_test_config())
 
-        # Manually create memora_client for this test
+        # Manually create memory_client for this test
         from tac.context.memory import MemoryClient
 
-        tac.memora_client = MemoryClient(
-            base_url=tac.config.memora_base_url,
+        tac.conversation_memory_client = MemoryClient(
+            base_url=tac.config.memory_base_url,
             store_id="MGtest123",
             api_key=tac.config.api_key,
             api_token=tac.config.api_token,
@@ -251,23 +251,23 @@ class TestSMSChannel:
             summaries=[],
             meta=MemoryRetrievalMeta(queryTime=0),
         )
-        tac.memora_client.retrieve_memory = AsyncMock(return_value=empty_response)
+        tac.conversation_memory_client.retrieve_memory = AsyncMock(return_value=empty_response)
 
         await channel.process_webhook(message_webhook)
 
         # Verify memory retrieval was called
-        tac.memora_client.retrieve_memory.assert_called_once()
+        tac.conversation_memory_client.retrieve_memory.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_process_empty_message_ignored(self) -> None:
         """Test that empty messages are ignored."""
         tac = TAC(get_test_config())
 
-        # Manually create memora_client for this test
+        # Manually create memory_client for this test
         from tac.context.memory import MemoryClient
 
-        tac.memora_client = MemoryClient(
-            base_url=tac.config.memora_base_url,
+        tac.conversation_memory_client = MemoryClient(
+            base_url=tac.config.memory_base_url,
             store_id="MGtest123",
             api_key=tac.config.api_key,
             api_token=tac.config.api_token,
@@ -279,12 +279,12 @@ class TestSMSChannel:
             "CH123456", "MB123", "", "2025-11-18T00:00:00.000Z"
         )
 
-        tac.memora_client.retrieve_memory = AsyncMock()
+        tac.conversation_memory_client.retrieve_memory = AsyncMock()
 
         await channel.process_webhook(webhook_data)
 
         # Verify memory retrieval was NOT called
-        tac.memora_client.retrieve_memory.assert_not_called()
+        tac.conversation_memory_client.retrieve_memory.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_process_conversation_ended(self) -> None:
@@ -348,11 +348,13 @@ class TestSMSChannel:
 
         with (
             patch.object(
-                tac.maestro_client,
+                tac.conversation_orchestrator_client,
                 "list_participants",
                 return_value=[mock_agent_participant, mock_customer_participant],
             ),
-            patch.object(tac.maestro_client, "send_communication") as mock_send_comm,
+            patch.object(
+                tac.conversation_orchestrator_client, "send_communication"
+            ) as mock_send_comm,
         ):
             await channel.send_response("CH123456", "Test response")
 
@@ -518,7 +520,9 @@ class TestSMSChannel:
         tac = TAC(get_test_config())
         channel = SMSChannel(tac)
 
-        with patch.object(tac.maestro_client, "list_participants", return_value=[]):
+        with patch.object(
+            tac.conversation_orchestrator_client, "list_participants", return_value=[]
+        ):
             # Should log error but not raise
             await channel.send_response("CH123456", "Test response")
 

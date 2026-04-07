@@ -169,7 +169,7 @@ class TACTool:
             to ensure proper cache invalidation and type validation.
 
         Example:
-            tool.configure_injection(client=memory_client, config=tac_config)
+            tool.configure_injection(client=conversation_memory_client, config=tac_config)
         """
         for param_name, value in kwargs.items():
             if param_name not in self._injected_param_types:

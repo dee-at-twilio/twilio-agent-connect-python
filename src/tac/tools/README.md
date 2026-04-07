@@ -65,11 +65,11 @@ from tac.context.memory import MemoryClient
 
 async def retrieve_profile_memory(
     query: str,
-    memory_client: Annotated[MemoryClient, InjectedToolArg],
+    conversation_memory_client: Annotated[MemoryClient, InjectedToolArg],
     profile_id: Annotated[str, InjectedToolArg],
 ) -> dict:
     """Search and retrieve relevant memories for the current profile."""
-    memory_response = await memory_client.retrieve_memory(
+    memory_response = await conversation_memory_client.retrieve_memory(
         profile_id=profile_id,
         query=query,
     )
@@ -78,12 +78,12 @@ async def retrieve_profile_memory(
 # Wrap with decorator and configure injection
 tool = function_tool()(retrieve_profile_memory)
 tool.configure_injection(
-    memory_client=my_memory_client,
+    conversation_memory_client=my_conversation_memory_client,
     profile_id="prof_123"
 )
 
 # LLM only sees: retrieve_profile_memory(query: str)
-# memory_client and profile_id are hidden from schema
+# conversation_memory_client and profile_id are hidden from schema
 ```
 
 ### Manual Creation
@@ -113,7 +113,7 @@ tool = create_tool(
 
 ### Memory Tool
 
-Retrieve memories from Twilio Memora:
+Retrieve memories from Twilio Conversation Memory:
 
 ```python
 from tac import TAC, TACConfig
@@ -131,7 +131,7 @@ session = ConversationSession(
 )
 
 # Create tool with injected dependencies
-memory_tool = create_memory_tool(tac.memora_client, session)
+memory_tool = create_memory_tool(tac.conversation_memory_client, session)
 
 # LLM only sees: retrieve_profile_memory(query: str)
 # Execute tool (async)
@@ -140,7 +140,7 @@ result = await memory_tool(query="user preferences about food")
 
 ### Knowledge Tool
 
-Search a knowledge base via Twilio Memora:
+Search a knowledge base via Twilio Conversation Memory:
 
 ```python
 from tac.tools.knowledge import create_knowledge_tool, KnowledgeToolConfig
@@ -155,7 +155,7 @@ knowledge_base = KnowledgeBase(
 
 # Create tool with optional config
 knowledge_tool = create_knowledge_tool(
-    memory_client=tac.memora_client,
+    conversation_memory_client=tac.conversation_memory_client,
     knowledge_base=knowledge_base,
     tool_config=KnowledgeToolConfig(
         name="search_product_faq",  # Optional custom name

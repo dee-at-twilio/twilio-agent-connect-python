@@ -17,7 +17,7 @@ class IntelligenceConfiguration(BaseModel):
         default=None,
         alias="friendlyName",
         description="Unique name of the intelligence configuration",
-        json_schema_extra={"example": "MEMORA_mem_store_00000000000000000000000000"},
+        json_schema_extra={"example": "CONVERSATION_MEMORY_mem_store_00000000000000000000000000"},
     )
     version: int = Field(
         ...,
@@ -107,7 +107,7 @@ class Participant(BaseModel):
     profile_id: str | None = Field(
         default=None,
         alias="profileId",
-        description="Memora profile id of the participant",
+        description="Conversation Memory profile id of the participant",
         json_schema_extra={"example": "mem_profile_00000000000000000000000000"},
     )
     type: str | None = Field(
@@ -257,7 +257,7 @@ class OperatorProcessingResult(BaseModel):
     )
     skip_reason: str | None = Field(
         default=None,
-        description="Reason for skipping (e.g., 'non-memora event')",
+        description="Reason for skipping (e.g., 'non-conversation-memory event')",
     )
     error: str | None = Field(
         default=None,

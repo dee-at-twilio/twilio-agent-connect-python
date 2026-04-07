@@ -8,7 +8,6 @@ import pytest
 from tac.intelligence.operator_result_processor import (
     OperatorResultProcessor,
     _extract_profile_ids,
-    _extract_store_id_from_friendly_name,
     _generate_content,
     _parse_observations_content,
     _parse_summaries_content,
@@ -39,7 +38,7 @@ VALID_SUMMARY_OPERATOR_SID = "LY00000000000000000000000000000002"
 
 
 def make_valid_event(
-    friendly_name: str = f"MEMORA_{VALID_STORE_ID}",
+    friendly_name: str = f"CONVERSATION_MEMORY_{VALID_STORE_ID}",
     operator_friendly_name: str = "Observation Extractor",
     profile_id: str = VALID_PROFILE_ID,
     conversation_id: str = VALID_CONV_ID,
@@ -163,12 +162,12 @@ class TestModelParsing:
         """Test IntelligenceConfiguration model."""
         config = IntelligenceConfiguration(
             id="GA123",
-            friendly_name="MEMORA_test",
+            friendly_name="CONVERSATION_MEMORY_test",
             version=1,
             rule_id="rule_123",
         )
         assert config.id == "GA123"
-        assert config.friendly_name == "MEMORA_test"
+        assert config.friendly_name == "CONVERSATION_MEMORY_test"
         assert config.version == 1
 
     def test_operator_parsing(self):
@@ -221,16 +220,6 @@ class TestModelParsing:
 
         json_result = JSONResult(payload='{"key": "value"}')
         assert json_result.payload == '{"key": "value"}'
-
-
-class TestFilteringLogic:
-    """Test event filtering logic."""
-
-    def test_extract_store_id_from_friendly_name(self):
-        """Test store ID extraction from friendly name."""
-        assert _extract_store_id_from_friendly_name("MEMORA_mem_store_123") == "mem_store_123"
-        assert _extract_store_id_from_friendly_name("OTHER_mem_store_123") is None
-        assert _extract_store_id_from_friendly_name("mem_store_123") is None
 
 
 class TestProfileExtraction:
@@ -566,7 +555,7 @@ class TestOperatorResultProcessor:
     ):
         """Test fallback to extracting store ID from friendly name."""
         payload = make_valid_event(
-            friendly_name=f"MEMORA_{VALID_STORE_ID}",
+            friendly_name=f"CONVERSATION_MEMORY_{VALID_STORE_ID}",
             memory_store_id=None,
             result={"payload": '{"observations": [{"content": "Test"}]}'},
         )
@@ -599,11 +588,11 @@ class TestOperatorProcessingResult:
         result = OperatorProcessingResult(
             success=True,
             skipped=True,
-            skip_reason="Non-memora event",
+            skip_reason="Non-conversation-memory event",
         )
         assert result.success is True
         assert result.skipped is True
-        assert result.skip_reason == "Non-memora event"
+        assert result.skip_reason == "Non-conversation-memory event"
 
     def test_processing_result_error(self):
         """Test error processing result."""

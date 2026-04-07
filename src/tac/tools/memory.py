@@ -9,7 +9,7 @@ from tac.tools.base import InjectedToolArg, TACTool, function_tool
 
 async def retrieve_profile_memory(
     query: str,
-    memory_client: Annotated[MemoryClient, InjectedToolArg],
+    conversation_memory_client: Annotated[MemoryClient, InjectedToolArg],
     profile_id: Annotated[str, InjectedToolArg],
 ) -> dict[str, Any]:
     """
@@ -25,26 +25,29 @@ async def retrieve_profile_memory(
     Returns:
         Dictionary containing relevant memories, traits, and metadata
     """
-    memory_response = await memory_client.retrieve_memory(
+    memory_response = await conversation_memory_client.retrieve_memory(
         profile_id=profile_id,
         query=query,
     )
     return memory_response.model_dump(by_alias=True, exclude_none=True)
 
 
-def create_memory_tool(memory_client: MemoryClient, session: ConversationSession) -> TACTool:
+def create_memory_tool(
+    conversation_memory_client: MemoryClient,
+    session: ConversationSession,
+) -> TACTool:
     """
     Create memory tool with injected MemoryClient and session context.
 
     Args:
-        memory_client: MemoryClient instance for retrieving memories
+        conversation_memory_client: MemoryClient instance for retrieving memories
         session: Current session identity with profile and conversation IDs
 
     Returns:
         Configured memory tool
 
     Example:
-        >>> tool = create_memory_tool(memory_client, session)
+        >>> tool = create_memory_tool(conversation_memory_client, session)
         >>> # LLM only sees: retrieve_profile_memory(query: str)
         >>> result = await tool(query="user preferences")
     """
@@ -53,6 +56,6 @@ def create_memory_tool(memory_client: MemoryClient, session: ConversationSession
 
     # Configure injection with the memory client and profile ID
     return memory_tool.configure_injection(
-        memory_client=memory_client,
+        conversation_memory_client=conversation_memory_client,
         profile_id=session.profile_id,
     )
