@@ -1,7 +1,5 @@
 """Voice channel configuration."""
 
-from typing import Optional
-
 from pydantic import BaseModel, Field
 
 from tac.session import SessionManager
@@ -24,7 +22,7 @@ class VoiceChannelConfig(BaseModel):
 
     model_config = {"arbitrary_types_allowed": True}
 
-    session_manager: Optional[SessionManager] = Field(
+    session_manager: SessionManager | None = Field(
         default=None,
         description="SessionManager for tracking and canceling in-flight streaming tasks",
     )

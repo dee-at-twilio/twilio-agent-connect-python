@@ -1,6 +1,6 @@
 """Integration tests for the complete TAC framework."""
 
-from typing import Any, Optional
+from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
@@ -188,7 +188,7 @@ class TestTACIntegration:
         def message_ready_callback(
             user_message: str,
             context: ConversationSession,
-            memory_response: Optional[TACMemoryResponse] = None,
+            memory_response: TACMemoryResponse | None = None,
         ):
             nonlocal callback_invoked, received_context, received_memories
             callback_invoked = True
@@ -250,7 +250,7 @@ class TestTACIntegration:
         def message_ready_callback(
             user_message: str,
             context: ConversationSession,
-            memory_response: Optional[TACMemoryResponse] = None,
+            memory_response: TACMemoryResponse | None = None,
         ):
             nonlocal callback_invoked
             callback_invoked = True
@@ -292,7 +292,7 @@ class TestTACIntegration:
         def message_ready_callback(
             user_message: str,
             context: ConversationSession,
-            memory_response: Optional[TACMemoryResponse] = None,
+            memory_response: TACMemoryResponse | None = None,
         ):
             nonlocal callback_invoked
             callback_invoked = True
@@ -363,7 +363,7 @@ class TestTACIntegration:
         def message_ready_callback(
             user_message: str,
             context: ConversationSession,
-            memory_response: Optional[TACMemoryResponse] = None,
+            memory_response: TACMemoryResponse | None = None,
         ):
             nonlocal callback_count
             callback_count += 1
@@ -419,7 +419,7 @@ class TestTACIntegration:
         def message_ready_callback(
             user_message: str,
             context: ConversationSession,
-            memory_response: Optional[TACMemoryResponse] = None,
+            memory_response: TACMemoryResponse | None = None,
         ):
             nonlocal callback_invoked, received_context
             callback_invoked = True
@@ -464,7 +464,7 @@ class TestTACIntegration:
         def message_ready_callback(
             user_message: str,
             context: ConversationSession,
-            memory_response: Optional[TACMemoryResponse] = None,
+            memory_response: TACMemoryResponse | None = None,
         ):
             nonlocal callback_invoked
             callback_invoked = True

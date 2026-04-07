@@ -21,7 +21,7 @@ Required env vars (in addition to standard TAC vars):
 import asyncio
 import os
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
@@ -69,7 +69,7 @@ SYSTEM_MESSAGE: ChatCompletionSystemMessageParam = {
 async def handle_message_ready(
     user_message: str,
     context: ConversationSession,
-    memory_response: Optional[TACMemoryResponse],
+    memory_response: TACMemoryResponse | None,
 ) -> None:
     conv_id = context.conversation_id
 

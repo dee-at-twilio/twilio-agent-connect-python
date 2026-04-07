@@ -1,7 +1,6 @@
 """Tests for TAC tools."""
 
 import json
-from typing import Optional
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -174,7 +173,7 @@ class TestFunctionTool:
         """Test function_tool with optional parameters."""
 
         @function_tool()
-        def optional_tool(required: str, optional: Optional[str] = None) -> str:
+        def optional_tool(required: str, optional: str | None = None) -> str:
             """Tool with optional parameters."""
             return f"{required} - {optional}"
 
@@ -315,8 +314,9 @@ class TestTypeToJsonSchema:
         assert _type_to_json_schema(bool) == {"type": "boolean"}
 
     def test_optional_type(self):
-        """Test conversion of Optional types."""
-        schema = _type_to_json_schema(Optional[str])
+        """Test conversion of Optional types - unwraps to base type."""
+        schema = _type_to_json_schema(str | None)
+        # Optional types are unwrapped to base type (optionality tracked via 'required' array)
         assert schema == {"type": "string"}
 
     def test_list_type(self):
@@ -354,9 +354,7 @@ class TestTypeToJsonSchema:
 
     def test_complex_union_type(self):
         """Test conversion of complex Union types (new capability)."""
-        from typing import Union
-
-        schema = _type_to_json_schema(Union[str, int])
+        schema = _type_to_json_schema(str | int)
         # TypeAdapter handles complex unions with anyOf
         assert "anyOf" in schema
         types = [item.get("type") for item in schema["anyOf"]]
@@ -382,7 +380,7 @@ class TestIsOptional:
 
     def test_optional_type_returns_true(self):
         """Test that Optional[T] is detected as optional."""
-        assert _is_optional(Optional[str]) is True
+        assert _is_optional(str | None) is True
 
     def test_non_optional_type_returns_false(self):
         """Test that non-Optional types are not detected as optional."""
@@ -411,7 +409,7 @@ class TestExtractSchemaFromFunction:
     def test_extract_schema_with_optional(self):
         """Test schema extraction with optional parameters."""
 
-        def optional_func(required: str, optional: Optional[str] = None) -> str:
+        def optional_func(required: str, optional: str | None = None) -> str:
             return required
 
         schema = _extract_schema_from_function(optional_func)
@@ -667,7 +665,7 @@ class TestMemoryTools:
         # Create a tool with Optional generic type annotations
         async def test_tool(
             query: str,
-            items: Annotated[Optional[list[str]], InjectedToolArg],
+            items: Annotated[list[str] | None, InjectedToolArg],
         ) -> str:
             """Test tool with optional generic type injections."""
             return "result"

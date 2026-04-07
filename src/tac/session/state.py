@@ -3,7 +3,6 @@ Session management utilities for agents
 """
 
 import asyncio
-from typing import Optional
 
 from tac.core.logging import get_logger
 
@@ -24,9 +23,7 @@ class SessionState:
     """
 
     def __init__(self) -> None:
-        self.stream_task: Optional[asyncio.Task] = (
-            None  # Track active streaming task for cancellation
-        )
+        self.stream_task: asyncio.Task | None = None  # Track active streaming task for cancellation
 
     async def cancel_stream_task(self) -> None:
         """

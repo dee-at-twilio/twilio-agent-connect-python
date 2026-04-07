@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 
@@ -66,7 +66,7 @@ class KnowledgeClient:
         knowledge_base_id: str,
         query: str,
         top_k: int = 5,
-        knowledge_ids: Optional[list[str]] = None,
+        knowledge_ids: list[str] | None = None,
     ) -> list[KnowledgeChunkResult]:
         """
         Search a knowledge base with the given query.

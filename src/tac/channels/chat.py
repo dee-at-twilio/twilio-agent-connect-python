@@ -1,7 +1,7 @@
 """Chat Channel implementation for TAC."""
 
 from collections.abc import AsyncGenerator
-from typing import Any, Optional, Union
+from typing import Any
 
 from pydantic import Field
 
@@ -39,7 +39,7 @@ class ChatChannel(MessagingChannel):
     def __init__(
         self,
         tac: TAC,
-        config: Optional[Union[ChatChannelConfig, dict[str, Any]]] = None,
+        config: ChatChannelConfig | dict[str, Any] | None = None,
     ):
         if isinstance(config, dict):
             config = ChatChannelConfig(**config)
@@ -65,8 +65,8 @@ class ChatChannel(MessagingChannel):
     async def send_response(
         self,
         conversation_id: str,
-        response: Union[str, AsyncGenerator[Union[str, dict[str, Any]], None]],
-        role: Optional[str] = None,
+        response: str | AsyncGenerator[str | dict[str, Any], None],
+        role: str | None = None,
     ) -> None:
         """Send chat response using the Conversation Orchestrator Send API.
 

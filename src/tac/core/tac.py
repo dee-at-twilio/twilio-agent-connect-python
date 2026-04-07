@@ -3,7 +3,7 @@
 import asyncio
 import inspect
 from collections.abc import Awaitable, Callable
-from typing import Any, Optional, Union
+from typing import Any
 
 from pydantic import ValidationError
 
@@ -23,7 +23,7 @@ from tac.models.tac import TACMemoryResponse
 
 
 class TAC:
-    _handoff_callback: Optional[Callable[[dict[str, str]], Awaitable[str]]] = None
+    _handoff_callback: Callable[[dict[str, str]], Awaitable[str]] | None = None
 
     def on_handoff(
         self,
@@ -43,7 +43,7 @@ class TAC:
     This class accepts configuration and provides methods to process webhook events.
     """
 
-    def __init__(self, config: Union[TACConfig, dict[str, Any]]):
+    def __init__(self, config: TACConfig | dict[str, Any]):
         """
         Initialize TAC instance with configuration.
 
@@ -96,7 +96,7 @@ class TAC:
         )
 
         # Initialize Knowledge client only if knowledge_base_id is configured
-        self.knowledge_client: Optional[KnowledgeClient] = None
+        self.knowledge_client: KnowledgeClient | None = None
         if self.config.knowledge_base_id:
             self.knowledge_client = KnowledgeClient(
                 base_url=self.config.knowledge_base_url,
@@ -105,7 +105,7 @@ class TAC:
             )
 
         # Initialize CI processor if CI config is provided
-        self.ci_processor: Optional[OperatorResultProcessor] = None
+        self.ci_processor: OperatorResultProcessor | None = None
         if self.config.conversation_intelligence_config:
             self.ci_processor = OperatorResultProcessor(
                 memory_client=self.memora_client,
@@ -114,33 +114,30 @@ class TAC:
             self.logger.info("Conversation Intelligence processor initialized")
 
         # Callback for when message is ready (supports both sync and async)
-        self._message_ready_callback: Optional[
-            Union[
-                Callable[[str, ConversationSession, Optional[TACMemoryResponse]], None],
-                Callable[[str, ConversationSession, Optional[TACMemoryResponse]], Awaitable[None]],
-            ]
-        ] = None
+        self._message_ready_callback: (
+            Callable[[str, ConversationSession, TACMemoryResponse | None], None]
+            | Callable[[str, ConversationSession, TACMemoryResponse | None], Awaitable[None]]
+            | None
+        ) = None
 
         # Callback for when user interrupts the agent (supports both sync and async)
-        self._interrupt_callback: Optional[
-            Union[
-                Callable[[ConversationSession, Any], None],
-                Callable[[ConversationSession, Any], Awaitable[None]],
-            ]
-        ] = None
+        self._interrupt_callback: (
+            Callable[[ConversationSession, Any], None]
+            | Callable[[ConversationSession, Any], Awaitable[None]]
+            | None
+        ) = None
 
         # Callback for when conversation ends (supports both sync and async)
-        self._conversation_ended_callback: Optional[
-            Union[
-                Callable[[ConversationSession], None],
-                Callable[[ConversationSession], Awaitable[None]],
-            ]
-        ] = None
+        self._conversation_ended_callback: (
+            Callable[[ConversationSession], None]
+            | Callable[[ConversationSession], Awaitable[None]]
+            | None
+        ) = None
 
     async def retrieve_memory(
         self,
         conversation_context: ConversationSession,
-        query: Optional[str] = None,
+        query: str | None = None,
     ) -> TACMemoryResponse:
         """
         Retrieve memories from Memory Service or fallback to Maestro Communications API.
@@ -225,7 +222,7 @@ class TAC:
             )
             return TACMemoryResponse(communications)
 
-    async def fetch_profile(self, profile_id: str) -> Optional[ProfileResponse]:
+    async def fetch_profile(self, profile_id: str) -> ProfileResponse | None:
         """
         Fetch profile information with traits for a given profile ID.
 
@@ -267,10 +264,10 @@ class TAC:
 
     def on_message_ready(
         self,
-        callback: Union[
-            Callable[[str, ConversationSession, Optional[TACMemoryResponse]], None],
-            Callable[[str, ConversationSession, Optional[TACMemoryResponse]], Awaitable[None]],
-        ],
+        callback: (
+            Callable[[str, ConversationSession, TACMemoryResponse | None], None]
+            | Callable[[str, ConversationSession, TACMemoryResponse | None], Awaitable[None]]
+        ),
     ) -> None:
         """
         Register a callback to be invoked when a message is ready to be processed.
@@ -344,7 +341,7 @@ class TAC:
         self,
         user_message: str,
         conversation_context: ConversationSession,
-        memory_response: Optional[TACMemoryResponse] = None,
+        memory_response: TACMemoryResponse | None = None,
     ) -> None:
         """
         Trigger the registered message ready callback.
@@ -370,10 +367,10 @@ class TAC:
 
     def on_interrupt(
         self,
-        callback: Union[
-            Callable[[ConversationSession, Any], None],
-            Callable[[ConversationSession, Any], Awaitable[None]],
-        ],
+        callback: (
+            Callable[[ConversationSession, Any], None]
+            | Callable[[ConversationSession, Any], Awaitable[None]]
+        ),
     ) -> None:
         """
         Register a callback to be invoked when user interrupts the agent.
@@ -469,10 +466,9 @@ class TAC:
 
     def on_conversation_ended(
         self,
-        callback: Union[
-            Callable[[ConversationSession], None],
-            Callable[[ConversationSession], Awaitable[None]],
-        ],
+        callback: (
+            Callable[[ConversationSession], None] | Callable[[ConversationSession], Awaitable[None]]
+        ),
     ) -> None:
         """
         Register a callback to be invoked when a conversation ends.

@@ -1,4 +1,4 @@
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -6,34 +6,34 @@ from pydantic import BaseModel, Field
 class MemoryRetrievalRequest(BaseModel):
     """Request payload for retrieving conversation memories."""
 
-    conversation_id: Optional[str] = Field(
+    conversation_id: str | None = Field(
         default=None,
         alias="conversationId",
         description="A unique identifier for the conversation using Twilio Type ID (TTID) format",
         json_schema_extra={"example": "comms_conversation_00000000000000000000000000"},
     )
-    query: Optional[str] = Field(
+    query: str | None = Field(
         default=None,
         min_length=1,
         max_length=1024,
         description="Semantic search query for finding relevant memories",
         json_schema_extra={"example": "customer satisfaction feedback"},
     )
-    begin_date: Optional[str] = Field(
+    begin_date: str | None = Field(
         default=None,
         alias="beginDate",
         max_length=30,
         description="Start date for filtering memories (inclusive)",
         json_schema_extra={"example": "2025-01-01T00:00:00Z"},
     )
-    end_date: Optional[str] = Field(
+    end_date: str | None = Field(
         default=None,
         alias="endDate",
         max_length=30,
         description="End date for filtering memories (exclusive)",
         json_schema_extra={"example": "2025-01-31T23:59:59Z"},
     )
-    observations_limit: Optional[int] = Field(
+    observations_limit: int | None = Field(
         default=20,
         alias="observationsLimit",
         ge=1,
@@ -41,7 +41,7 @@ class MemoryRetrievalRequest(BaseModel):
         description="Maximum number of observation memories to return",
         json_schema_extra={"example": 20},
     )
-    summaries_limit: Optional[int] = Field(
+    summaries_limit: int | None = Field(
         default=5,
         alias="summariesLimit",
         ge=1,
@@ -49,7 +49,7 @@ class MemoryRetrievalRequest(BaseModel):
         description="Maximum number of summary memories to return",
         json_schema_extra={"example": 5},
     )
-    communications_limit: Optional[int] = Field(
+    communications_limit: int | None = Field(
         default=10,
         alias="communicationsLimit",
         ge=1,
@@ -83,19 +83,19 @@ class MemoryParticipant(BaseModel):
     channel: Literal["VOICE", "SMS", "RCS", "EMAIL", "WHATSAPP", "CHAT", "API", "SYSTEM"] = Field(
         ..., description="The channel on which the message originated"
     )
-    type: Optional[Literal["HUMAN_AGENT", "CUSTOMER", "AI_AGENT"]] = Field(
+    type: Literal["HUMAN_AGENT", "CUSTOMER", "AI_AGENT"] | None = Field(
         default=None,
         description="Type of Participant in the Conversation",
     )
-    profile_id: Optional[str] = Field(
+    profile_id: str | None = Field(
         default=None,
         alias="profileId",
         description="The canonical profile ID",
         json_schema_extra={"example": "mem_profile_00000000000000000000000000"},
     )
-    delivery_status: Optional[
-        Literal["INITIATED", "IN_PROGRESS", "DELIVERED", "COMPLETED", "FAILED"]
-    ] = Field(
+    delivery_status: (
+        Literal["INITIATED", "IN_PROGRESS", "DELIVERED", "COMPLETED", "FAILED"] | None
+    ) = Field(
         default=None,
         alias="deliveryStatus",
         description="Delivery status of the Communication to this recipient (only for recipients)",
@@ -107,7 +107,7 @@ class MemoryParticipant(BaseModel):
 class MemoryCommunicationContent(BaseModel):
     """Content of a Memory communication."""
 
-    text: Optional[str] = Field(
+    text: str | None = Field(
         default=None,
         max_length=8388608,
         description="Primary text content (optional)",
@@ -130,7 +130,7 @@ class MemoryCommunication(BaseModel):
     recipients: list[MemoryParticipant] = Field(
         ..., max_length=100, description="Communication recipients"
     )
-    channel_id: Optional[str] = Field(
+    channel_id: str | None = Field(
         default=None,
         alias="channelId",
         max_length=256,
@@ -143,7 +143,7 @@ class MemoryCommunication(BaseModel):
         description="When communication was created",
         json_schema_extra={"example": "2025-01-15T10:15:30Z"},
     )
-    updated_at: Optional[str] = Field(
+    updated_at: str | None = Field(
         default=None,
         alias="updatedAt",
         description="When communication was last updated",
@@ -218,14 +218,14 @@ class ObservationInfo(BaseModel):
         description="Timestamp when the observation was last updated",
         json_schema_extra={"example": "2025-01-15T10:30:45Z"},
     )
-    occurred_at: Optional[str] = Field(
+    occurred_at: str | None = Field(
         default=None,
         alias="occurredAt",
         max_length=30,
         description="Timestamp when the observation originally occurred",
         json_schema_extra={"example": "2025-01-15T10:15:30Z"},
     )
-    conversation_ids: Optional[list[str]] = Field(
+    conversation_ids: list[str] | None = Field(
         default=None,
         alias="conversationIds",
         max_length=10,
@@ -248,7 +248,7 @@ class SummaryInfo(BaseModel):
             "example": "Customer discussed billing concerns and was satisfied with resolution."
         },
     )
-    conversation_id: Optional[str] = Field(
+    conversation_id: str | None = Field(
         default=None,
         alias="conversationId",
         description="Unique identifier for the conversation using Twilio Type ID (TTID) format",
@@ -273,13 +273,13 @@ class SummaryInfo(BaseModel):
         description="Timestamp when the summary was last updated",
         json_schema_extra={"example": "2025-01-15T10:30:45Z"},
     )
-    source: Optional[str] = Field(
+    source: str | None = Field(
         default=None,
         max_length=100,
         description="Source system that generated the summary",
         json_schema_extra={"example": "conversations"},
     )
-    occurred_at: Optional[str] = Field(
+    occurred_at: str | None = Field(
         default=None,
         alias="occurredAt",
         max_length=30,
@@ -293,7 +293,7 @@ class SummaryInfo(BaseModel):
 class MemoryRetrievalMeta(BaseModel):
     """Metadata about the memory retrieval operation."""
 
-    query_time: Optional[int] = Field(
+    query_time: int | None = Field(
         default=None,
         alias="queryTime",
         ge=0,
@@ -309,15 +309,17 @@ class MemoryRetrievalResponse(BaseModel):
     """Response from the Memory API /Recall endpoint."""
 
     observations: list[ObservationInfo] = Field(
-        default=[], max_length=100, description="Array of observation memories"
+        default_factory=list, max_length=100, description="Array of observation memories"
     )
     summaries: list[SummaryInfo] = Field(
-        default=[],
+        default_factory=list,
         max_length=100,
         description="Array of summary memories from end of conversations",
     )
-    communications: Optional[list[MemoryCommunication]] = Field(
-        default=[], max_length=100, description="Array of communication memories from Memory API"
+    communications: list[MemoryCommunication] = Field(
+        default_factory=list,
+        max_length=100,
+        description="Array of communication memories from Memory API",
     )
     meta: MemoryRetrievalMeta = Field(
         default_factory=MemoryRetrievalMeta, description="Metadata about the retrieval operation"

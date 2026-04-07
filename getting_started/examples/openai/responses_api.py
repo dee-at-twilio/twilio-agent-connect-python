@@ -6,7 +6,6 @@ For the Chat Completions API, see chat_completions.py.
 """
 
 import os
-from typing import Optional
 
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
@@ -46,7 +45,7 @@ SYSTEM_INSTRUCTIONS = "You are a helpful customer service agent. Be concise and 
 async def handle_message_ready(
     user_message: str,
     context: ConversationSession,
-    memory_response: Optional[TACMemoryResponse],
+    memory_response: TACMemoryResponse | None,
 ) -> None:
     """
     Callback invoked when a message is ready to be processed.

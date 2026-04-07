@@ -1,5 +1,3 @@
-from typing import Optional
-
 from twilio.twiml.voice_response import VoiceResponse
 
 from tac import get_logger
@@ -8,9 +6,7 @@ from tac.models.handoff_data import HandoffData
 logger = get_logger(__name__)
 
 
-def handle_flex_handoff_logic(
-    request_data: dict[str, str], flex_workflow_sid: Optional[str]
-) -> str:
+def handle_flex_handoff_logic(request_data: dict[str, str], flex_workflow_sid: str | None) -> str:
     """
     Encapsulates all Flex handoff logic for Twilio webhook.
 

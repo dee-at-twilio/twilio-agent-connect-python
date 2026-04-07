@@ -8,7 +8,6 @@ Requires: pip install tac[server]
 """
 
 from collections.abc import Mapping
-from typing import Union
 
 from fastapi import Request
 from twilio.request_validator import RequestValidator
@@ -17,7 +16,7 @@ from twilio.request_validator import RequestValidator
 def validate_twilio_webhook(
     request: Request,
     auth_token: str,
-    body: Union[str, Mapping[str, str]],
+    body: str | Mapping[str, str],
 ) -> bool:
     """Validate a Twilio webhook signature.
 

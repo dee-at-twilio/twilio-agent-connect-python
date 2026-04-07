@@ -1,7 +1,7 @@
 """OpenAI adapter for automatic memory injection using wrapper approach."""
 
 import copy
-from typing import Any, Optional, Union, overload
+from typing import Any, overload
 
 from tac.adapters.options import AdapterOptions
 from tac.adapters.prompt_builder import MemoryPromptBuilder
@@ -26,9 +26,9 @@ class _BaseCompletionsNamespace:
     def __init__(
         self,
         completions: Any,
-        memory_response: Optional[TACMemoryResponse],
-        context: Optional[ConversationSession],
-        options: Optional[AdapterOptions],
+        memory_response: TACMemoryResponse | None,
+        context: ConversationSession | None,
+        options: AdapterOptions | None,
     ):
         self._completions = completions
         self._memory_response = memory_response
@@ -79,16 +79,16 @@ class _BaseResponsesNamespace:
     def __init__(
         self,
         responses: Any,
-        memory_response: Optional[TACMemoryResponse],
-        context: Optional[ConversationSession],
-        options: Optional[AdapterOptions],
+        memory_response: TACMemoryResponse | None,
+        context: ConversationSession | None,
+        options: AdapterOptions | None,
     ):
         self._responses = responses
         self._memory_response = memory_response
         self._context = context
         self._options = options
 
-    def _enhance_instructions(self, instructions: Optional[str]) -> Optional[str]:
+    def _enhance_instructions(self, instructions: str | None) -> str | None:
         """Enhance instructions with memory injection."""
         return _inject_memory_to_instructions(
             instructions, self._memory_response, self._context, self._options
@@ -101,7 +101,7 @@ class _BaseResponsesNamespace:
 class TACResponsesNamespace(_BaseResponsesNamespace):
     """Sync wrapper for OpenAI responses namespace with memory injection."""
 
-    def create(self, *args: Any, instructions: Optional[str] = None, **kwargs: Any) -> Any:
+    def create(self, *args: Any, instructions: str | None = None, **kwargs: Any) -> Any:
         """Intercepts create() calls to inject memory automatically."""
         return self._responses.create(
             *args, instructions=self._enhance_instructions(instructions), **kwargs
@@ -111,7 +111,7 @@ class TACResponsesNamespace(_BaseResponsesNamespace):
 class AsyncTACResponsesNamespace(_BaseResponsesNamespace):
     """Async wrapper for OpenAI responses namespace with memory injection."""
 
-    async def create(self, *args: Any, instructions: Optional[str] = None, **kwargs: Any) -> Any:
+    async def create(self, *args: Any, instructions: str | None = None, **kwargs: Any) -> Any:
         """Intercepts async create() calls to inject memory automatically."""
         return await self._responses.create(
             *args, instructions=self._enhance_instructions(instructions), **kwargs
@@ -124,9 +124,9 @@ class _BaseChatNamespace:
     def __init__(
         self,
         chat: Any,
-        memory_response: Optional[TACMemoryResponse],
-        context: Optional[ConversationSession],
-        options: Optional[AdapterOptions],
+        memory_response: TACMemoryResponse | None,
+        context: ConversationSession | None,
+        options: AdapterOptions | None,
     ):
         self._chat = chat
         self._memory_response = memory_response
@@ -162,10 +162,10 @@ class _BaseOpenAIClient:
 
     def __init__(
         self,
-        client: Union[OpenAI, AsyncOpenAI],
-        memory_response: Optional[TACMemoryResponse],
-        context: Optional[ConversationSession],
-        options: Optional[AdapterOptions],
+        client: OpenAI | AsyncOpenAI,
+        memory_response: TACMemoryResponse | None,
+        context: ConversationSession | None,
+        options: AdapterOptions | None,
     ):
         self._client = client
         self._memory_response = memory_response
@@ -220,27 +220,27 @@ class AsyncTACOpenAIClient(_BaseOpenAIClient):
 @overload
 def with_tac_memory(
     openai_client: OpenAI,
-    memory_response: Optional[TACMemoryResponse] = None,
-    context: Optional[ConversationSession] = None,
-    options: Optional[AdapterOptions] = None,
+    memory_response: TACMemoryResponse | None = None,
+    context: ConversationSession | None = None,
+    options: AdapterOptions | None = None,
 ) -> TACOpenAIClient: ...
 
 
 @overload
 def with_tac_memory(
     openai_client: AsyncOpenAI,
-    memory_response: Optional[TACMemoryResponse] = None,
-    context: Optional[ConversationSession] = None,
-    options: Optional[AdapterOptions] = None,
+    memory_response: TACMemoryResponse | None = None,
+    context: ConversationSession | None = None,
+    options: AdapterOptions | None = None,
 ) -> AsyncTACOpenAIClient: ...
 
 
 def with_tac_memory(
-    openai_client: Union[OpenAI, AsyncOpenAI],
-    memory_response: Optional[TACMemoryResponse] = None,
-    context: Optional[ConversationSession] = None,
-    options: Optional[AdapterOptions] = None,
-) -> Union[TACOpenAIClient, AsyncTACOpenAIClient]:
+    openai_client: OpenAI | AsyncOpenAI,
+    memory_response: TACMemoryResponse | None = None,
+    context: ConversationSession | None = None,
+    options: AdapterOptions | None = None,
+) -> TACOpenAIClient | AsyncTACOpenAIClient:
     """
     Wraps an OpenAI or AsyncOpenAI client with automatic Twilio memory injection.
 
@@ -285,9 +285,9 @@ def with_tac_memory(
 
 def _inject_memory(
     messages: list[ChatCompletionMessageParam],
-    memory_response: Optional[TACMemoryResponse],
-    context: Optional[ConversationSession],
-    options: Optional[AdapterOptions],
+    memory_response: TACMemoryResponse | None,
+    context: ConversationSession | None,
+    options: AdapterOptions | None,
 ) -> list[ChatCompletionMessageParam]:
     """
     Inject TAC memory and profile into OpenAI messages.
@@ -328,11 +328,11 @@ def _inject_memory(
 
 
 def _inject_memory_to_instructions(
-    instructions: Optional[str],
-    memory_response: Optional[TACMemoryResponse],
-    context: Optional[ConversationSession],
-    options: Optional[AdapterOptions],
-) -> Optional[str]:
+    instructions: str | None,
+    memory_response: TACMemoryResponse | None,
+    context: ConversationSession | None,
+    options: AdapterOptions | None,
+) -> str | None:
     """
     Inject TAC memory and profile into OpenAI Responses API instructions.
 

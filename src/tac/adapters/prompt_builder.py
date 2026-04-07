@@ -8,8 +8,6 @@ All adapters (OpenAI, Anthropic, Bedrock, LangChain, etc.) should use MemoryProm
 to ensure consistent memory presentation across different LLM providers.
 """
 
-from typing import Optional
-
 from tac.adapters.options import AdapterOptions
 from tac.models.session import ConversationSession
 from tac.models.tac import TACMemoryResponse
@@ -32,10 +30,10 @@ class MemoryPromptBuilder:
 
     @staticmethod
     def build(
-        memory_response: Optional[TACMemoryResponse] = None,
-        context: Optional[ConversationSession] = None,
-        options: Optional[AdapterOptions] = None,
-    ) -> Optional[str]:
+        memory_response: TACMemoryResponse | None = None,
+        context: ConversationSession | None = None,
+        options: AdapterOptions | None = None,
+    ) -> str | None:
         """
         Build a complete memory prompt from TAC data.
 

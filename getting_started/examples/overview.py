@@ -13,7 +13,7 @@ Key Concepts:
 For SDK-specific examples with more detail, see the openai/ directory.
 """
 
-from typing import Any, Optional
+from typing import Any
 
 from dotenv import load_dotenv
 
@@ -46,7 +46,7 @@ conversation_messages: dict[str, list[Any]] = {}
 async def handle_message_ready(
     user_message: str,
     context: ConversationSession,
-    memory_response: Optional[TACMemoryResponse],
+    memory_response: TACMemoryResponse | None,
 ) -> None:
     """
     Process incoming messages using manual memory injection.

@@ -1,6 +1,6 @@
 """TwiML generation for voice channel."""
 
-from typing import Any, Union
+from typing import Any
 
 from pydantic import BaseModel
 from twilio.twiml.voice_response import VoiceResponse
@@ -9,7 +9,7 @@ from tac.models.voice import TwiMLOptions
 
 
 def generate_twiml(
-    options: Union[TwiMLOptions, dict[str, Any]],
+    options: TwiMLOptions | dict[str, Any],
 ) -> str:
     """
     Generate TwiML XML for ConversationRelay with custom parameters.

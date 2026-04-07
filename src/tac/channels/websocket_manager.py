@@ -5,8 +5,6 @@ Provides WebSocket connection tracking for concurrent conversations,
 enabling proper response routing in multi-connection scenarios.
 """
 
-from typing import Optional
-
 from tac.channels.websocket_protocol import WebSocketProtocol
 
 
@@ -48,7 +46,7 @@ class WebSocketManager:
         """
         self._websockets[conversation_id] = websocket
 
-    def get_websocket(self, conversation_id: str) -> Optional[WebSocketProtocol]:
+    def get_websocket(self, conversation_id: str) -> WebSocketProtocol | None:
         """
         Retrieve WebSocket connection for a conversation.
 

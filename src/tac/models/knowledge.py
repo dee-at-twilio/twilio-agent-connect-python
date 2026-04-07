@@ -1,6 +1,6 @@
 """Knowledge models for the Twilio Agent Connect."""
 
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -40,8 +40,6 @@ class KnowledgeChunkResult(BaseModel):
     content: str = Field(description="The chunk content")
     knowledge_id: str = Field(alias="knowledgeId", description="The knowledge source ID")
     created_at: str = Field(alias="createdAt", description="Creation timestamp in ISO 8601 format")
-    score: Optional[float] = Field(
-        default=None, description="Relevance score for the search result"
-    )
+    score: float | None = Field(default=None, description="Relevance score for the search result")
 
     model_config = {"populate_by_name": True}

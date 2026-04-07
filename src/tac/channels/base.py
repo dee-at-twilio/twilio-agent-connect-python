@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator
-from typing import Any, Optional, Union
+from typing import Any
 
 from tac import TAC
 from tac.core.logging import get_logger
@@ -58,8 +58,8 @@ class BaseChannel(ABC):
     async def send_response(
         self,
         conversation_id: str,
-        response: Union[str, AsyncGenerator[Union[str, dict[str, Any]], None]],
-        role: Optional[str] = None,
+        response: str | AsyncGenerator[str | dict[str, Any], None],
+        role: str | None = None,
     ) -> None:
         """
         Send response back through the channel.
@@ -87,7 +87,7 @@ class BaseChannel(ABC):
     def _start_conversation(
         self,
         conv_id: str,
-        profile_id: Optional[str] = None,
+        profile_id: str | None = None,
     ) -> None:
         """
         Initialize new conversation session with optional profile_id.
@@ -148,8 +148,8 @@ class BaseChannel(ABC):
             )
 
     async def _retrieve_memory_if_enabled(
-        self, session: ConversationSession, query: Optional[str], conv_id: str
-    ) -> Optional[TACMemoryResponse]:
+        self, session: ConversationSession, query: str | None, conv_id: str
+    ) -> TACMemoryResponse | None:
         """
         Retrieve memory if auto_retrieve_memory is enabled.
 

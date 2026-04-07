@@ -11,7 +11,6 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import (
     Annotated,
-    Optional,
     Union,
     get_args,
     get_origin,
@@ -60,7 +59,7 @@ class TACTool:
     _raw_implementation: Callable[..., object] = field(repr=False)
     _injected_args: dict[str, object] = field(default_factory=dict, init=False, repr=False)
     _injected_param_types: dict[str, object] = field(default_factory=dict, init=False, repr=False)
-    _cached_callable: Optional[Callable[..., Awaitable[object]]] = field(
+    _cached_callable: Callable[..., Awaitable[object]] | None = field(
         default=None, init=False, repr=False
     )
 
@@ -391,14 +390,17 @@ def _type_to_json_schema(param_type: object) -> dict[str, object]:
     This leverages Pydantic's robust type system to handle all type annotations
     including Literal, Enum, complex Unions, nested models, and more.
 
-    For Optional[T] types, we unwrap to the base type since optionality is
-    tracked separately via the 'required' array in the parent schema.
+    For Optional[T] types (both Optional[T] and T | None), we unwrap to the
+    base type since optionality is tracked separately via the 'required' array
+    in the parent schema.
     """
+    import types
+
     origin = get_origin(param_type)
     args = get_args(param_type)
 
-    # Handle Optional[T] (Union[T, NoneType])
-    if origin is Union:
+    # Handle Optional[T] (both typing.Union and types.UnionType for T | None)
+    if origin is Union or origin is types.UnionType:
         if len(args) == 2 and type(None) in args:
             non_none_type = args[0] if args[1] is type(None) else args[1]
             param_type = non_none_type
@@ -418,18 +420,21 @@ def _type_to_json_schema(param_type: object) -> dict[str, object]:
 
 def _is_optional(param_type: object) -> bool:
     """Check if a type is Optional (Union with None)."""
-    origin = get_origin(param_type)
+    import types
     from typing import Union
 
-    if origin is Union:
+    origin = get_origin(param_type)
+
+    # Check both typing.Union (for backward compatibility) and types.UnionType (Python 3.10+)
+    if origin is Union or origin is types.UnionType:
         args = get_args(param_type)
         return type(None) in args
     return False
 
 
 def function_tool(
-    name: Optional[str] = None,
-    description: Optional[str] = None,
+    name: str | None = None,
+    description: str | None = None,
 ) -> Callable[[Callable[..., object]], TACTool]:
     """
     Decorator to create a TAC tool from a function.

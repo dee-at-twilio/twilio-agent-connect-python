@@ -1,7 +1,7 @@
 """Processor for Conversation Intelligence webhook events."""
 
 import json
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import ValidationError
 
@@ -15,7 +15,7 @@ from tac.models.intelligence import (
 )
 
 
-def _extract_store_id_from_friendly_name(friendly_name: str) -> Optional[str]:
+def _extract_store_id_from_friendly_name(friendly_name: str) -> str | None:
     """
     Extract store ID from the IntelligenceConfiguration.friendlyName.
 
@@ -54,7 +54,7 @@ def _extract_profile_ids(operator_result: "OperatorResult") -> list[str]:
     return profile_ids
 
 
-def _generate_content(operator_result: "OperatorResult") -> Optional[str]:
+def _generate_content(operator_result: "OperatorResult") -> str | None:
     """
     Generate content string from the operator result based on output format.
 
@@ -273,7 +273,7 @@ class OperatorResultProcessor:
         all_errors: list[str] = []
         event_types: set[str] = set()
         skipped_count = 0
-        last_skip_reason: Optional[str] = None
+        last_skip_reason: str | None = None
 
         for operator_result in event.operator_results:
             result = await self._process_operator_result(
@@ -307,7 +307,7 @@ class OperatorResultProcessor:
             )
 
         # Determine combined event type
-        combined_type: Optional[str] = None
+        combined_type: str | None = None
         if len(event_types) == 1:
             combined_type = event_types.pop()
         elif len(event_types) > 1:

@@ -1,7 +1,7 @@
 import asyncio
 import json
 from collections.abc import AsyncGenerator
-from typing import Any, Optional, Union
+from typing import Any
 
 from tac.channels.base import BaseChannel
 from tac.channels.websocket_manager import WebSocketManager
@@ -38,7 +38,7 @@ class VoiceChannel(BaseChannel):
     def __init__(
         self,
         tac: TAC,
-        config: Optional[Union[VoiceChannelConfig, dict[str, Any]]] = None,
+        config: VoiceChannelConfig | dict[str, Any] | None = None,
     ):
         """
         Initialize Voice channel for websocket protocol handling.
@@ -65,7 +65,7 @@ class VoiceChannel(BaseChannel):
 
     async def handle_incoming_call(
         self,
-        options: Union[TwiMLOptions, dict[str, Any]],
+        options: TwiMLOptions | dict[str, Any],
     ) -> str:
         """
         Generate TwiML response for incoming voice calls.
@@ -134,7 +134,7 @@ class VoiceChannel(BaseChannel):
     async def handle_conversation_relay_callback(
         self,
         payload_dict: dict[str, str],
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         Handle ConversationRelay callback webhook from Twilio.
 
@@ -220,7 +220,7 @@ class VoiceChannel(BaseChannel):
         await websocket.accept()
         self.logger.debug("WebSocket connection established")
 
-        conv_id: Optional[str] = None
+        conv_id: str | None = None
         session_state = None
 
         try:
@@ -309,7 +309,7 @@ class VoiceChannel(BaseChannel):
         self,
         conv_id: str,
         data: dict[str, Any],
-        session_state: Optional[SessionState],
+        session_state: SessionState | None,
     ) -> None:
         """
         Handle prompt message asynchronously with task tracking.
@@ -342,7 +342,7 @@ class VoiceChannel(BaseChannel):
         self,
         conv_id: str,
         data: dict[str, Any],
-        session_state: Optional[SessionState],
+        session_state: SessionState | None,
     ) -> None:
         """
         Handle interrupt message asynchronously with task cancellation.
@@ -385,8 +385,8 @@ class VoiceChannel(BaseChannel):
     async def send_response(
         self,
         conversation_id: str,
-        response: Union[str, AsyncGenerator[Union[str, dict[str, Any]], None]],
-        role: Optional[str] = None,
+        response: str | AsyncGenerator[str | dict[str, Any], None],
+        role: str | None = None,
     ) -> None:
         """
         Send voice response through the websocket connection for this conversation.
@@ -417,7 +417,7 @@ class VoiceChannel(BaseChannel):
                 # Streaming response
                 json_template = {"type": "text", "token": "", "last": False}
                 closed = False
-                response_gen: AsyncGenerator[Union[str, dict[str, Any]], None] = response
+                response_gen: AsyncGenerator[str | dict[str, Any], None] = response
 
                 try:
                     async for chunk in response_gen:
@@ -479,7 +479,7 @@ class VoiceChannel(BaseChannel):
     def get_channel_name(self) -> str:
         return "voice"
 
-    def get_websocket(self, conversation_id: str) -> Optional[WebSocketProtocol]:
+    def get_websocket(self, conversation_id: str) -> WebSocketProtocol | None:
         """
         Get the WebSocket connection for a specific conversation.
 

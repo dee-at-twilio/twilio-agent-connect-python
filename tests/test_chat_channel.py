@@ -1,6 +1,6 @@
 """Tests for Chat Channel."""
 
-from typing import Any, Optional
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -181,7 +181,7 @@ class TestChatChannel:
         def message_callback(
             user_message: str,
             context: ConversationSession,
-            memory_response: Optional[TACMemoryResponse],
+            memory_response: TACMemoryResponse | None,
         ) -> None:
             captured_messages.append(user_message)
 
@@ -593,9 +593,9 @@ class TestChatChannel:
             )
         )
 
-        captured_memory: list[Optional[TACMemoryResponse]] = []
+        captured_memory: list[TACMemoryResponse | None] = []
 
-        def callback(msg: str, ctx: ConversationSession, mem: Optional[TACMemoryResponse]) -> None:
+        def callback(msg: str, ctx: ConversationSession, mem: TACMemoryResponse | None) -> None:
             captured_memory.append(mem)
 
         tac.on_message_ready(callback)

@@ -1,6 +1,6 @@
 """Tests for SMS Channel."""
 
-from typing import Any, Optional
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -188,7 +188,7 @@ class TestSMSChannel:
         def message_callback(
             user_message: str,
             context: ConversationSession,
-            memory_response: Optional[TACMemoryResponse],
+            memory_response: TACMemoryResponse | None,
         ) -> None:
             nonlocal captured_context, captured_memories
             captured_context = context

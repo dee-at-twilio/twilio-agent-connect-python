@@ -1,7 +1,6 @@
 """Configuration for TAC server implementations."""
 
 import os
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -32,7 +31,7 @@ class TACServerConfig(BaseModel):
         default="/conversation-relay-callback",
         description="Path for ConversationRelay callback endpoint",
     )
-    cintel_webhook_path: Optional[str] = Field(
+    cintel_webhook_path: str | None = Field(
         default=None,
         description="Path for Conversation Intelligence webhook endpoint. "
         "Set to enable CI webhook route (e.g., '/ci-webhook').",

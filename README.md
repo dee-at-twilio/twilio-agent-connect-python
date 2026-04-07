@@ -21,7 +21,7 @@ Explore the [getting_started](getting_started) directory to see the SDK in actio
 
 ## Get Started
 
-To get started, set up your Python environment (Python 3.9 or newer required), and then install TAC SDK package.
+To get started, set up your Python environment (Python 3.10 or newer required), and then install TAC SDK package.
 
 ### uv (Recommended)
 

@@ -3,7 +3,7 @@
 from abc import abstractmethod
 from collections import OrderedDict
 from collections.abc import AsyncGenerator
-from typing import Any, Optional, Union
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -88,8 +88,8 @@ class MessagingChannel(BaseChannel):
     async def send_response(
         self,
         conversation_id: str,
-        response: Union[str, AsyncGenerator[Union[str, dict[str, Any]], None]],
-        role: Optional[str] = None,
+        response: str | AsyncGenerator[str | dict[str, Any], None],
+        role: str | None = None,
     ) -> None:
         pass
 
@@ -137,7 +137,7 @@ class MessagingChannel(BaseChannel):
         return True
 
     async def process_webhook(
-        self, webhook_data: dict[str, Any], idempotency_token: Optional[str] = None
+        self, webhook_data: dict[str, Any], idempotency_token: str | None = None
     ) -> None:
         """Process messaging channel webhook event and manage conversation lifecycle.
 

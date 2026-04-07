@@ -1,6 +1,6 @@
 import asyncio
 import json
-from typing import Any, Optional
+from typing import Any
 
 from tac import get_logger
 from tac.channels.websocket_protocol import WebSocketProtocol
@@ -11,7 +11,7 @@ logger = get_logger(__name__)
 
 
 def create_flex_escalation_tool(
-    websocket: Optional[WebSocketProtocol] = None,
+    websocket: WebSocketProtocol | None = None,
 ) -> TACTool:
     """
     Create a Flex escalation tool with injected websocket context.

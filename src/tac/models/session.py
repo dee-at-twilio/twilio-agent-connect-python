@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -10,7 +9,7 @@ class AuthorInfo(BaseModel):
     """Information about the author of a communication."""
 
     address: str = Field(..., description="Author address (phone number or identifier)")
-    participant_id: Optional[str] = Field(
+    participant_id: str | None = Field(
         default=None, description="Participant ID of the author in the conversation"
     )
 
@@ -24,7 +23,7 @@ class ConversationSession(BaseModel):
     """
 
     conversation_id: str = Field(..., description="Unique conversation identifier")
-    profile_id: Optional[str] = Field(
+    profile_id: str | None = Field(
         None, description="Profile ID associated with conversation (optional)"
     )
     channel: str = Field(..., description="Channel type (e.g., 'sms', 'voice')")
@@ -32,13 +31,13 @@ class ConversationSession(BaseModel):
         default_factory=datetime.now,
         description="When the conversation session was started",
     )
-    profile: Optional[ProfileResponse] = Field(
+    profile: ProfileResponse | None = Field(
         None, description="Profile information with traits (optional)"
     )
-    author_info: Optional[AuthorInfo] = Field(
+    author_info: AuthorInfo | None = Field(
         None, description="Author information from communication event (optional)"
     )
-    ai_agent_info: Optional[AuthorInfo] = Field(
+    ai_agent_info: AuthorInfo | None = Field(
         None, description="AI agent information from communication event (optional)"
     )
     metadata: dict = Field(
@@ -47,7 +46,7 @@ class ConversationSession(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    def build_profile_prompt(self, trait_groups: Optional[list[str]] = None) -> Optional[str]:
+    def build_profile_prompt(self, trait_groups: list[str] | None = None) -> str | None:
         """
         Build customer profile prompt section for LLM context.
 

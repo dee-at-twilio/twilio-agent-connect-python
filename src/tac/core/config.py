@@ -17,11 +17,11 @@ class ConversationIntelligenceConfig(BaseModel):
     configuration_id: str = Field(
         description="Conversation Intelligence Configuration ID",
     )
-    observation_operator_sid: Optional[str] = Field(
+    observation_operator_sid: str | None = Field(
         default=None,
         description="Operator SID for observation extraction (e.g., LY...)",
     )
-    summary_operator_sid: Optional[str] = Field(
+    summary_operator_sid: str | None = Field(
         default=None,
         description="Operator SID for summary extraction (e.g., LY...)",
     )
@@ -71,7 +71,7 @@ class TwilioMemoryConfig(BaseModel):
     like which trait groups to include when fetching profiles.
     """
 
-    trait_groups: Optional[list[str]] = Field(
+    trait_groups: list[str] | None = Field(
         default=None,
         description="Optional list of trait group names to include when retrieving profiles",
     )
@@ -132,7 +132,7 @@ class TACConfig(BaseModel):
             raise ValueError(f"environment must be one of {allowed}, got '{v}'")
         return v
 
-    twilio_memory_config: Optional[TwilioMemoryConfig] = Field(
+    twilio_memory_config: TwilioMemoryConfig | None = Field(
         default=None,
         description="Optional Twilio Memory configuration for controlling which trait groups "
         "to include when fetching profiles. Note: Memory client is always initialized "
@@ -147,7 +147,7 @@ class TACConfig(BaseModel):
         description="Twilio Phone Number for Voice (inbound) and SMS (send/receive).",
     )
 
-    knowledge_base_id: Optional[str] = Field(
+    knowledge_base_id: str | None = Field(
         default=None,
         description="Optional Knowledge Base ID for knowledge search functionality",
     )
@@ -157,7 +157,7 @@ class TACConfig(BaseModel):
         description="Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)",
     )
 
-    conversation_intelligence_config: Optional[ConversationIntelligenceConfig] = Field(
+    conversation_intelligence_config: ConversationIntelligenceConfig | None = Field(
         default=None,
         description="Optional Conversation Intelligence configuration for filtering webhook "
         "events. When provided to OperatorResultProcessor, only matching events are processed.",

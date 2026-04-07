@@ -1,6 +1,6 @@
 """Knowledge API tools for the Twilio Agent Connect."""
 
-from typing import Annotated, Optional
+from typing import Annotated
 
 from pydantic import BaseModel
 
@@ -12,8 +12,8 @@ from tac.tools.base import InjectedToolArg, TACTool, function_tool
 class KnowledgeToolConfig(BaseModel):
     """Configuration to customize the generated knowledge tool."""
 
-    name: Optional[str] = None
-    description: Optional[str] = None
+    name: str | None = None
+    description: str | None = None
     top_k: int = 5  # Number of knowledge chunks to return
 
 
@@ -45,7 +45,7 @@ async def search_knowledge(
 async def create_knowledge_tool(
     knowledge_client: KnowledgeClient,
     knowledge_base_id: str,
-    tool_config: Optional[KnowledgeToolConfig] = None,
+    tool_config: KnowledgeToolConfig | None = None,
 ) -> TACTool:
     """
     Create a knowledge search tool for the given knowledge base.

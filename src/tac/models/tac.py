@@ -1,6 +1,6 @@
 """TAC unified response models."""
 
-from typing import Literal, Optional, Union
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -25,24 +25,24 @@ class TACCommunicationAuthor(BaseModel):
     )
 
     # Maestro-only fields
-    participant_id: Optional[str] = Field(
+    participant_id: str | None = Field(
         default=None, alias="participantId", description="Participant ID (Maestro only)"
     )
-    delivery_status: Optional[
-        Literal["INITIATED", "IN_PROGRESS", "DELIVERED", "COMPLETED", "FAILED"]
-    ] = Field(
+    delivery_status: (
+        Literal["INITIATED", "IN_PROGRESS", "DELIVERED", "COMPLETED", "FAILED"] | None
+    ) = Field(
         default=None,
         alias="deliveryStatus",
         description="Delivery status (Maestro recipients only)",
     )
 
     # Memory-only fields
-    id: Optional[str] = Field(default=None, description="Author ID (Memory only)")
-    name: Optional[str] = Field(default=None, description="Display name (Memory only)")
-    type: Optional[Literal["HUMAN_AGENT", "CUSTOMER", "AI_AGENT"]] = Field(
+    id: str | None = Field(default=None, description="Author ID (Memory only)")
+    name: str | None = Field(default=None, description="Display name (Memory only)")
+    type: Literal["HUMAN_AGENT", "CUSTOMER", "AI_AGENT"] | None = Field(
         default=None, description="Author type (Memory only)"
     )
-    profile_id: Optional[str] = Field(
+    profile_id: str | None = Field(
         default=None, alias="profileId", description="Profile ID (Memory only)"
     )
 
@@ -54,11 +54,11 @@ class TACCommunicationContent(BaseModel):
     Unified content model with all fields from both Memory and Maestro APIs.
     """
 
-    type: Optional[Literal["TEXT", "TRANSCRIPTION"]] = Field(
+    type: Literal["TEXT", "TRANSCRIPTION"] | None = Field(
         default=None, description="Content type discriminator (Maestro only)"
     )
-    text: Optional[str] = Field(default=None, description="Message text content")
-    transcription: Optional[Transcription] = Field(
+    text: str | None = Field(default=None, description="Message text content")
+    transcription: Transcription | None = Field(
         default=None, description="Transcription metadata (Maestro only, when type=TRANSCRIPTION)"
     )
 
@@ -80,23 +80,23 @@ class TACCommunication(BaseModel):
     recipients: list[TACCommunicationAuthor] = Field(
         default_factory=list, description="Communication recipients"
     )
-    channel_id: Optional[str] = Field(
+    channel_id: str | None = Field(
         default=None,
         alias="channelId",
         description="Channel-specific reference ID, when provided by the source API",
     )
-    created_at: Optional[str] = Field(
+    created_at: str | None = Field(
         default=None, alias="createdAt", description="When communication was created"
     )
-    updated_at: Optional[str] = Field(
+    updated_at: str | None = Field(
         default=None, alias="updatedAt", description="When communication was last updated"
     )
 
     # Maestro-only fields
-    conversation_id: Optional[str] = Field(
+    conversation_id: str | None = Field(
         default=None, alias="conversationId", description="Conversation ID (Maestro only)"
     )
-    account_id: Optional[str] = Field(
+    account_id: str | None = Field(
         default=None, alias="accountId", description="Account ID (Maestro only)"
     )
 
@@ -119,7 +119,7 @@ class TACMemoryResponse:
     - communications include Maestro-specific fields (conversation_id, account_id, etc.)
     """
 
-    def __init__(self, data: Union[MemoryRetrievalResponse, list[Communication]]):
+    def __init__(self, data: MemoryRetrievalResponse | list[Communication]):
         """
         Initialize wrapper with either Memory or Maestro data.
 
@@ -188,7 +188,7 @@ class TACMemoryResponse:
         return self._is_memory
 
     @property
-    def raw_data(self) -> Union[MemoryRetrievalResponse, list[Communication]]:
+    def raw_data(self) -> MemoryRetrievalResponse | list[Communication]:
         """
         Access raw underlying data for advanced use cases.
 
@@ -242,7 +242,7 @@ class TACMemoryResponse:
 
         return sections
 
-    def _build_observations_prompt(self) -> Optional[str]:
+    def _build_observations_prompt(self) -> str | None:
         """Build observations LLM prompt section."""
         if not self.observations:
             return None
@@ -257,7 +257,7 @@ class TACMemoryResponse:
 
         return "\n".join(lines)
 
-    def _build_summaries_prompt(self) -> Optional[str]:
+    def _build_summaries_prompt(self) -> str | None:
         """Build summaries LLM prompt section."""
         if not self.summaries:
             return None
@@ -272,7 +272,7 @@ class TACMemoryResponse:
 
         return "\n".join(lines)
 
-    def _build_communications_prompt(self) -> Optional[str]:
+    def _build_communications_prompt(self) -> str | None:
         """Build communications LLM prompt section."""
         if not self.communications:
             return None
@@ -290,9 +290,7 @@ class TACMemoryResponse:
 
         return "\n".join(lines)
 
-    def _convert_communication(
-        self, comm: Union[MemoryCommunication, Communication]
-    ) -> TACCommunication:
+    def _convert_communication(self, comm: MemoryCommunication | Communication) -> TACCommunication:
         """
         Convert Memory or Maestro communication to unified format.
 

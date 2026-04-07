@@ -6,16 +6,16 @@ authors = [{ name = "Twilio Conversation AI", email = "team_conversational-ai@tw
 readme = "README.md"
 homepage = "https://github.com/twilio-innovation/twilio-agent-connect-python"
 repository = "https://github.com/twilio-innovation/twilio-agent-connect-python"
-requires-python = ">=3.9,<4"
+requires-python = ">=3.10,<4"
 classifiers = [
     "Typing :: Typed",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Operating System :: OS Independent",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "License :: OSI Approved :: MIT License",
@@ -72,7 +72,7 @@ packages = ["src/tac"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py39"
+target-version = "py310"
 
 [tool.ruff.lint]
 select = [
@@ -97,7 +97,7 @@ indent-style = "space"
 docstring-code-format = true
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.10"
 plugins = ["pydantic.mypy"]
 warn_return_any = true
 warn_unused_configs = true
@@ -122,7 +122,7 @@ exclude = [
 module = ["src.tac.*", "twilio.*"]  # twilio.* added to ignore missing type stubs
 ignore_missing_imports = true
 
-# Ignore mcp module to avoid Python 3.10 syntax errors when checking with 3.9
+# Ignore mcp module to avoid syntax errors from newer Python features
 [[tool.mypy.overrides]]
 module = "mcp.*"
 ignore_errors = true

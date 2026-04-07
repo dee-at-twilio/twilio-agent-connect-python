@@ -1,7 +1,5 @@
 """Options for configuring adapter behavior."""
 
-from typing import Optional
-
 from pydantic import BaseModel, Field
 
 
@@ -28,7 +26,7 @@ class AdapterOptions(BaseModel):
         client = with_tac_memory(openai_client, memory_response, context, options=options)
     """
 
-    profile_traits: Optional[list[str]] = Field(
+    profile_traits: list[str] | None = Field(
         default=None,
         description=(
             "List of trait groups to include in profile injection. "
@@ -38,7 +36,7 @@ class AdapterOptions(BaseModel):
         ),
     )
 
-    def get_profile_traits(self) -> Optional[list[str]]:
+    def get_profile_traits(self) -> list[str] | None:
         """Get the profile traits to include.
 
         Returns:

@@ -1,6 +1,6 @@
 """Models for Conversation Intelligence webhook events."""
 
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -13,7 +13,7 @@ class IntelligenceConfiguration(BaseModel):
         description="Unique Identifier for IntelligenceConfiguration (TTID)",
         json_schema_extra={"example": "GA00000000000000000000000000000000"},
     )
-    friendly_name: Optional[str] = Field(
+    friendly_name: str | None = Field(
         default=None,
         alias="friendlyName",
         description="Unique name of the intelligence configuration",
@@ -24,7 +24,7 @@ class IntelligenceConfiguration(BaseModel):
         description="Version of the IntelligenceConfiguration used",
         json_schema_extra={"example": 1},
     )
-    rule_id: Optional[str] = Field(
+    rule_id: str | None = Field(
         default=None,
         alias="ruleId",
         description="Id of the associated rule",
@@ -37,23 +37,23 @@ class IntelligenceConfiguration(BaseModel):
 class Operator(BaseModel):
     """Operator details from the CI service."""
 
-    id: Optional[str] = Field(
+    id: str | None = Field(
         default=None,
         description="Operator Sid (Sid<LY>) or TTID",
         json_schema_extra={"example": "LY00000000000000000000000000000000"},
     )
-    friendly_name: Optional[str] = Field(
+    friendly_name: str | None = Field(
         default=None,
         alias="friendlyName",
         description="Operator Friendly Name",
         json_schema_extra={"example": "Summary Extractor"},
     )
-    version: Optional[int] = Field(
+    version: int | None = Field(
         default=None,
         description="Version of the Operator used",
         json_schema_extra={"example": 1},
     )
-    parameters: Optional[dict[str, str]] = Field(
+    parameters: dict[str, str] | None = Field(
         default=None,
         description="Snapshot of the parameters passed to the Operator as key/value pairs",
         json_schema_extra={"example": {"param1": "value1"}},
@@ -65,12 +65,12 @@ class Operator(BaseModel):
 class TriggerDetails(BaseModel):
     """Trigger details for the operator execution."""
 
-    on: Optional[str] = Field(
+    on: str | None = Field(
         default=None,
         description="Trigger type (e.g., utterance, conversation_closed)",
         json_schema_extra={"example": "conversation_closed"},
     )
-    timestamp: Optional[str] = Field(
+    timestamp: str | None = Field(
         default=None,
         description="Trigger timestamp (ISO-8601)",
         json_schema_extra={"example": "2025-01-15T10:30:45Z"},
@@ -82,12 +82,12 @@ class TriggerDetails(BaseModel):
 class CommunicationsRange(BaseModel):
     """Range of communications used in the operator execution."""
 
-    first: Optional[str] = Field(
+    first: str | None = Field(
         default=None,
         description="Starting Communication ID TTID of Operator Execution",
         json_schema_extra={"example": "comms_communication_00000000000000000000000000"},
     )
-    last: Optional[str] = Field(
+    last: str | None = Field(
         default=None,
         description="Ending Communication ID TTID of Operator Execution",
         json_schema_extra={"example": "comms_communication_00000000000000000000000001"},
@@ -104,13 +104,13 @@ class Participant(BaseModel):
         description="Participant ID TTID",
         json_schema_extra={"example": "comms_participant_00000000000000000000000000"},
     )
-    profile_id: Optional[str] = Field(
+    profile_id: str | None = Field(
         default=None,
         alias="profileId",
         description="Memora profile id of the participant",
         json_schema_extra={"example": "mem_profile_00000000000000000000000000"},
     )
-    type: Optional[str] = Field(
+    type: str | None = Field(
         default=None,
         description="Type of participant (e.g., HUMAN_AGENT, CUSTOMER, AI_AGENT)",
         json_schema_extra={"example": "CUSTOMER"},
@@ -122,24 +122,24 @@ class Participant(BaseModel):
 class ExecutionDetails(BaseModel):
     """Execution context details for the operator result."""
 
-    trigger: Optional[TriggerDetails] = Field(
+    trigger: TriggerDetails | None = Field(
         default=None,
         description="Trigger details",
     )
-    communications: Optional[CommunicationsRange] = Field(
+    communications: CommunicationsRange | None = Field(
         default=None,
         description="Range of communications used",
     )
-    channels: Optional[list[str]] = Field(
+    channels: list[str] | None = Field(
         default=None,
         description="List of unique channels in a conversation (e.g., Voice, SMS, Email)",
         json_schema_extra={"example": ["SMS", "Voice"]},
     )
-    participants: Optional[list[Participant]] = Field(
+    participants: list[Participant] | None = Field(
         default=None,
         description="Participants involved in the conversation",
     )
-    context: Optional[dict[str, str]] = Field(
+    context: dict[str, str] | None = Field(
         default=None,
         description="Additional execution context key/value pairs",
         json_schema_extra={"example": {"key1": "value1"}},
@@ -166,19 +166,19 @@ class ClassificationResult(BaseModel):
 class ExtractionEntity(BaseModel):
     """An extracted entity from Text-Extraction."""
 
-    communication_id: Optional[str] = Field(
+    communication_id: str | None = Field(
         default=None,
         alias="communicationId",
         description="Communication context identifier",
         json_schema_extra={"example": "comms_communication_00000000000000000000000000"},
     )
-    begin_offset: Optional[int] = Field(
+    begin_offset: int | None = Field(
         default=None,
         alias="beginOffset",
         description="Starting character offset",
         json_schema_extra={"example": 0},
     )
-    end_offset: Optional[int] = Field(
+    end_offset: int | None = Field(
         default=None,
         alias="endOffset",
         description="Ending character offset",
@@ -217,7 +217,7 @@ class TextGenerationResult(BaseModel):
         description="Generated text output",
         json_schema_extra={"example": "The customer expressed satisfaction with the product."},
     )
-    format: Optional[str] = Field(
+    format: str | None = Field(
         default=None,
         description="Format of generated result. Allowed: text",
         json_schema_extra={"example": "text"},
@@ -247,7 +247,7 @@ class OperatorProcessingResult(BaseModel):
         ...,
         description="Whether processing completed successfully",
     )
-    event_type: Optional[str] = Field(
+    event_type: str | None = Field(
         default=None,
         description="Type of event processed: 'observation', 'summary', or None if filtered/failed",
     )
@@ -255,11 +255,11 @@ class OperatorProcessingResult(BaseModel):
         default=False,
         description="True if event was filtered out (not an error)",
     )
-    skip_reason: Optional[str] = Field(
+    skip_reason: str | None = Field(
         default=None,
         description="Reason for skipping (e.g., 'non-memora event')",
     )
-    error: Optional[str] = Field(
+    error: str | None = Field(
         default=None,
         description="Error message if processing failed",
     )
@@ -303,7 +303,7 @@ class OperatorResult(BaseModel):
         json_schema_extra={"example": "2025-01-15T10:30:45Z"},
     )
     reference_ids: list[str] = Field(
-        default=[],
+        default_factory=list,
         alias="referenceIds",
         description="Reference Ids for easier integration with Segment, Insights etc.",
         json_schema_extra={"example": ["ref_001", "ref_002"]},
@@ -336,7 +336,7 @@ class OperatorResultEvent(BaseModel):
         description="Conversation ID (TTID) associated with the execution",
         json_schema_extra={"example": "conv_conversation_00000000000000000000000000"},
     )
-    memory_store_id: Optional[str] = Field(
+    memory_store_id: str | None = Field(
         default=None,
         alias="memoryStoreId",
         description="Memory store id",

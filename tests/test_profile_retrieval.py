@@ -1,6 +1,6 @@
 """Tests for profile retrieval functionality."""
 
-from typing import Any, Optional
+from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
@@ -80,7 +80,7 @@ def create_communication_created_webhook(
     }
 
 
-def get_test_config_with_trait_groups(trait_groups: Optional[list[str]] = None) -> TACConfig:
+def get_test_config_with_trait_groups(trait_groups: list[str] | None = None) -> TACConfig:
     """Get test configuration with optional trait groups."""
     memory_config = TwilioMemoryConfig(
         trait_groups=trait_groups,
@@ -224,7 +224,7 @@ class TestProfileInSMSChannel:
         def message_ready_callback(
             user_message: str,
             context: ConversationSession,
-            memory_response: Optional[TACMemoryResponse] = None,
+            memory_response: TACMemoryResponse | None = None,
         ) -> None:
             nonlocal received_context
             received_context = context

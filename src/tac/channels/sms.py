@@ -1,7 +1,7 @@
 """SMS Channel implementation for TAC."""
 
 from collections.abc import AsyncGenerator
-from typing import Any, Optional, Union
+from typing import Any
 
 from pydantic import Field
 
@@ -37,7 +37,7 @@ class SMSChannel(MessagingChannel):
     def __init__(
         self,
         tac: TAC,
-        config: Optional[Union[SMSChannelConfig, dict[str, Any]]] = None,
+        config: SMSChannelConfig | dict[str, Any] | None = None,
     ):
         if isinstance(config, dict):
             config = SMSChannelConfig(**config)
@@ -69,8 +69,8 @@ class SMSChannel(MessagingChannel):
     async def send_response(
         self,
         conversation_id: str,
-        response: Union[str, AsyncGenerator[Union[str, dict[str, Any]], None]],
-        role: Optional[str] = None,
+        response: str | AsyncGenerator[str | dict[str, Any], None],
+        role: str | None = None,
     ) -> None:
         """Send SMS response using the Conversation Orchestrator Send API.
 

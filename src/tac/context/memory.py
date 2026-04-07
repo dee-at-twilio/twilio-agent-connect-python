@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 
@@ -47,8 +47,8 @@ class MemoryClient:
     async def retrieve_memory(
         self,
         profile_id: str,
-        conversation_id: Optional[str] = None,
-        query: Optional[str] = None,
+        conversation_id: str | None = None,
+        query: str | None = None,
     ) -> MemoryRetrievalResponse:
         """
         Retrieve conversation memories including observations, sessions, and summaries.
@@ -119,7 +119,7 @@ class MemoryClient:
     async def get_profile(
         self,
         profile_id: str,
-        trait_groups: Optional[list[str]] = None,
+        trait_groups: list[str] | None = None,
     ) -> ProfileResponse:
         """
         Retrieve a profile by ID with optional trait group selection.
@@ -233,8 +233,8 @@ class MemoryClient:
         profile_id: str,
         content: str,
         source: str = "conversation-intelligence",
-        conversation_ids: Optional[list[str]] = None,
-        occurred_at: Optional[str] = None,
+        conversation_ids: list[str] | None = None,
+        occurred_at: str | None = None,
     ) -> dict[str, Any]:
         """
         Create a new observation in Memora.

@@ -1,4 +1,4 @@
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 import httpx
 from pydantic import ValidationError
@@ -62,10 +62,10 @@ class ConversationClient:
 
     async def list_conversations(
         self,
-        status: Optional[list[Literal["ACTIVE", "INACTIVE", "CLOSED"]]] = None,
-        channel_id: Optional[str] = None,
-        page_size: Optional[int] = None,
-        page_token: Optional[str] = None,
+        status: list[Literal["ACTIVE", "INACTIVE", "CLOSED"]] | None = None,
+        channel_id: str | None = None,
+        page_size: int | None = None,
+        page_token: str | None = None,
     ) -> list[ConversationResponse]:
         """
         List conversations with optional filtering and pagination.
@@ -120,7 +120,7 @@ class ConversationClient:
     async def add_participant(
         self,
         conversation_id: str,
-        addresses: Optional[list[ParticipantAddress]] = None,
+        addresses: list[ParticipantAddress] | None = None,
         participant_type: Literal["HUMAN_AGENT", "CUSTOMER", "AI_AGENT"] = "CUSTOMER",
     ) -> ParticipantResponse:
         """
@@ -190,7 +190,7 @@ class ConversationClient:
 
     async def create_conversation(
         self,
-        name: Optional[str] = None,
+        name: str | None = None,
     ) -> ConversationResponse:
         """
         Create a new conversation.
@@ -237,7 +237,7 @@ class ConversationClient:
         self,
         conversation_id: str,
         status: Literal["ACTIVE", "INACTIVE", "CLOSED"],
-        name: Optional[str] = None,
+        name: str | None = None,
     ) -> ConversationResponse:
         """
         Update an existing conversation.
@@ -331,9 +331,9 @@ class ConversationClient:
     async def list_communications(
         self,
         conversation_id: str,
-        channel_id: Optional[str] = None,
-        page_size: Optional[int] = None,
-        page_token: Optional[str] = None,
+        channel_id: str | None = None,
+        page_size: int | None = None,
+        page_token: str | None = None,
     ) -> list[Communication]:
         """
         List communications for a conversation.

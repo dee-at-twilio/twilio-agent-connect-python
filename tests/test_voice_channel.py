@@ -1,7 +1,6 @@
 """Tests for Voice Channel."""
 
 import asyncio
-from typing import Optional
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -227,7 +226,7 @@ class TestVoiceChannel:
         async def message_callback(
             user_message: str,
             context: ConversationSession,
-            memory_response: Optional[TACMemoryResponse],
+            memory_response: TACMemoryResponse | None,
         ) -> None:
             nonlocal captured_context, captured_memories, captured_user_message
             captured_context = context
@@ -697,7 +696,7 @@ class TestVoiceChannel:
         async def user_callback(
             user_message: str,
             context: ConversationSession,
-            memory_response: Optional[TACMemoryResponse],
+            memory_response: TACMemoryResponse | None,
         ) -> None:
             """User callback that generates streaming response."""
             nonlocal stream_started, stream_cancelled, chunks_sent

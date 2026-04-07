@@ -40,7 +40,7 @@ Tests are in `tests/` — one test file per module (e.g., `test_tac.py`, `test_s
 
 ## Code Conventions
 
-- **Python 3.9+**: Use `typing` module types (`List`, `Dict`, `Optional`) — not `list`, `dict`
+- **Python 3.10+**: Use built-in generics (`list[str]`, `dict[str, Any]`) and union syntax (`X | None`, `X | Y`) instead of `typing.List`, `typing.Dict`, `typing.Optional`, `typing.Union`
 - **mypy strict**: All functions need type hints, no incomplete defs
 - **Pydantic v2**: Use `Field(alias=...)` for API name mapping, `model_config = {"populate_by_name": True}`, `.model_dump(by_alias=True, exclude_none=True)` for API payloads
 - **ruff**: Line length 100, black-compatible formatting
