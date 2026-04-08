@@ -54,6 +54,7 @@ Tests are in `tests/` — one test file per module (e.g., `test_tac.py`, `test_s
 - **Profile resolution**: Automatic profile lookup by phone/email if `profile_id` not present in webhook
 - **Memory auto-init**: Memory client is always initialized from Conversation Orchestrator configuration's `memory_store_id`
 - **Auth**: All API clients use HTTP Basic Auth (API Key as username, API Token as password)
+- **BaseAPIClient**: All API clients (ConversationClient, MemoryClient, KnowledgeClient) inherit from `BaseAPIClient`, which provides shared HTTP client configuration, authentication, and User-Agent header management following Twilio SDK conventions
 
 ## OpenAI Adapter
 
@@ -71,6 +72,6 @@ Both APIs are fully supported with sync/async variants and streaming support.
 
 ## Dependencies
 
-- **Core**: `pydantic>=2`, `requests>=2.31`, `httpx>=0.27`, `twilio>=9.8.3`
+- **Core**: `pydantic>=2`, `httpx>=0.27`, `twilio>=9.8.3`
 - **Server** (optional): `fastapi`, `uvicorn`, `python-multipart` — install with `pip install tac[server]`
 - **Dev**: `pytest`, `ruff`, `mypy`, `openai`, `openai-agents`

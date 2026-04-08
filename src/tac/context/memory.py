@@ -2,7 +2,7 @@ from typing import Any
 
 import httpx
 
-from tac.core.logging import get_logger
+from tac.context.base import BaseAPIClient
 from tac.models.memory import (
     MemoryRetrievalRequest,
     MemoryRetrievalResponse,
@@ -12,7 +12,7 @@ from tac.models.memory import (
 )
 
 
-class MemoryClient:
+class MemoryClient(BaseAPIClient):
     """Client for interacting with Twilio Conversation Memory data plane API."""
 
     def __init__(
@@ -31,18 +31,8 @@ class MemoryClient:
             api_key: API Key for Conversation Memory authentication.
             api_token: API Token for Conversation Memory authentication.
         """
-        self.base_url = base_url
+        super().__init__(base_url, api_key, api_token)
         self.store_id = store_id
-        self.api_key = api_key
-        self.api_token = api_token
-        self.logger = get_logger(__name__)
-
-    def _get_client(self) -> httpx.AsyncClient:
-        """Create a new httpx.AsyncClient for each request to avoid event loop issues."""
-        return httpx.AsyncClient(
-            auth=(self.api_key, self.api_token),
-            timeout=30.0,
-        )
 
     async def retrieve_memory(
         self,

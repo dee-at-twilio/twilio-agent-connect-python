@@ -2056,7 +2056,6 @@ source = { editable = "." }
 dependencies = [
     { name = "httpx" },
     { name = "pydantic" },
-    { name = "requests" },
     { name = "twilio" },
 ]
 
@@ -2076,7 +2075,6 @@ dev = [
     { name = "python-dotenv" },
     { name = "python-multipart" },
     { name = "ruff" },
-    { name = "types-requests" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 server = [
@@ -2102,10 +2100,8 @@ requires-dist = [
     { name = "python-dotenv", marker = "extra == 'dev'", specifier = ">=1.0.0,<2" },
     { name = "python-multipart", marker = "extra == 'dev'", specifier = ">=0.0.12" },
     { name = "python-multipart", marker = "extra == 'server'", specifier = ">=0.0.12" },
-    { name = "requests", specifier = ">=2.31.0,<3" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.0,<1" },
     { name = "twilio", specifier = ">=9.8.3,<10" },
-    { name = "types-requests", marker = "extra == 'dev'", specifier = ">=2.31.0,<3" },
     { name = "uvicorn", extras = ["standard"], marker = "extra == 'dev'", specifier = ">=0.32.0,<1" },
     { name = "uvicorn", extras = ["standard"], marker = "extra == 'server'", specifier = ">=0.32.0,<1" },
 ]

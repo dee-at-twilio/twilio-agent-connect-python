@@ -22,7 +22,6 @@ classifiers = [
 ]
 dependencies = [
     "pydantic>=2.0.0,<3",
-    "requests>=2.31.0,<3",
     "httpx>=0.27.0,<1",
     "twilio>=9.8.3,<10",
 ]
@@ -36,7 +35,6 @@ dev = [
     # Linting and formatting
     "ruff>=0.8.0,<1",
     "mypy>=1.0.0,<2",
-    "types-requests>=2.31.0,<3",
     # Example dependencies
     "openai>=2.0.0",
     "openai-agents>=0.6.0",

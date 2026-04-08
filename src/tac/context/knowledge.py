@@ -2,38 +2,12 @@ from typing import Any
 
 import httpx
 
-from tac.core.logging import get_logger
+from tac.context.base import BaseAPIClient
 from tac.models.knowledge import KnowledgeBase, KnowledgeChunkResult
 
 
-class KnowledgeClient:
+class KnowledgeClient(BaseAPIClient):
     """Client for interacting with Twilio Knowledge Base API."""
-
-    def __init__(
-        self,
-        base_url: str,
-        api_key: str,
-        api_token: str,
-    ) -> None:
-        """
-        Initialize the Knowledge client.
-
-        Args:
-            base_url: Base URL for the Knowledge Base API.
-            api_key: API Key for Knowledge Base authentication.
-            api_token: API Token for Knowledge Base authentication.
-        """
-        self.base_url = base_url
-        self.api_key = api_key
-        self.api_token = api_token
-        self.logger = get_logger(__name__)
-
-    def _get_client(self) -> httpx.AsyncClient:
-        """Create a new httpx.AsyncClient for each request to avoid event loop issues."""
-        return httpx.AsyncClient(
-            auth=(self.api_key, self.api_token),
-            timeout=30.0,
-        )
 
     async def get_knowledge_base(self, knowledge_base_id: str) -> KnowledgeBase:
         """

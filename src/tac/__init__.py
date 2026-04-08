@@ -10,4 +10,5 @@ __all__ = [
     "TACConfig",
     "get_logger",
     "TwiMLOptions",
+    "__version__",
 ]

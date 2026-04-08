@@ -3,7 +3,7 @@ from typing import Any, Literal
 import httpx
 from pydantic import ValidationError
 
-from tac.core.logging import get_logger
+from tac.context.base import BaseAPIClient
 from tac.models.conversation import (
     Communication,
     CommunicationRequest,
@@ -21,7 +21,7 @@ from tac.models.conversation import (
 )
 
 
-class ConversationClient:
+class ConversationClient(BaseAPIClient):
     """Client for interacting with Conversation Orchestrator API."""
 
     def __init__(
@@ -40,25 +40,8 @@ class ConversationClient:
             api_token: Twilio API Key Secret for authentication
             configuration_id: Conversation Configuration ID for API requests
         """
-        self.base_url = base_url
+        super().__init__(base_url, api_key, api_token)
         self.configuration_id = configuration_id
-        self.api_key = api_key
-        self.api_token = api_token
-        self.logger = get_logger(__name__)
-
-    def _get_client(self) -> httpx.AsyncClient:
-        """Create a new httpx.AsyncClient for each request to avoid event loop issues."""
-        return httpx.AsyncClient(
-            auth=(self.api_key, self.api_token),
-            timeout=30.0,
-        )
-
-    def _get_sync_client(self) -> httpx.Client:
-        """Create a new synchronous httpx.Client."""
-        return httpx.Client(
-            auth=(self.api_key, self.api_token),
-            timeout=30.0,
-        )
 
     async def list_conversations(
         self,
