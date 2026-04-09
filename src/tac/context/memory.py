@@ -15,9 +15,10 @@ from tac.models.memory import (
 class MemoryClient(BaseAPIClient):
     """Client for interacting with Twilio Conversation Memory data plane API."""
 
+    base_url = "https://memory.twilio.com"
+
     def __init__(
         self,
-        base_url: str,
         store_id: str,
         api_key: str,
         api_token: str,
@@ -26,12 +27,11 @@ class MemoryClient(BaseAPIClient):
         Initialize the Memory client.
 
         Args:
-            base_url: Base URL for the Conversation Memory data plane API.
             store_id: Memory store ID (starts with mem_store_).
             api_key: API Key for Conversation Memory authentication.
             api_token: API Token for Conversation Memory authentication.
         """
-        super().__init__(base_url, api_key, api_token)
+        super().__init__(api_key, api_token)
         self.store_id = store_id
 
     async def retrieve_memory(

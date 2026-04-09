@@ -6,7 +6,6 @@ import re
 import pytest
 
 from tac import __version__
-from tac.context.base import BaseAPIClient
 from tac.context.conversation import ConversationClient
 from tac.context.knowledge import KnowledgeClient
 from tac.context.memory import MemoryClient
@@ -17,10 +16,10 @@ class TestUserAgent:
 
     def test_base_client_user_agent_format(self) -> None:
         """Test that BaseAPIClient generates correct User-Agent format."""
-        client = BaseAPIClient(
-            base_url="https://api.example.com",
+        client = ConversationClient(
             api_key="test_key",
             api_token="test_token",
+            configuration_id="test_config",
         )
 
         user_agent = client._get_user_agent()
@@ -41,10 +40,10 @@ class TestUserAgent:
 
     def test_user_agent_matches_twilio_pattern(self) -> None:
         """Test that User-Agent follows Twilio SDK pattern."""
-        client = BaseAPIClient(
-            base_url="https://api.example.com",
+        client = ConversationClient(
             api_key="test_key",
             api_token="test_token",
+            configuration_id="test_config",
         )
 
         user_agent = client._get_user_agent()
@@ -60,7 +59,6 @@ class TestUserAgent:
     async def test_conversation_client_sends_user_agent(self) -> None:
         """Test that ConversationClient includes User-Agent in requests."""
         client = ConversationClient(
-            base_url="https://api.example.com",
             api_key="test_key",
             api_token="test_token",
             configuration_id="test_configuration",
@@ -75,7 +73,6 @@ class TestUserAgent:
     async def test_memory_client_sends_user_agent(self) -> None:
         """Test that MemoryClient includes User-Agent in requests."""
         client = MemoryClient(
-            base_url="https://api.example.com",
             store_id="test_store",
             api_key="test_key",
             api_token="test_token",
@@ -90,7 +87,6 @@ class TestUserAgent:
     async def test_knowledge_client_sends_user_agent(self) -> None:
         """Test that KnowledgeClient includes User-Agent in requests."""
         client = KnowledgeClient(
-            base_url="https://api.example.com",
             api_key="test_key",
             api_token="test_token",
         )
@@ -102,10 +98,10 @@ class TestUserAgent:
 
     def test_sync_client_sends_user_agent(self) -> None:
         """Test that synchronous client includes User-Agent in requests."""
-        client = BaseAPIClient(
-            base_url="https://api.example.com",
+        client = ConversationClient(
             api_key="test_key",
             api_token="test_token",
+            configuration_id="test_config",
         )
 
         with client._get_sync_client() as http_client:

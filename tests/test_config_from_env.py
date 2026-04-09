@@ -40,13 +40,7 @@ class TestTACConfigFromEnv:
     """Test suite for TACConfig.from_env() factory method."""
 
     def _set_all_env_vars(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Helper to set all TACConfig environment variables.
-
-        Sets all required vars (Conversation Configuration ID, Account SID, Auth Token,
-        API Key/Token, Phone Number) and optional vars (Environment). Tests can
-        selectively remove variables to test specific scenarios.
-        """
-        monkeypatch.setenv("TWILIO_TAC_ENVIRONMENT", "prod")
+        """Helper to set all TACConfig environment variables."""
         monkeypatch.setenv("TWILIO_TAC_CONVERSATION_CONFIGURATION_ID", "conv_configuration_123")
         monkeypatch.setenv("TWILIO_TAC_AUTH_TOKEN", "test_auth_token")
         monkeypatch.setenv("TWILIO_TAC_API_KEY", "SK123")
@@ -59,7 +53,6 @@ class TestTACConfigFromEnv:
 
         config = TACConfig.from_env()
 
-        assert config.environment == "prod"
         assert config.conversation_configuration_id == "conv_configuration_123"
         assert config.twilio_auth_token == "test_auth_token"
         assert config.api_key == "SK123"
@@ -88,16 +81,6 @@ class TestTACConfigFromEnv:
         config = TACConfig.from_env()
 
         assert config.log_level == "DEBUG"
-
-    def test_from_env_missing_environment_defaults_to_prod(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Test from_env() defaults to prod when TWILIO_TAC_ENVIRONMENT is missing."""
-        self._set_all_env_vars(monkeypatch)
-        monkeypatch.delenv("TWILIO_TAC_ENVIRONMENT", raising=False)
-
-        config = TACConfig.from_env()
-        assert config.environment == "prod"
 
     def test_from_env_missing_conversation_configuration_id(
         self, monkeypatch: pytest.MonkeyPatch
@@ -144,42 +127,9 @@ class TestTACConfigFromEnv:
 
     def test_from_env_missing_multiple_vars(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test from_env() raises KeyError when environment variables are missing."""
-        monkeypatch.delenv("TWILIO_TAC_ENVIRONMENT", raising=False)
         monkeypatch.delenv("TWILIO_TAC_CONVERSATION_CONFIGURATION_ID", raising=False)
         monkeypatch.delenv("TWILIO_TAC_AUTH_TOKEN", raising=False)
         monkeypatch.delenv("TWILIO_TAC_PHONE_NUMBER", raising=False)
 
         with pytest.raises(KeyError):
             TACConfig.from_env()
-
-    def test_from_env_validates_environment_value(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Test from_env() validates environment field through Pydantic."""
-        self._set_all_env_vars(monkeypatch)
-        monkeypatch.setenv("TWILIO_TAC_ENVIRONMENT", "invalid")
-
-        with pytest.raises(ValueError, match="environment must be one of"):
-            TACConfig.from_env()
-
-    def test_from_env_environment_case_insensitive(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Test from_env() accepts environment values in any case and normalizes to lowercase."""
-        self._set_all_env_vars(monkeypatch)
-
-        # Test uppercase
-        monkeypatch.setenv("TWILIO_TAC_ENVIRONMENT", "PROD")
-        config = TACConfig.from_env()
-        assert config.environment == "prod"
-
-        # Test mixed case
-        monkeypatch.setenv("TWILIO_TAC_ENVIRONMENT", "Prod")
-        config = TACConfig.from_env()
-        assert config.environment == "prod"
-
-        # Test stage uppercase
-        monkeypatch.setenv("TWILIO_TAC_ENVIRONMENT", "STAGE")
-        config = TACConfig.from_env()
-        assert config.environment == "stage"
-
-        # Test dev uppercase
-        monkeypatch.setenv("TWILIO_TAC_ENVIRONMENT", "DEV")
-        config = TACConfig.from_env()
-        assert config.environment == "dev"

@@ -13,7 +13,6 @@ from tac.models.knowledge import KnowledgeBase, KnowledgeChunkResult
 def knowledge_client():
     """Create a KnowledgeClient instance for testing."""
     return KnowledgeClient(
-        base_url="https://knowledge-api.example.com",
         api_key="test_api_key",
         api_token="test_api_token",
     )
@@ -25,11 +24,10 @@ class TestKnowledgeClient:
     def test_init(self):
         """Test KnowledgeClient initialization."""
         client = KnowledgeClient(
-            base_url="https://knowledge-api.example.com",
             api_key="test_api_key",
             api_token="test_api_token",
         )
-        assert client.base_url == "https://knowledge-api.example.com"
+        assert client.base_url == "https://knowledge.twilio.com"
         assert client.api_key == "test_api_key"
         assert client.api_token == "test_api_token"
 
@@ -71,7 +69,7 @@ class TestKnowledgeClient:
 
             # Verify API call
             mock_client.get.assert_called_once_with(
-                "https://knowledge-api.example.com/v2/ControlPlane/KnowledgeBases/know_knowledgebase_00000000000000000000000000"
+                "https://knowledge.twilio.com/v2/ControlPlane/KnowledgeBases/know_knowledgebase_00000000000000000000000000"
             )
 
     @pytest.mark.asyncio
@@ -143,7 +141,7 @@ class TestKnowledgeClient:
 
             # Verify API call
             mock_client.post.assert_called_once_with(
-                "https://knowledge-api.example.com/v2/KnowledgeBases/know_knowledgebase_00000000000000000000000000/Search",
+                "https://knowledge.twilio.com/v2/KnowledgeBases/know_knowledgebase_00000000000000000000000000/Search",
                 json={"query": "customer support", "top": 5},
             )
 

@@ -21,7 +21,6 @@ def test_basic_tac_functionality():
         "twilio_auth_token": "test_token_123",
         "api_key": "SK123",
         "api_token": "test_api_token",
-        "environment": "prod",
         "conversation_configuration_id": "conv_configuration_test123",
         "twilio_phone_number": "+15551234567",
     }

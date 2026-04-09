@@ -1,9 +1,8 @@
 """Configuration models for the Twilio Agent Connect."""
 
 import os
-from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ConversationIntelligenceConfig(BaseModel):
@@ -37,7 +36,7 @@ class ConversationIntelligenceConfig(BaseModel):
     )
 
     @classmethod
-    def from_env(cls) -> Optional["ConversationIntelligenceConfig"]:
+    def from_env(cls) -> "ConversationIntelligenceConfig | None":
         """
         Create ConversationIntelligenceConfig from environment variables.
 
@@ -119,18 +118,7 @@ class TwilioMemoryConfig(BaseModel):
 class TACConfig(BaseModel):
     """Configuration model for Twilio Agent Connect settings."""
 
-    environment: str = Field(default="prod", description="TAC environment (dev, stage, or prod)")
     conversation_configuration_id: str = Field(description="Twilio Conversation Configuration ID")
-
-    @field_validator("environment")
-    @classmethod
-    def validate_environment(cls, v: str) -> str:
-        """Validate that environment is one of the allowed values."""
-        v = v.lower()  # Normalize to lowercase
-        allowed = {"dev", "stage", "prod"}
-        if v not in allowed:
-            raise ValueError(f"environment must be one of {allowed}, got '{v}'")
-        return v
 
     twilio_memory_config: TwilioMemoryConfig | None = Field(
         default=None,
@@ -164,44 +152,10 @@ class TACConfig(BaseModel):
         "events. When provided to OperatorResultProcessor, only matching events are processed.",
     )
 
-    @computed_field  # type: ignore[prop-decorator]
-    @property
-    def memory_base_url(self) -> str:
-        """Return the Conversation Memory base URL based on the environment."""
-        memory_urls = {
-            "dev": "https://memory.dev.twilio.com",
-            "stage": "https://memory.stage.twilio.com",
-            "prod": "https://memory.twilio.com",
-        }
-        return memory_urls[self.environment]
-
-    @computed_field  # type: ignore[prop-decorator]
-    @property
-    def conversation_base_url(self) -> str:
-        """Return the Conversation Orchestrator base URL based on the environment."""
-        conversation_urls = {
-            "dev": "https://conversations.dev.twilio.com",
-            "stage": "https://conversations.stage.twilio.com",
-            "prod": "https://conversations.twilio.com",
-        }
-        return conversation_urls[self.environment]
-
-    @computed_field  # type: ignore[prop-decorator]
-    @property
-    def knowledge_base_url(self) -> str:
-        """Return the Knowledge Base URL based on the environment."""
-        knowledge_urls = {
-            "dev": "https://knowledge.dev.twilio.com",
-            "stage": "https://knowledge.stage.twilio.com",
-            "prod": "https://knowledge.twilio.com",
-        }
-        return knowledge_urls[self.environment]
-
     model_config = ConfigDict(
         use_enum_values=True,
         json_schema_extra={
             "example": {
-                "environment": "prod",
                 "conversation_configuration_id": "conv_configuration_xxxxxxxxxxxxxxxxxx",
                 "twilio_auth_token": "your_auth_token_here",
                 "api_key": "SKxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
@@ -225,7 +179,6 @@ class TACConfig(BaseModel):
         Create TACConfig from environment variables.
 
         Loads configuration from the following environment variables:
-        - TWILIO_TAC_ENVIRONMENT: TAC environment (dev, stage, or prod) (optional, defaults to prod)
         - TWILIO_TAC_CONVERSATION_CONFIGURATION_ID: Twilio Conversation Configuration ID
         - TWILIO_TAC_API_KEY: Twilio API Key SID (starts with SK)
         - TWILIO_TAC_API_TOKEN: Twilio API Key Secret
@@ -254,12 +207,6 @@ class TACConfig(BaseModel):
             >>> # With all env vars set in .env file
             >>> config = TACConfig.from_env()
             >>> tac = TAC(config=config)
-
-            >>> # Or fall back to manual config if env vars not set
-            >>> try:
-            >>>     config = TACConfig.from_env()
-            >>> except (KeyError, ValidationError):
-            >>>     config = TACConfig(environment="prod", ...)
         """
         # Load optional memory configuration
         twilio_memory_config = TwilioMemoryConfig.from_env()
@@ -268,7 +215,6 @@ class TACConfig(BaseModel):
         conversation_intelligence_config = ConversationIntelligenceConfig.from_env()
 
         return cls(
-            environment=os.environ.get("TWILIO_TAC_ENVIRONMENT", "prod"),
             conversation_configuration_id=os.environ["TWILIO_TAC_CONVERSATION_CONFIGURATION_ID"],
             twilio_auth_token=os.environ["TWILIO_TAC_AUTH_TOKEN"],
             api_key=os.environ["TWILIO_TAC_API_KEY"],

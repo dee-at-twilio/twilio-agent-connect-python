@@ -24,9 +24,10 @@ from tac.models.conversation import (
 class ConversationClient(BaseAPIClient):
     """Client for interacting with Conversation Orchestrator API."""
 
+    base_url = "https://conversations.twilio.com"
+
     def __init__(
         self,
-        base_url: str,
         api_key: str,
         api_token: str,
         configuration_id: str,
@@ -35,12 +36,11 @@ class ConversationClient(BaseAPIClient):
         Initialize the Conversation client.
 
         Args:
-            base_url: Base URL for the Conversation Orchestrator API
             api_key: Twilio API Key SID for authentication
             api_token: Twilio API Key Secret for authentication
             configuration_id: Conversation Configuration ID for API requests
         """
-        super().__init__(base_url, api_key, api_token)
+        super().__init__(api_key, api_token)
         self.configuration_id = configuration_id
 
     async def list_conversations(

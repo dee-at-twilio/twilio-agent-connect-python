@@ -9,9 +9,10 @@ from tac.core.logging import get_logger
 class BaseAPIClient:
     """Base client for Twilio API interactions with shared HTTP client logic."""
 
+    base_url: str
+
     def __init__(
         self,
-        base_url: str,
         api_key: str,
         api_token: str,
     ) -> None:
@@ -19,11 +20,9 @@ class BaseAPIClient:
         Initialize the base API client.
 
         Args:
-            base_url: Base URL for the API
             api_key: Twilio API Key SID for authentication
             api_token: Twilio API Key Secret for authentication
         """
-        self.base_url = base_url
         self.api_key = api_key
         self.api_token = api_token
         self.logger = get_logger(self.__class__.__name__)

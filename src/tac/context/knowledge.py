@@ -9,6 +9,22 @@ from tac.models.knowledge import KnowledgeBase, KnowledgeChunkResult
 class KnowledgeClient(BaseAPIClient):
     """Client for interacting with Twilio Knowledge Base API."""
 
+    base_url = "https://knowledge.twilio.com"
+
+    def __init__(
+        self,
+        api_key: str,
+        api_token: str,
+    ) -> None:
+        """
+        Initialize the Knowledge client.
+
+        Args:
+            api_key: API Key for Knowledge Base authentication.
+            api_token: API Token for Knowledge Base authentication.
+        """
+        super().__init__(api_key, api_token)
+
     async def get_knowledge_base(self, knowledge_base_id: str) -> KnowledgeBase:
         """
         Fetch knowledge base metadata from the Knowledge Base API.

@@ -14,7 +14,6 @@ from tac.models.session import AuthorInfo, ConversationSession
 def get_test_config_with_memory() -> TACConfig:
     """Get test configuration with Twilio Memory."""
     return TACConfig(
-        environment="prod",
         conversation_configuration_id="conv_configuration_test123",
         twilio_auth_token="test_token_123",
         api_key="SK123",
@@ -27,7 +26,6 @@ def get_test_config_with_memory() -> TACConfig:
 def create_memory_client(tac: TAC) -> MemoryClient:
     """Helper to manually create Conversation Memory client for tests."""
     return MemoryClient(
-        base_url=tac.config.memory_base_url,
         store_id="MGtest123",
         api_key=tac.config.api_key,
         api_token=tac.config.api_token,

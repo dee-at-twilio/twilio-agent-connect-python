@@ -11,7 +11,6 @@ def get_test_config(with_memory=False):
         "twilio_auth_token": "test_token_123",
         "api_key": "SK123",
         "api_token": "test_api_token",
-        "environment": "prod",
         "conversation_configuration_id": "conv_configuration_test123",
         "twilio_phone_number": "+15551234567",
     }
@@ -32,7 +31,6 @@ class TestTAC:
 
         assert isinstance(tac.config, TACConfig)
         assert tac.config.twilio_auth_token == "test_token_123"
-        assert tac.config.memory_base_url == "https://memory.twilio.com"
 
     def test_init_with_config_object(self):
         """Test TAC initialization with TACConfig object."""
@@ -41,7 +39,6 @@ class TestTAC:
 
         assert isinstance(tac.config, TACConfig)
         assert tac.config.twilio_auth_token == "test_token_123"
-        assert tac.config.memory_base_url == "https://memory.twilio.com"
 
     def test_init_with_empty_config_dict_fails(self):
         """Test TAC initialization with empty configuration dictionary fails."""

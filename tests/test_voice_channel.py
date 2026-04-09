@@ -25,7 +25,6 @@ def get_test_config() -> dict:
         "twilio_auth_token": "test_token_123",
         "api_key": "SK123",
         "api_token": "test_api_token",
-        "environment": "prod",
         "conversation_configuration_id": "conv_configuration_test123",
         "twilio_phone_number": "+15551234567",
     }
@@ -85,7 +84,6 @@ class TestVoiceChannel:
         from tac.context.memory import MemoryClient
 
         tac.conversation_memory_client = MemoryClient(
-            base_url=tac.config.memory_base_url,
             store_id="MGtest123",
             api_key=tac.config.api_key,
             api_token=tac.config.api_token,

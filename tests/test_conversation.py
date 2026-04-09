@@ -270,7 +270,6 @@ class TestConversationClient:
     def test_client_initialization(self):
         """Test ConversationClient initialization."""
         client = ConversationClient(
-            base_url="https://conversations.twilio.com",
             api_key="SK123456",
             api_token="test_token",
             configuration_id="conv_configuration_test123",
@@ -299,7 +298,6 @@ class TestConversationClient:
         mock_async_client_class.return_value.__aenter__.return_value = mock_client
 
         client = ConversationClient(
-            base_url="https://conversations.twilio.com",
             api_key="SK123456",
             api_token="test_token",
             configuration_id="conv_configuration_test123",
@@ -337,7 +335,6 @@ class TestConversationClient:
         mock_async_client_class.return_value.__aenter__.return_value = mock_client
 
         client = ConversationClient(
-            base_url="https://conversations.twilio.com",
             api_key="SK123456",
             api_token="test_token",
             configuration_id="conv_configuration_test123",
@@ -365,7 +362,6 @@ class TestConversationClient:
         mock_async_client_class.return_value.__aenter__.return_value = mock_client
 
         client = ConversationClient(
-            base_url="https://conversations.twilio.com",
             api_key="SK123456",
             api_token="test_token",
             configuration_id="conv_configuration_test123",
@@ -397,7 +393,6 @@ class TestConversationClient:
         mock_async_client_class.return_value.__aenter__.return_value = mock_client
 
         client = ConversationClient(
-            base_url="https://conversations.twilio.com",
             api_key="SK123456",
             api_token="test_token",
             configuration_id="conv_configuration_test123",
@@ -443,7 +438,6 @@ class TestConversationClient:
         mock_async_client_class.return_value.__aenter__.return_value = mock_client
 
         client = ConversationClient(
-            base_url="https://conversations.twilio.com",
             api_key="SK123456",
             api_token="test_token",
             configuration_id="conv_configuration_test123",
@@ -469,7 +463,6 @@ class TestConversationClient:
         mock_async_client_class.return_value.__aenter__.return_value = mock_client
 
         client = ConversationClient(
-            base_url="https://conversations.twilio.com",
             api_key="SK123456",
             api_token="test_token",
             configuration_id="conv_configuration_test123",
@@ -484,7 +477,6 @@ class TestConversationClient:
         """Test that ConversationClient stores authentication credentials."""
         # Credentials are stored as instance variables and passed to httpx.AsyncClient
         client = ConversationClient(
-            base_url="https://conversations.twilio.com",
             api_key="SK123456",
             api_token="test_token",
             configuration_id="conv_configuration_test123",
@@ -511,7 +503,6 @@ class TestConversationClient:
         mock_async_client_class.return_value.__aenter__.return_value = mock_client
 
         client = ConversationClient(
-            base_url="https://conversations.twilio.com",
             api_key="SK123456",
             api_token="test_token",
             configuration_id="conv_configuration_test999",
@@ -575,7 +566,6 @@ class TestConversationClient:
         mock_async_client_class.return_value.__aenter__.return_value = mock_client
 
         client = ConversationClient(
-            base_url="https://conversations.twilio.com",
             api_key="SK123456",
             api_token="test_token",
             configuration_id="conv_configuration_test123",
@@ -621,7 +611,6 @@ class TestConversationClient:
         mock_async_client_class.return_value.__aenter__.return_value = mock_client
 
         client = ConversationClient(
-            base_url="https://conversations.twilio.com",
             api_key="SK123456",
             api_token="test_token",
             configuration_id="conv_configuration_test123",
@@ -706,7 +695,6 @@ class TestConversationClient:
         mock_async_client_class.return_value.__aenter__.return_value = mock_client
 
         client = ConversationClient(
-            base_url="https://conversations.twilio.com",
             api_key="SK123456",
             api_token="test_token",
             configuration_id="conv_configuration_test123",
@@ -746,7 +734,6 @@ class TestConversationClient:
         mock_async_client_class.return_value.__aenter__.return_value = mock_client
 
         client = ConversationClient(
-            base_url="https://conversations.twilio.com",
             api_key="SK123456",
             api_token="test_token",
             configuration_id="conv_configuration_test123",
@@ -781,7 +768,6 @@ class TestConversationClient:
         mock_async_client_class.return_value.__aenter__.return_value = mock_client
 
         client = ConversationClient(
-            base_url="https://conversations.twilio.com",
             api_key="SK123456",
             api_token="test_token",
             configuration_id="conv_configuration_test123",
@@ -808,7 +794,6 @@ class TestConversationClient:
         mock_async_client_class.return_value.__aenter__.return_value = mock_client
 
         client = ConversationClient(
-            base_url="https://conversations.twilio.com",
             api_key="SK123456",
             api_token="test_token",
             configuration_id="conv_configuration_test123",
@@ -861,7 +846,6 @@ class TestConversationClient:
         mock_async_client_class.return_value.__aenter__.return_value = mock_client
 
         client = ConversationClient(
-            base_url="https://conversations.twilio.com",
             api_key="SK123456",
             api_token="test_token",
             configuration_id="conv_configuration_test123",
@@ -903,7 +887,6 @@ class TestConversationClient:
         mock_client.__exit__ = Mock(return_value=False)
 
         client = ConversationClient(
-            base_url="https://conversations.twilio.com",
             api_key="SK123456",
             api_token="test_token",
             configuration_id="conv_configuration_test123",
@@ -940,7 +923,6 @@ class TestConversationClient:
         mock_client.__exit__ = Mock(return_value=False)
 
         client = ConversationClient(
-            base_url="https://conversations.twilio.com",
             api_key="SK123456",
             api_token="test_token",
             configuration_id="conv_configuration_test123",
@@ -971,7 +953,6 @@ class TestConversationClient:
         mock_client.__exit__ = Mock(return_value=False)
 
         client = ConversationClient(
-            base_url="https://conversations.twilio.com",
             api_key="SK123456",
             api_token="test_token",
             configuration_id="conv_configuration_test123",
@@ -990,7 +971,6 @@ class TestConversationClient:
         mock_client.__exit__ = Mock(return_value=False)
 
         client = ConversationClient(
-            base_url="https://conversations.twilio.com",
             api_key="SK123456",
             api_token="test_token",
             configuration_id="conv_configuration_test123",

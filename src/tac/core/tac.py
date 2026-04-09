@@ -69,7 +69,6 @@ class TAC:
         self.logger = get_logger(__name__)
 
         self.conversation_orchestrator_client = ConversationClient(
-            base_url=self.config.conversation_base_url,
             api_key=self.config.api_key,
             api_token=self.config.api_token,
             configuration_id=self.config.conversation_configuration_id,
@@ -89,7 +88,6 @@ class TAC:
         # Initialize Memory client using memory_store_id from CO configuration
         # Memory is always available - twilio_memory_config only configures trait groups
         self.conversation_memory_client = MemoryClient(
-            base_url=self.config.memory_base_url,
             store_id=configuration.memory_store_id,
             api_key=self.config.api_key,
             api_token=self.config.api_token,
@@ -99,7 +97,6 @@ class TAC:
         self.knowledge_client: KnowledgeClient | None = None
         if self.config.knowledge_base_id:
             self.knowledge_client = KnowledgeClient(
-                base_url=self.config.knowledge_base_url,
                 api_key=self.config.api_key,
                 api_token=self.config.api_token,
             )
