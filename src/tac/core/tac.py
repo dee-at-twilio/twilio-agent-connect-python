@@ -1,5 +1,3 @@
-"""Core TAC (Twilio Agent Connect) class for processing events and configuration."""
-
 import asyncio
 import inspect
 from collections.abc import Awaitable, Callable
@@ -14,29 +12,12 @@ from tac.core.config import TACConfig
 from tac.core.logging import get_logger, setup_logging
 from tac.intelligence.operator_result_processor import OperatorResultProcessor
 from tac.models.intelligence import OperatorProcessingResult
-from tac.models.memory import (
-    ProfileLookupResponse,
-    ProfileResponse,
-)
+from tac.models.memory import ProfileLookupResponse
 from tac.models.session import ConversationSession
 from tac.models.tac import TACMemoryResponse
 
 
 class TAC:
-    _handoff_callback: Callable[[dict[str, str]], Awaitable[str]] | None = None
-
-    def on_handoff(
-        self,
-        callback: Callable[[dict[str, str]], Awaitable[str]],
-    ) -> None:
-        """
-        Register a callback to be invoked when a handoff event occurs (e.g., Flex handoff).
-
-        The callback will be triggered by the channel when a handoff is required.
-        Supports both synchronous and asynchronous callbacks.
-        """
-        self._handoff_callback = callback
-
     """
     Main Twilio Agent Connect class for processing webhook events with configuration.
 
@@ -44,16 +25,11 @@ class TAC:
     """
 
     def __init__(self, config: TACConfig | dict[str, Any]):
-        """
-        Initialize TAC instance with configuration.
+        """Initialize TAC instance with configuration.
 
         Args:
-            config: TACConfig instance or dictionary with configuration settings
-
-        Raises:
-            ValueError: If config is invalid
+            config: TACConfig instance or dictionary with configuration parameters.
         """
-        # Parse and validate configuration
         if isinstance(config, dict):
             try:
                 self.config = TACConfig(**config)
@@ -64,7 +40,6 @@ class TAC:
         else:
             raise ValueError("Config must be TACConfig instance or dictionary")
 
-        # Setup logging
         setup_logging(log_level=self.config.log_level, log_format="console")
         self.logger = get_logger(__name__)
 
@@ -85,15 +60,12 @@ class TAC:
                 "Please check your conversation_configuration_id and credentials."
             ) from e
 
-        # Initialize Memory client using memory_store_id from CO configuration
-        # Memory is always available - twilio_memory_config only configures trait groups
         self.conversation_memory_client = MemoryClient(
             store_id=configuration.memory_store_id,
             api_key=self.config.api_key,
             api_token=self.config.api_token,
         )
 
-        # Initialize Knowledge client only if knowledge_base_id is configured
         self.knowledge_client: KnowledgeClient | None = None
         if self.config.knowledge_base_id:
             self.knowledge_client = KnowledgeClient(
@@ -101,7 +73,6 @@ class TAC:
                 api_token=self.config.api_token,
             )
 
-        # Initialize CI processor if CI config is provided
         self.ci_processor: OperatorResultProcessor | None = None
         if self.config.conversation_intelligence_config:
             self.ci_processor = OperatorResultProcessor(
@@ -110,25 +81,26 @@ class TAC:
             )
             self.logger.info("Conversation Intelligence processor initialized")
 
-        # Callback for when message is ready (supports both sync and async)
         self._message_ready_callback: (
             Callable[[str, ConversationSession, TACMemoryResponse | None], None]
             | Callable[[str, ConversationSession, TACMemoryResponse | None], Awaitable[None]]
             | None
         ) = None
 
-        # Callback for when user interrupts the agent (supports both sync and async)
         self._interrupt_callback: (
             Callable[[ConversationSession, Any], None]
             | Callable[[ConversationSession, Any], Awaitable[None]]
             | None
         ) = None
 
-        # Callback for when conversation ends (supports both sync and async)
         self._conversation_ended_callback: (
             Callable[[ConversationSession], None]
             | Callable[[ConversationSession], Awaitable[None]]
             | None
+        ) = None
+
+        self._handoff_callback: (
+            Callable[[dict[str, str]], str] | Callable[[dict[str, str]], Awaitable[str]] | None
         ) = None
 
     async def retrieve_memory(
@@ -136,39 +108,16 @@ class TAC:
         conversation_context: ConversationSession,
         query: str | None = None,
     ) -> TACMemoryResponse:
-        """
-        Retrieve memories from Memory Store or fallback to
-        Conversation Orchestrator Communications API.
-
-        This method attempts to retrieve memory using the following strategy:
-        1. Try to get profile_id (via lookup if missing)
-        2. Try to fetch profile data
-        3. Try to retrieve memory from Memory Store
-        If any step fails, falls back to Conversation Orchestrator Communications API.
+        """Retrieve memories from Memory Store with fallback to Conversation Orchestrator.
 
         Args:
-            conversation_context: Conversation context containing conversation_id, profile_id,
-                and optional author_info. This object will be mutated to populate profile_id
-                (via automatic lookup) and profile (via automatic fetch) if not already present.
-            query: Optional semantic search query for memory retrieval (only used with Memory)
+            conversation_context: Session containing conversation and profile information.
+            query: Optional search query to filter memories.
 
         Returns:
-            TACMemoryResponse: Unified wrapper providing access to memory data.
-
-            When Memory retrieval succeeds (with profile_id):
-            - observations, summaries, and communications with full metadata
-            - communications include author name, type, and participant details
-
-            When falling back to Conversation Orchestrator:
-            - observations and summaries are empty lists
-            - communications have basic fields only (no author metadata)
-
-        Note:
-            Failures in Memory Store retrieval fall back to Conversation Orchestrator's
-            list_communications API. If the fallback also fails, the exception propagates.
+            Memory response containing conversation history and profile data.
         """
         try:
-            # Try to get profile_id if not already available
             if not conversation_context.profile_id:
                 self.logger.debug(
                     "profile_id not found, attempting to lookup profile using address"
@@ -196,13 +145,28 @@ class TAC:
                     )
                     raise ValueError("No profile_id or author_info available")
 
-            # Try to fetch profile data if not already fetched
             if conversation_context.profile_id and not conversation_context.profile:
-                conversation_context.profile = await self.fetch_profile(
-                    conversation_context.profile_id
-                )
+                try:
+                    trait_groups = (
+                        self.config.twilio_memory_config.trait_groups
+                        if self.config.twilio_memory_config
+                        else None
+                    )
 
-            # Retrieve memory from Memory Store
+                    profile_response = await self.conversation_memory_client.get_profile(
+                        profile_id=conversation_context.profile_id,
+                        trait_groups=trait_groups,
+                    )
+                    conversation_context.profile = profile_response
+                except asyncio.CancelledError:
+                    raise
+                except Exception as e:
+                    self.logger.warning(
+                        f"Failed to fetch profile for {conversation_context.profile_id}: {e}. "
+                        "Continuing without profile data.",
+                        exc_info=True,
+                    )
+
             memory_response = await self.conversation_memory_client.retrieve_memory(
                 profile_id=conversation_context.profile_id,
                 conversation_id=conversation_context.conversation_id,
@@ -211,7 +175,6 @@ class TAC:
             return TACMemoryResponse(memory_response)
 
         except Exception as e:
-            # Fall back to Conversation Orchestrator Communications API for any failure
             self.logger.warning(
                 f"Memory retrieval failed: {e}. "
                 "Falling back to Conversation Orchestrator Communications API."
@@ -221,357 +184,17 @@ class TAC:
             )
             return TACMemoryResponse(communications)
 
-    async def fetch_profile(self, profile_id: str) -> ProfileResponse | None:
-        """
-        Fetch profile information with traits for a given profile ID.
-
-        This method retrieves profile data including traits from Twilio Memory.
-        If trait_groups are configured in TwilioMemoryConfig, only those trait
-        groups will be included in the response.
-
-        Args:
-            profile_id: Profile ID using Twilio Type ID (TTID) format
-
-        Returns:
-            ProfileResponse with id, created_at, and traits, or None if fetch fails
-        """
-        # Validate profile_id
-        if not profile_id:
-            self.logger.warning("profile_id is required for profile fetching but was not provided")
-            return None
-
-        try:
-            # Get trait_groups from config if provided
-            trait_groups = (
-                self.config.twilio_memory_config.trait_groups
-                if self.config.twilio_memory_config
-                else None
-            )
-
-            # Fetch profile
-            profile_response = await self.conversation_memory_client.get_profile(
-                profile_id=profile_id,
-                trait_groups=trait_groups,
-            )
-            return profile_response
-
-        except Exception as e:
-            self.logger.warning(
-                f"Failed to fetch profile for {profile_id}: {e}. Continuing without profile data."
-            )
-            return None
-
-    def on_message_ready(
-        self,
-        callback: (
-            Callable[[str, ConversationSession, TACMemoryResponse | None], None]
-            | Callable[[str, ConversationSession, TACMemoryResponse | None], Awaitable[None]]
-        ),
-    ) -> None:
-        """
-        Register a callback to be invoked when a message is ready to be processed.
-
-        The callback will be triggered by channels when a new user message arrives,
-        regardless of whether memory was fetched. This allows different channels
-        (SMS, Voice) to handle memory retrieval differently.
-
-        Supports both synchronous and asynchronous callbacks. Async callbacks
-        will be scheduled as background tasks using asyncio.create_task().
-
-        Args:
-            callback: A callable that accepts:
-                     - str: The user's message content
-                     - ConversationSession: Contains conversation_id, profile_id, channel
-                     - Optional[TACMemoryResponse]: Retrieved memory data wrapper
-                       (None if memory retrieval is skipped or fails)
-
-        Example (Synchronous):
-            ```python
-            from tac.models.session import ConversationSession
-            from tac.models.tac import TACMemoryResponse
-            from typing import Optional
-
-
-            def handle_message(
-                user_message: str,
-                context: ConversationSession,
-                memory_response: Optional[TACMemoryResponse],
-            ):
-                print(f"User message: {user_message}")
-                print(f"Conversation {context.conversation_id} on {context.channel}")
-
-                if memory_response:
-                    print(f"Observations: {len(memory_response.observations)}")
-                    print(f"Summaries: {len(memory_response.summaries)}")
-                    print(f"Communications: {len(memory_response.communications)}")
-
-                # Process user message with LLM
-                # llm_response = llm.process(user_message, memory_response)
-
-                # Send response back through the channel
-                # channel.send_response(context.conversation_id, llm_response)
-
-
-            tac = TAC(config)
-            tac.on_message_ready(handle_message)
-            ```
-
-        Example (Asynchronous):
-            ```python
-            async def handle_message(
-                user_message: str,
-                context: ConversationSession,
-                memory_response: Optional[TACMemoryResponse],
-            ):
-                print(f"Message on {context.channel}: {user_message}")
-
-                # Call async operations directly
-                response = await call_llm(user_message, memory_response)
-                await channel.send_response(context.conversation_id, response)
-
-
-            tac = TAC(config)
-            tac.on_message_ready(handle_message)
-            ```
-        """
-        self._message_ready_callback = callback
-
-    async def trigger_message_ready(
-        self,
-        user_message: str,
-        conversation_context: ConversationSession,
-        memory_response: TACMemoryResponse | None = None,
-    ) -> None:
-        """
-        Trigger the registered message ready callback.
-
-        This method is called by channels when a new message is ready to be processed.
-        Different channels can call this with or without memory based on their needs.
-
-        Args:
-            user_message: The user's message content
-            conversation_context: Conversation context with conversation_id, profile_id, channel
-            memory_response: Optional memory retrieval response
-        """
-        if self._message_ready_callback:
-            # Check if callback is async
-            if inspect.iscoroutinefunction(self._message_ready_callback):
-                # Await async callback
-                await self._message_ready_callback(
-                    user_message, conversation_context, memory_response
-                )
-            else:
-                # Call sync callback directly
-                self._message_ready_callback(user_message, conversation_context, memory_response)
-
-    def on_interrupt(
-        self,
-        callback: (
-            Callable[[ConversationSession, Any], None]
-            | Callable[[ConversationSession, Any], Awaitable[None]]
-        ),
-    ) -> None:
-        """
-        Register a callback to be invoked when user interrupts the agent.
-
-        The callback will be triggered when the user interrupts the agent's response
-        (e.g., in voice conversations when the user starts speaking while the agent
-        is still talking). This allows developers to handle interruptions appropriately,
-        such as canceling ongoing tool calls, stopping LLM generation, or logging events.
-
-        Supports both synchronous and asynchronous callbacks. Async callbacks
-        will be scheduled as background tasks using asyncio.create_task().
-
-        Args:
-            callback: A callable that accepts:
-                     - ConversationSession: Contains conversation_id, profile_id, channel
-                     - InterruptMessage: Details about the interruption (utterance_until_interrupt,
-                       duration_until_interrupt_ms)
-
-        Example (Synchronous):
-            ```python
-            from tac.models.session import ConversationSession
-            from tac.models.voice import InterruptMessage
-
-
-            def handle_interrupt(
-                context: ConversationSession,
-                interrupt_data: InterruptMessage,
-            ):
-                print(f"User interrupted conversation {context.conversation_id}")
-                print(f"Interrupted at: {interrupt_data.utterance_until_interrupt}")
-                print(f"Duration: {interrupt_data.duration_until_interrupt_ms}ms")
-
-                # Cancel ongoing operations, stop LLM generation, etc.
-                cancel_pending_operations(context.conversation_id)
-
-
-            tac = TAC(config)
-            tac.on_interrupt(handle_interrupt)
-            ```
-
-        Example (Asynchronous):
-            ```python
-            async def handle_interrupt(
-                context: ConversationSession,
-                interrupt_data: InterruptMessage,
-            ):
-                print(f"User interrupted on {context.channel}")
-
-                # Cancel async operations
-                await cancel_llm_generation(context.conversation_id)
-
-                # Log to analytics
-                await log_interrupt_event(context, interrupt_data)
-
-
-            tac = TAC(config)
-            tac.on_interrupt(handle_interrupt)
-            ```
-        """
-        self._interrupt_callback = callback
-
-    def trigger_interrupt(
-        self,
-        conversation_context: ConversationSession,
-        interrupt_data: Any,
-    ) -> None:
-        """
-        Trigger the registered interrupt callback.
-
-        This method is called by channels when an interrupt event occurs.
-
-        Args:
-            conversation_context: Conversation context with conversation_id, profile_id, channel
-            interrupt_data: Interrupt details (InterruptMessage for voice channel)
-        """
-        if self._interrupt_callback:
-            # Check if callback is async
-            if inspect.iscoroutinefunction(self._interrupt_callback):
-                # Schedule async callback as a background task
-                try:
-                    asyncio.create_task(
-                        self._interrupt_callback(conversation_context, interrupt_data)
-                    )
-                except RuntimeError:
-                    # No event loop running, log warning
-                    self.logger.warning(
-                        "Async interrupt callback registered but no event loop running. "
-                        "Callback will not be executed."
-                    )
-            else:
-                # Call sync callback directly
-                self._interrupt_callback(conversation_context, interrupt_data)
-
-    def on_conversation_ended(
-        self,
-        callback: (
-            Callable[[ConversationSession], None] | Callable[[ConversationSession], Awaitable[None]]
-        ),
-    ) -> None:
-        """
-        Register a callback to be invoked when a conversation ends.
-
-        The callback will be triggered by channels when a conversation is closed
-        (e.g., SMS conversation status changed to CLOSED, or voice WebSocket
-        disconnected). The callback receives the full ConversationSession before
-        it is cleaned up, allowing access to conversation_id, profile, channel,
-        metadata, and other session data.
-
-        Supports both synchronous and asynchronous callbacks.
-
-        Args:
-            callback: A callable that accepts:
-                     - ConversationSession: Contains conversation_id, profile_id,
-                       channel, started_at, profile, author_info, metadata
-
-        Example (Synchronous):
-            ```python
-            from tac.models.session import ConversationSession
-
-
-            def handle_end(context: ConversationSession):
-                print(f"Conversation {context.conversation_id} ended on {context.channel}")
-                # Log analytics, clean up resources, etc.
-
-
-            tac = TAC(config)
-            tac.on_conversation_ended(handle_end)
-            ```
-
-        Example (Asynchronous):
-            ```python
-            async def handle_end(context: ConversationSession):
-                await save_conversation_summary(context)
-                await analytics.log_event("conversation_ended", context.conversation_id)
-
-
-            tac = TAC(config)
-            tac.on_conversation_ended(handle_end)
-            ```
-        """
-        self._conversation_ended_callback = callback
-
-    async def trigger_conversation_ended(
-        self,
-        conversation_context: ConversationSession,
-    ) -> None:
-        """
-        Trigger the registered conversation ended callback.
-
-        This method is called by channels when a conversation ends (closed or
-        disconnected). The session has already been removed from the channel's
-        internal tracking, but the full ConversationSession object is passed
-        directly to the callback.
-
-        Args:
-            conversation_context: Conversation context with full session data
-        """
-        if self._conversation_ended_callback:
-            # Check if callback is async
-            if inspect.iscoroutinefunction(self._conversation_ended_callback):
-                await self._conversation_ended_callback(conversation_context)
-            else:
-                self._conversation_ended_callback(conversation_context)
-
     async def process_cintel_event(
         self,
         payload: dict[str, Any],
     ) -> OperatorProcessingResult:
-        """
-        Process a Conversation Intelligence webhook event.
-
-        This method delegates to the internal CI processor to handle incoming
-        CI webhook payloads, validate them, and create observations or summaries
-        in Conversation Memory based on operator results.
+        """Process Conversation Intelligence webhook and create observations/summaries in Memory.
 
         Args:
-            payload: The raw webhook payload dictionary from Twilio CI
+            payload: Webhook payload from Conversation Intelligence service.
 
         Returns:
-            OperatorProcessingResult with processing status and details
-
-        Raises:
-            ValueError: If CI processor is not initialized (requires both
-                twilio_memory_config and conversation_intelligence_config)
-
-        Example:
-            ```python
-            @app.post("/ci-webhook")
-            async def ci_webhook_handler(request: Request):
-                payload = await request.json()
-                result = await tac.process_cintel_event(payload)
-
-                if result.success:
-                    if result.skipped:
-                        print(f"Skipped: {result.skip_reason}")
-                    else:
-                        print(f"Created {result.created_count} {result.event_type}(s)")
-                else:
-                    print(f"Error: {result.error}")
-
-                return result.model_dump()
-            ```
+            Processing result with created observations and summaries.
         """
         if not self.ci_processor:
             raise ValueError(
@@ -581,3 +204,176 @@ class TAC:
             )
 
         return await self.ci_processor.process_event(payload)
+
+    def on_message_ready(
+        self,
+        callback: (
+            Callable[[str, ConversationSession, TACMemoryResponse | None], None]
+            | Callable[[str, ConversationSession, TACMemoryResponse | None], Awaitable[None]]
+        ),
+    ) -> None:
+        """Register callback invoked when a message is ready.
+
+        Example:
+            ```python
+            def handle_message(
+                message: str, context: ConversationSession, memory: TACMemoryResponse | None
+            ):
+                # Process message and respond...
+                pass
+
+
+            tac.on_message_ready(handle_message)
+            ```
+
+        Args:
+            callback: Function to call with (message, context, memory). Supports sync and async.
+        """
+        self._message_ready_callback = callback
+
+    def on_interrupt(
+        self,
+        callback: (
+            Callable[[ConversationSession, Any], None]
+            | Callable[[ConversationSession, Any], Awaitable[None]]
+        ),
+    ) -> None:
+        """Register callback invoked on user interrupt.
+
+        Example:
+            ```python
+            def handle_interrupt(context: ConversationSession, interrupt_data: Any):
+                # Handle user interrupt...
+                pass
+
+
+            tac.on_interrupt(handle_interrupt)
+            ```
+
+        Args:
+            callback: Function to call with (context, interrupt_data). Supports sync and async.
+        """
+        self._interrupt_callback = callback
+
+    def on_conversation_ended(
+        self,
+        callback: (
+            Callable[[ConversationSession], None] | Callable[[ConversationSession], Awaitable[None]]
+        ),
+    ) -> None:
+        """Register callback invoked when conversation ends.
+
+        Example:
+            ```python
+            def handle_conversation_ended(context: ConversationSession):
+                # Clean up conversation...
+                pass
+
+
+            tac.on_conversation_ended(handle_conversation_ended)
+            ```
+
+        Args:
+            callback: Function to call with conversation context. Supports sync and async.
+        """
+        self._conversation_ended_callback = callback
+
+    def on_handoff(
+        self,
+        callback: Callable[[dict[str, str]], str] | Callable[[dict[str, str]], Awaitable[str]],
+    ) -> None:
+        """Register callback invoked on handoff event.
+
+        Example:
+            ```python
+            def handle_handoff(form_data: dict[str, str]) -> str:
+                # Process handoff and return TwiML...
+                return "<Response><Say>Transferring...</Say></Response>"
+
+
+            tac.on_handoff(handle_handoff)
+            ```
+
+        Args:
+            callback: Function to call with form data. Must return TwiML string.
+                Supports sync and async.
+        """
+        self._handoff_callback = callback
+
+    async def trigger_message_ready(
+        self,
+        user_message: str,
+        conversation_context: ConversationSession,
+        memory_response: TACMemoryResponse | None = None,
+    ) -> None:
+        """Trigger the registered message ready callback.
+
+        Args:
+            user_message: User's message text.
+            conversation_context: Session containing conversation information.
+            memory_response: Optional memory data to pass to callback.
+        """
+        if self._message_ready_callback:
+            result = self._message_ready_callback(
+                user_message, conversation_context, memory_response
+            )
+            if inspect.isawaitable(result):
+                await result
+
+    def trigger_interrupt(
+        self,
+        conversation_context: ConversationSession,
+        interrupt_data: Any,
+    ) -> None:
+        """Trigger the registered interrupt callback.
+
+        Args:
+            conversation_context: Session containing conversation information.
+            interrupt_data: Interrupt event data from voice channel.
+        """
+        if self._interrupt_callback:
+            result = self._interrupt_callback(conversation_context, interrupt_data)
+            if inspect.isawaitable(result):
+                try:
+                    asyncio.ensure_future(result)
+                except RuntimeError:
+                    # Close the coroutine to prevent "was never awaited" warning
+                    if inspect.iscoroutine(result):
+                        result.close()
+                    self.logger.warning(
+                        "Async interrupt callback registered but no event loop running. "
+                        "Callback will not be executed."
+                    )
+
+    async def trigger_conversation_ended(
+        self,
+        conversation_context: ConversationSession,
+    ) -> None:
+        """Trigger the registered conversation ended callback.
+
+        Args:
+            conversation_context: Session containing conversation information.
+        """
+        if self._conversation_ended_callback:
+            result = self._conversation_ended_callback(conversation_context)
+            if inspect.isawaitable(result):
+                await result
+
+    async def trigger_handoff(self, form_data: dict[str, str]) -> str:
+        """Trigger the registered handoff callback.
+
+        Args:
+            form_data: Form data from handoff webhook.
+
+        Returns:
+            TwiML string to execute handoff action.
+        """
+        if not self._handoff_callback:
+            raise ValueError(
+                "No handoff handler registered. Use tac.on_handoff() to register a callback."
+            )
+
+        result = self._handoff_callback(form_data)
+        if inspect.isawaitable(result):
+            return await result
+        return result

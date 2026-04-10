@@ -1062,6 +1062,54 @@ class TestHandleConversationRelayCallback:
         assert result == handoff_result
 
     @pytest.mark.asyncio
+    async def test_handoff_with_sync_callback(self) -> None:
+        """Test that synchronous handoff callbacks are supported."""
+        tac = TAC(get_test_config())
+        channel = VoiceChannel(tac)
+
+        handoff_result = "<Response><Dial>+15551234567</Dial></Response>"
+
+        def mock_handoff_sync(form_data: dict) -> str:
+            return handoff_result
+
+        tac.on_handoff(mock_handoff_sync)
+
+        payload = self._make_payload(
+            CallStatus="in-progress",
+            HandoffData='{"reason": "customer request"}',
+        )
+
+        result = await channel.handle_conversation_relay_callback(payload)
+        assert result == handoff_result
+
+    @pytest.mark.asyncio
+    async def test_handoff_with_wrapped_async_callback(self) -> None:
+        """Test that wrapped async callbacks (e.g., functools.partial) are supported."""
+        from functools import partial
+
+        tac = TAC(get_test_config())
+        channel = VoiceChannel(tac)
+
+        handoff_result = "<Response><Say>Wrapped async handler</Say></Response>"
+
+        async def mock_handoff_with_extra_arg(extra: str, form_data: dict) -> str:
+            assert extra == "test"
+            return handoff_result
+
+        # Wrap the async function with functools.partial
+        # inspect.iscoroutinefunction() would return False for this
+        wrapped_handler = partial(mock_handoff_with_extra_arg, "test")
+        tac.on_handoff(wrapped_handler)
+
+        payload = self._make_payload(
+            CallStatus="in-progress",
+            HandoffData='{"reason": "customer request"}',
+        )
+
+        result = await channel.handle_conversation_relay_callback(payload)
+        assert result == handoff_result
+
+    @pytest.mark.asyncio
     async def test_handoff_passes_original_payload_dict(self) -> None:
         """Test that handoff receives the original payload_dict with all keys."""
         tac = TAC(get_test_config())

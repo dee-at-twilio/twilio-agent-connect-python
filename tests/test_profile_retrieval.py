@@ -129,27 +129,34 @@ def get_mock_profile_response() -> ProfileResponse:
     )
 
 
-class TestProfileRetrieval:
-    """Tests for profile retrieval functionality."""
+class TestProfileFetchingInRetrieveMemory:
+    """Tests for profile fetching logic within retrieve_memory()."""
 
     @pytest.mark.asyncio
-    async def test_profile_fetched_with_trait_groups(self) -> None:
-        """Test that profile is fetched with configured trait groups."""
+    async def test_retrieve_memory_fetches_profile_with_trait_groups(self) -> None:
+        """Test that retrieve_memory fetches profile with configured trait_groups."""
         config = get_test_config_with_trait_groups(trait_groups=["Contact", "Preferences"])
         tac = TAC(config)
         tac.conversation_memory_client = create_memory_client(tac)
 
         mock_profile = get_mock_profile_response()
+        empty_memory = MemoryRetrievalResponse(
+            observations=[],
+            summaries=[],
+            communications=[],
+            meta=MemoryRetrievalMeta(queryTime=0),
+        )
 
         tac.conversation_memory_client.get_profile = AsyncMock(return_value=mock_profile)
-        profile = await tac.fetch_profile("profile_test_123")
+        tac.conversation_memory_client.retrieve_memory = AsyncMock(return_value=empty_memory)
 
-        # Verify profile was fetched
-        assert profile is not None
-        assert profile.id == "profile_test_123"
-        assert "Contact" in profile.traits
-        assert "Preferences" in profile.traits
-        assert profile.traits["Contact"]["firstName"] == "John"
+        context = ConversationSession(
+            conversation_id="conv123",
+            profile_id="profile_test_123",
+            channel="sms",
+        )
+
+        await tac.retrieve_memory(context)
 
         # Verify get_profile was called with correct trait_groups
         tac.conversation_memory_client.get_profile.assert_called_once_with(
@@ -158,20 +165,30 @@ class TestProfileRetrieval:
         )
 
     @pytest.mark.asyncio
-    async def test_profile_fetched_without_trait_groups(self) -> None:
-        """Test that profile is fetched without trait_groups when not configured."""
+    async def test_retrieve_memory_fetches_profile_without_trait_groups(self) -> None:
+        """Test that retrieve_memory fetches profile with trait_groups=None when not configured."""
         config = get_test_config_with_trait_groups(trait_groups=None)
         tac = TAC(config)
         tac.conversation_memory_client = create_memory_client(tac)
 
         mock_profile = get_mock_profile_response()
+        empty_memory = MemoryRetrievalResponse(
+            observations=[],
+            summaries=[],
+            communications=[],
+            meta=MemoryRetrievalMeta(queryTime=0),
+        )
 
         tac.conversation_memory_client.get_profile = AsyncMock(return_value=mock_profile)
-        profile = await tac.fetch_profile("profile_test_123")
+        tac.conversation_memory_client.retrieve_memory = AsyncMock(return_value=empty_memory)
 
-        # Verify profile was fetched
-        assert profile is not None
-        assert profile.id == "profile_test_123"
+        context = ConversationSession(
+            conversation_id="conv123",
+            profile_id="profile_test_123",
+            channel="sms",
+        )
+
+        await tac.retrieve_memory(context)
 
         # Verify get_profile was called with trait_groups=None
         tac.conversation_memory_client.get_profile.assert_called_once_with(
@@ -180,29 +197,38 @@ class TestProfileRetrieval:
         )
 
     @pytest.mark.asyncio
-    async def test_profile_fetch_error_handling(self) -> None:
-        """Test that profile fetch errors are handled gracefully."""
+    async def test_retrieve_memory_continues_on_profile_fetch_error(self) -> None:
+        """Test that retrieve_memory continues when profile fetch fails."""
         config = get_test_config_with_trait_groups()
         tac = TAC(config)
         tac.conversation_memory_client = create_memory_client(tac)
 
-        # Simulate an error during profile fetch
-        tac.conversation_memory_client.get_profile = AsyncMock(side_effect=Exception("API Error"))
-        profile = await tac.fetch_profile("profile_test_123")
+        empty_memory = MemoryRetrievalResponse(
+            observations=[],
+            summaries=[],
+            communications=[],
+            meta=MemoryRetrievalMeta(queryTime=0),
+        )
 
-        # Verify None is returned on error (not raised)
-        assert profile is None
+        # Simulate profile fetch failure
+        tac.conversation_memory_client.get_profile = AsyncMock(
+            side_effect=Exception("Profile fetch failed")
+        )
+        tac.conversation_memory_client.retrieve_memory = AsyncMock(return_value=empty_memory)
 
-    @pytest.mark.asyncio
-    async def test_profile_fetch_with_empty_profile_id(self) -> None:
-        """Test that profile fetch handles empty profile_id gracefully."""
-        config = get_test_config_with_trait_groups()
-        tac = TAC(config)
-        tac.conversation_memory_client = create_memory_client(tac)
+        context = ConversationSession(
+            conversation_id="conv123",
+            profile_id="profile_test_123",
+            channel="sms",
+        )
 
-        # Test with empty string
-        profile = await tac.fetch_profile("")
-        assert profile is None
+        # Should not raise - exception is swallowed and memory retrieval continues
+        result = await tac.retrieve_memory(context)
+
+        # Verify profile is None but memory retrieval still happened
+        assert context.profile is None
+        assert result is not None
+        tac.conversation_memory_client.retrieve_memory.assert_called_once()
 
 
 class TestProfileInSMSChannel:
@@ -245,7 +271,7 @@ class TestProfileInSMSChannel:
         empty_memory = MemoryRetrievalResponse(
             observations=[],
             summaries=[],
-            sessions=[],
+            communications=[],
             meta=MemoryRetrievalMeta(queryTime=0),
         )
         tac.conversation_memory_client.retrieve_memory = AsyncMock(return_value=empty_memory)
@@ -326,7 +352,7 @@ class TestProfileInSMSChannel:
         empty_memory = MemoryRetrievalResponse(
             observations=[],
             summaries=[],
-            sessions=[],
+            communications=[],
             meta=MemoryRetrievalMeta(queryTime=0),
         )
         tac.conversation_memory_client.retrieve_memory = AsyncMock(return_value=empty_memory)
@@ -393,7 +419,7 @@ class TestProfileInSMSChannel:
         empty_memory = MemoryRetrievalResponse(
             observations=[],
             summaries=[],
-            sessions=[],
+            communications=[],
             meta=MemoryRetrievalMeta(queryTime=0),
         )
         tac.conversation_memory_client.retrieve_memory = AsyncMock(return_value=empty_memory)

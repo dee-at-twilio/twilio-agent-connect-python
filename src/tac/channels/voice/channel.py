@@ -126,10 +126,7 @@ class VoiceChannel(BaseChannel):
             ValueError: If no handoff handler is registered.
         """
         self.logger.info("Handling handoff webhook (delegated)")
-        cb = self.tac._handoff_callback
-        if cb is None:
-            raise ValueError("No handoff handler registered")
-        return await cb(form_data)
+        return await self.tac.trigger_handoff(form_data)
 
     async def handle_conversation_relay_callback(
         self,
