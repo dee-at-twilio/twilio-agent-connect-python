@@ -511,6 +511,68 @@ class TestSMSChannel:
         assert "CH_NOCB" not in channel._conversations
 
     @pytest.mark.asyncio
+    async def test_send_response_with_agent_type_participant(self) -> None:
+        """Test that participant with type='AGENT' is recognized as agent."""
+        tac = TAC(get_test_config())
+        channel = SMSChannel(tac)
+
+        from tac.models.conversation import ParticipantAddress, ParticipantResponse
+
+        # Mock agent participant with new "AGENT" type
+        mock_agent_participant = ParticipantResponse(
+            **{  # type: ignore[arg-type]
+                "id": "PA_AGENT",
+                "accountId": "ACtest123",
+                "conversationId": "CH123456",
+                "name": "Agent System",
+                "type": "AGENT",  # New AGENT type
+                "addresses": [
+                    ParticipantAddress(channel="SMS", address="+15551234567").model_dump(
+                        by_alias=True
+                    )
+                ],
+            }
+        )
+
+        # Mock customer participant
+        mock_customer_participant = ParticipantResponse(
+            **{  # type: ignore[arg-type]
+                "id": "PA_CUSTOMER",
+                "accountId": "ACtest123",
+                "conversationId": "CH123456",
+                "name": "+12345678901",
+                "type": "CUSTOMER",
+                "addresses": [
+                    ParticipantAddress(channel="SMS", address="+12345678901").model_dump(
+                        by_alias=True
+                    )
+                ],
+            }
+        )
+
+        with (
+            patch.object(
+                tac.conversation_orchestrator_client,
+                "list_participants",
+                return_value=[mock_agent_participant, mock_customer_participant],
+            ),
+            patch.object(
+                tac.conversation_orchestrator_client, "send_communication"
+            ) as mock_send_comm,
+        ):
+            await channel.send_response("CH123456", "Test response")
+
+            # Verify send_communication was called successfully
+            mock_send_comm.assert_called_once()
+            call_args = mock_send_comm.call_args
+            assert call_args[0][0] == "CH123456"
+
+            # Verify the AGENT participant was selected as author
+            request = call_args[0][1]
+            assert request.author.address == "+15551234567"
+            assert request.author.participant_id == "PA_AGENT"
+
+    @pytest.mark.asyncio
     async def test_send_response_agent_participant_not_found(self) -> None:
         """Test sending response when agent participant is not found."""
         tac = TAC(get_test_config())

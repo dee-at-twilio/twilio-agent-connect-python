@@ -101,7 +101,7 @@ class SMSChannel(MessagingChannel):
         customer_participant = None
         customer_address = None
         for participant in participants:
-            if not agent_participant and participant.type in ("AI_AGENT", "HUMAN_AGENT"):
+            if not agent_participant and participant.type in ("AI_AGENT", "HUMAN_AGENT", "AGENT"):
                 for address in participant.addresses:
                     if (
                         address.channel == "SMS"

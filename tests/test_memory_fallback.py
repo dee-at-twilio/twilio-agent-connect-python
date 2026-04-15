@@ -590,3 +590,102 @@ class TestTACCommunicationConversion:
         for i, comm in enumerate(tac_response.communications):
             assert comm.id == f"comm_{i}"
             assert comm.content.text == f"Message {i}"
+
+    def test_tac_communication_author_with_agent_type(self):
+        """Test TACCommunicationAuthor handles AGENT participant type."""
+        memory_comm = MemoryCommunication(
+            id="mem_comm_agent",
+            author=MemoryParticipant(
+                id="author_agent",
+                name="Agent System",
+                type="AGENT",
+                address="+18887608751",
+                channel="SMS",
+                profileId="profile_agent",
+            ),
+            content=MemoryCommunicationContent(text="Agent message"),
+            recipients=[],
+            channelId="SM123",
+            createdAt="2025-01-15T10:15:30Z",
+            updatedAt="2025-01-15T10:20:30Z",
+        )
+
+        memory_response = MemoryRetrievalResponse(
+            observations=[],
+            summaries=[],
+            communications=[memory_comm],
+            meta=MemoryRetrievalMeta(queryTime=100),
+        )
+
+        tac_response = TACMemoryResponse(memory_response)
+
+        assert len(tac_response.communications) == 1
+        comm = tac_response.communications[0]
+        assert comm.author.type == "AGENT"
+        assert comm.author.name == "Agent System"
+
+    def test_tac_communication_author_with_unknown_type(self):
+        """Test TACCommunicationAuthor handles UNKNOWN participant type."""
+        memory_comm = MemoryCommunication(
+            id="mem_comm_unknown",
+            author=MemoryParticipant(
+                id="author_unknown",
+                name="Unknown Entity",
+                type="UNKNOWN",
+                address="unknown@example.com",
+                channel="EMAIL",
+            ),
+            content=MemoryCommunicationContent(text="Unknown message"),
+            recipients=[],
+            channelId="EM123",
+            createdAt="2025-01-15T10:15:30Z",
+            updatedAt="2025-01-15T10:20:30Z",
+        )
+
+        memory_response = MemoryRetrievalResponse(
+            observations=[],
+            summaries=[],
+            communications=[memory_comm],
+            meta=MemoryRetrievalMeta(queryTime=100),
+        )
+
+        tac_response = TACMemoryResponse(memory_response)
+
+        assert len(tac_response.communications) == 1
+        comm = tac_response.communications[0]
+        assert comm.author.type == "UNKNOWN"
+        assert comm.author.name == "Unknown Entity"
+
+    def test_tac_communication_author_all_participant_types(self):
+        """Test TACCommunicationAuthor accepts all valid participant types."""
+        valid_types = ["HUMAN_AGENT", "CUSTOMER", "AI_AGENT", "AGENT", "UNKNOWN"]
+
+        for participant_type in valid_types:
+            memory_comm = MemoryCommunication(
+                id=f"mem_comm_{participant_type.lower()}",
+                author=MemoryParticipant(
+                    id=f"author_{participant_type.lower()}",
+                    name=f"{participant_type} User",
+                    type=participant_type,
+                    address="+12025551234",
+                    channel="SMS",
+                ),
+                content=MemoryCommunicationContent(text=f"{participant_type} message"),
+                recipients=[],
+                channelId="SM123",
+                createdAt="2025-01-15T10:15:30Z",
+                updatedAt="2025-01-15T10:20:30Z",
+            )
+
+            memory_response = MemoryRetrievalResponse(
+                observations=[],
+                summaries=[],
+                communications=[memory_comm],
+                meta=MemoryRetrievalMeta(queryTime=100),
+            )
+
+            tac_response = TACMemoryResponse(memory_response)
+
+            assert len(tac_response.communications) == 1
+            comm = tac_response.communications[0]
+            assert comm.author.type == participant_type

@@ -83,7 +83,7 @@ class MemoryParticipant(BaseModel):
     channel: Literal["VOICE", "SMS", "RCS", "EMAIL", "WHATSAPP", "CHAT", "API", "SYSTEM"] = Field(
         ..., description="The channel on which the message originated"
     )
-    type: Literal["HUMAN_AGENT", "CUSTOMER", "AI_AGENT"] | None = Field(
+    type: Literal["HUMAN_AGENT", "CUSTOMER", "AI_AGENT", "AGENT", "UNKNOWN"] | None = Field(
         default=None,
         description="Type of Participant in the Conversation",
     )

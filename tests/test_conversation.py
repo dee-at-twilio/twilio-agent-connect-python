@@ -168,6 +168,80 @@ class TestConversationModels:
         assert participant.created_at is None
         assert participant.updated_at is None
 
+    def test_participant_request_with_agent_type(self):
+        """Test ParticipantRequest accepts AGENT type."""
+        request = ParticipantRequest(
+            name="Agent Bot",
+            type="AGENT",
+            profile_id="profile_agent_123",
+        )
+
+        assert request.type == "AGENT"
+        payload = request.model_dump(by_alias=True, exclude_none=True)
+        assert payload["type"] == "AGENT"
+
+    def test_participant_request_with_unknown_type(self):
+        """Test ParticipantRequest accepts UNKNOWN type."""
+        request = ParticipantRequest(
+            name="Unknown Participant",
+            type="UNKNOWN",
+        )
+
+        assert request.type == "UNKNOWN"
+        payload = request.model_dump(by_alias=True, exclude_none=True)
+        assert payload["type"] == "UNKNOWN"
+
+    def test_participant_response_with_agent_type(self):
+        """Test ParticipantResponse validates webhook payload with AGENT type."""
+        # Simulates webhook payload from API with new AGENT type
+        response_data = {
+            "id": "MB123456",
+            "conversationId": "CH123456",
+            "accountId": "AC123456",
+            "name": "Agent System",
+            "type": "AGENT",
+            "addresses": [{"channel": "SMS", "address": "+18887608751"}],
+        }
+
+        participant = ParticipantResponse(**response_data)
+
+        assert participant.id == "MB123456"
+        assert participant.type == "AGENT"
+        assert participant.name == "Agent System"
+
+    def test_participant_response_with_unknown_type(self):
+        """Test ParticipantResponse validates webhook payload with UNKNOWN type."""
+        # Simulates webhook payload from API with new UNKNOWN type
+        response_data = {
+            "id": "MB123456",
+            "conversationId": "CH123456",
+            "accountId": "AC123456",
+            "name": "Unknown Entity",
+            "type": "UNKNOWN",
+        }
+
+        participant = ParticipantResponse(**response_data)
+
+        assert participant.id == "MB123456"
+        assert participant.type == "UNKNOWN"
+        assert participant.name == "Unknown Entity"
+
+    def test_participant_response_all_types(self):
+        """Test ParticipantResponse accepts all valid participant types."""
+        valid_types = ["HUMAN_AGENT", "CUSTOMER", "AI_AGENT", "AGENT", "UNKNOWN"]
+
+        for participant_type in valid_types:
+            response_data = {
+                "id": f"MB_{participant_type}",
+                "conversationId": "CH123456",
+                "accountId": "AC123456",
+                "name": f"{participant_type} Participant",
+                "type": participant_type,
+            }
+
+            participant = ParticipantResponse(**response_data)
+            assert participant.type == participant_type
+
     def test_communication_request_model(self):
         """Test CommunicationRequest model with all fields."""
         request_data = {
@@ -406,7 +480,7 @@ class TestConversationClient:
         expected_url = "https://conversations.twilio.com/v2/Conversations/CH123456/Participants"
         mock_client.post.assert_called_once_with(
             expected_url,
-            json={"type": "CUSTOMER"},
+            json={},  # No default type - API determines participant type
         )
 
         # Verify response
@@ -447,8 +521,8 @@ class TestConversationClient:
             conversation_id="CH123456",
         )
 
-        # Verify only non-None values are sent (type is always included)
-        assert mock_client.post.call_args[1]["json"] == {"type": "CUSTOMER"}
+        # Verify only non-None values are sent
+        assert mock_client.post.call_args[1]["json"] == {}
 
         # Verify response
         assert isinstance(result, ParticipantResponse)
@@ -472,6 +546,80 @@ class TestConversationClient:
             await client.add_participant(
                 conversation_id="CH123456",
             )
+
+    @pytest.mark.asyncio
+    @patch("httpx.AsyncClient")
+    async def test_add_participant_with_agent_type(self, mock_async_client_class):
+        """Test add_participant with participant_type=AGENT."""
+        mock_response = Mock()
+        mock_response.json.return_value = {
+            "id": "MB123456",
+            "conversationId": "CH123456",
+            "accountId": "AC123456",
+            "name": "Agent System",
+            "type": "AGENT",
+            "addresses": [],
+        }
+        mock_response.raise_for_status = Mock()
+
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(return_value=mock_response)
+        mock_async_client_class.return_value.__aenter__.return_value = mock_client
+
+        client = ConversationClient(
+            api_key="SK123456",
+            api_token="test_token",
+            configuration_id="conv_configuration_test123",
+        )
+
+        result = await client.add_participant(
+            conversation_id="CH123456",
+            participant_type="AGENT",
+        )
+
+        # Verify the request payload contains the AGENT type
+        assert mock_client.post.call_args[1]["json"]["type"] == "AGENT"
+
+        # Verify response
+        assert isinstance(result, ParticipantResponse)
+        assert result.type == "AGENT"
+
+    @pytest.mark.asyncio
+    @patch("httpx.AsyncClient")
+    async def test_add_participant_with_unknown_type(self, mock_async_client_class):
+        """Test add_participant with participant_type=UNKNOWN."""
+        mock_response = Mock()
+        mock_response.json.return_value = {
+            "id": "MB123456",
+            "conversationId": "CH123456",
+            "accountId": "AC123456",
+            "name": "Unknown Entity",
+            "type": "UNKNOWN",
+            "addresses": [],
+        }
+        mock_response.raise_for_status = Mock()
+
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(return_value=mock_response)
+        mock_async_client_class.return_value.__aenter__.return_value = mock_client
+
+        client = ConversationClient(
+            api_key="SK123456",
+            api_token="test_token",
+            configuration_id="conv_configuration_test123",
+        )
+
+        result = await client.add_participant(
+            conversation_id="CH123456",
+            participant_type="UNKNOWN",
+        )
+
+        # Verify the request payload contains the UNKNOWN type
+        assert mock_client.post.call_args[1]["json"]["type"] == "UNKNOWN"
+
+        # Verify response
+        assert isinstance(result, ParticipantResponse)
+        assert result.type == "UNKNOWN"
 
     def test_conversation_client_uses_correct_headers(self):
         """Test that ConversationClient stores authentication credentials."""

@@ -372,6 +372,76 @@ class TestChatChannel:
             assert request.channel_id == "CH_CHAT_SID_123"
 
     @pytest.mark.asyncio
+    async def test_send_response_recognizes_agent_type(self) -> None:
+        """Test that participant with type='AGENT' is recognized and reused."""
+        from tac.models.conversation import ParticipantAddress, ParticipantResponse
+
+        tac = TAC(get_test_config())
+        channel = ChatChannel(tac)
+
+        # Set up session with author_info and channel_id
+        channel._conversations["CH123"] = ConversationSession(
+            conversation_id="CH123",
+            channel="chat",
+            author_info=AuthorInfo(address="user@example.com", participant_id="PA_USER"),
+            metadata={"channel_id": "CH_CHAT_SID_123"},
+        )
+
+        # Mock agent with new "AGENT" type (not "AI_AGENT")
+        mock_agent = ParticipantResponse(
+            **{  # type: ignore[arg-type]
+                "id": "PA_AGENT",
+                "accountId": "ACtest123",
+                "conversationId": "CH123",
+                "name": "Agent System",
+                "type": "AGENT",  # New AGENT type
+                "addresses": [
+                    ParticipantAddress(
+                        channel="CHAT", address="agent-system", channel_id="CH_CHAT_SID_123"
+                    ).model_dump(by_alias=True)
+                ],
+            }
+        )
+
+        mock_customer = ParticipantResponse(
+            **{  # type: ignore[arg-type]
+                "id": "PA_USER",
+                "accountId": "ACtest123",
+                "conversationId": "CH123",
+                "name": "user@example.com",
+                "type": "CUSTOMER",
+                "addresses": [
+                    ParticipantAddress(
+                        channel="CHAT", address="user@example.com", channel_id="CH_CHAT_SID_123"
+                    ).model_dump(by_alias=True)
+                ],
+            }
+        )
+
+        with (
+            patch.object(
+                tac.conversation_orchestrator_client,
+                "list_participants",
+                return_value=[mock_agent, mock_customer],
+            ),
+            patch.object(tac.conversation_orchestrator_client, "send_communication") as mock_send,
+            patch.object(
+                tac.conversation_orchestrator_client, "add_participant"
+            ) as mock_add_participant,
+        ):
+            await channel.send_response("CH123", "Response from agent!")
+
+            # Verify send_communication was called with AGENT participant
+            mock_send.assert_called_once()
+            request = mock_send.call_args[0][1]
+            assert request.author.participant_id == "PA_AGENT"
+            # Note: address uses ChatChannel's agent_address (default "ai-assistant")
+            assert request.author.address == "ai-assistant"
+
+            # Verify add_participant was NOT called (AGENT participant was reused)
+            mock_add_participant.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_send_response_creates_agent_lazily(self) -> None:
         from tac.models.conversation import ParticipantAddress, ParticipantResponse
 

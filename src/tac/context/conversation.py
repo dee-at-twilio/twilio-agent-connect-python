@@ -104,7 +104,8 @@ class ConversationClient(BaseAPIClient):
         self,
         conversation_id: str,
         addresses: list[ParticipantAddress] | None = None,
-        participant_type: Literal["HUMAN_AGENT", "CUSTOMER", "AI_AGENT"] = "CUSTOMER",
+        participant_type: Literal["HUMAN_AGENT", "CUSTOMER", "AI_AGENT", "AGENT", "UNKNOWN"]
+        | None = None,
     ) -> ParticipantResponse:
         """
         Add a new participant to a conversation.
@@ -112,8 +113,7 @@ class ConversationClient(BaseAPIClient):
         Args:
             conversation_id: The conversation ID to add participant to
             addresses: List of communication addresses for the participant (optional)
-            participant_type: Type of participant (e.g., "CUSTOMER", "AGENT").
-                Defaults to "CUSTOMER"
+            participant_type: Type of participant (e.g., "CUSTOMER", "AGENT"). Optional.
 
         Returns:
             ParticipantResponse object containing the created participant details

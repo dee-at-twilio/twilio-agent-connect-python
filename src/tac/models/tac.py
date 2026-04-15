@@ -41,7 +41,7 @@ class TACCommunicationAuthor(BaseModel):
     # Memory-only fields
     id: str | None = Field(default=None, description="Author ID (Memory only)")
     name: str | None = Field(default=None, description="Display name (Memory only)")
-    type: Literal["HUMAN_AGENT", "CUSTOMER", "AI_AGENT"] | None = Field(
+    type: Literal["HUMAN_AGENT", "CUSTOMER", "AI_AGENT", "AGENT", "UNKNOWN"] | None = Field(
         default=None, description="Author type (Memory only)"
     )
     profile_id: str | None = Field(

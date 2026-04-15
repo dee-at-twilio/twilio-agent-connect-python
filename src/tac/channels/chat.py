@@ -119,7 +119,7 @@ class ChatChannel(MessagingChannel):
             return
 
         agent_participant = next(
-            (p for p in participants if p.type == "AI_AGENT"),
+            (p for p in participants if p.type in ("AI_AGENT", "AGENT")),
             None,
         )
 
@@ -158,7 +158,7 @@ class ChatChannel(MessagingChannel):
                         conversation_id
                     )
                     agent_participant = next(
-                        (p for p in retried if p.type == "AI_AGENT"),
+                        (p for p in retried if p.type in ("AI_AGENT", "AGENT")),
                         None,
                     )
                 except Exception as e:

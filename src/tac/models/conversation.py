@@ -212,7 +212,7 @@ class ParticipantRequest(BaseModel):
     """Request payload for creating a conversation participant."""
 
     name: str | None = Field(default=None, description="Display name for the Participant")
-    type: Literal["HUMAN_AGENT", "CUSTOMER", "AI_AGENT"] | None = Field(
+    type: Literal["HUMAN_AGENT", "CUSTOMER", "AI_AGENT", "AGENT", "UNKNOWN"] | None = Field(
         default=None, description="Type of Participant in the Conversation"
     )
     profile_id: str | None = Field(
@@ -232,7 +232,7 @@ class ParticipantResponse(BaseModel):
     conversation_id: str = Field(..., alias="conversationId", description="Conversation ID")
     account_id: str = Field(..., alias="accountId", description="Account ID")
     name: str = Field(..., description="Participant display name")
-    type: Literal["HUMAN_AGENT", "CUSTOMER", "AI_AGENT"] | None = Field(
+    type: Literal["HUMAN_AGENT", "CUSTOMER", "AI_AGENT", "AGENT", "UNKNOWN"] | None = Field(
         None, description="Type of Participant in the Conversation"
     )
     profile_id: str | None = Field(None, alias="profileId", description="Segment profile ID")
