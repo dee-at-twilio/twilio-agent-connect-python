@@ -50,3 +50,145 @@ class TestTAC:
         """Test TAC initialization with invalid configuration type."""
         with pytest.raises(ValueError, match="Config must be TACConfig instance or dictionary"):
             TAC("invalid_config")
+
+    @pytest.mark.asyncio
+    async def test_callback_return_type_validation_int(self):
+        """Test that callback returning int raises TypeError."""
+        from tac.models.session import ConversationSession
+
+        tac = TAC(get_test_config())
+
+        # Callback that returns an int (invalid)
+        def bad_callback(user_message, context, memory_response):
+            return 123
+
+        tac.on_message_ready(bad_callback)
+
+        session = ConversationSession(
+            conversation_id="CH123",
+            profile_id="prof123",
+            channel="sms",
+        )
+
+        with pytest.raises(
+            TypeError,
+            match="on_message_ready callback must return str or None, got int",
+        ):
+            await tac.trigger_message_ready("test message", session, None)
+
+    @pytest.mark.asyncio
+    async def test_callback_return_type_validation_dict(self):
+        """Test that callback returning dict raises TypeError."""
+        from tac.models.session import ConversationSession
+
+        tac = TAC(get_test_config())
+
+        # Callback that returns a dict (invalid)
+        async def bad_callback(user_message, context, memory_response):
+            return {"message": "test"}
+
+        tac.on_message_ready(bad_callback)
+
+        session = ConversationSession(
+            conversation_id="CH123",
+            profile_id="prof123",
+            channel="sms",
+        )
+
+        with pytest.raises(
+            TypeError,
+            match="on_message_ready callback must return str or None, got dict",
+        ):
+            await tac.trigger_message_ready("test message", session, None)
+
+    @pytest.mark.asyncio
+    async def test_callback_return_type_validation_list(self):
+        """Test that callback returning list raises TypeError."""
+        from tac.models.session import ConversationSession
+
+        tac = TAC(get_test_config())
+
+        # Callback that returns a list (invalid)
+        def bad_callback(user_message, context, memory_response):
+            return ["response1", "response2"]
+
+        tac.on_message_ready(bad_callback)
+
+        session = ConversationSession(
+            conversation_id="CH123",
+            profile_id="prof123",
+            channel="sms",
+        )
+
+        with pytest.raises(
+            TypeError,
+            match="on_message_ready callback must return str or None, got list",
+        ):
+            await tac.trigger_message_ready("test message", session, None)
+
+    @pytest.mark.asyncio
+    async def test_callback_return_type_validation_valid_str_sync(self):
+        """Test that sync callback returning str works correctly."""
+        from tac.models.session import ConversationSession
+
+        tac = TAC(get_test_config())
+
+        # Sync callback that returns a string (valid)
+        def good_callback(user_message, context, memory_response):
+            return "Valid response from sync"
+
+        tac.on_message_ready(good_callback)
+
+        session = ConversationSession(
+            conversation_id="CH123",
+            profile_id="prof123",
+            channel="sms",
+        )
+
+        result = await tac.trigger_message_ready("test message", session, None)
+        assert result == "Valid response from sync"
+
+    @pytest.mark.asyncio
+    async def test_callback_return_type_validation_valid_str_async(self):
+        """Test that async callback returning str works correctly."""
+        from tac.models.session import ConversationSession
+
+        tac = TAC(get_test_config())
+
+        # Async callback that returns a string (valid)
+        async def good_callback(user_message, context, memory_response):
+            return "Valid response from async"
+
+        tac.on_message_ready(good_callback)
+
+        session = ConversationSession(
+            conversation_id="CH123",
+            profile_id="prof123",
+            channel="sms",
+        )
+
+        result = await tac.trigger_message_ready("test message", session, None)
+        assert result == "Valid response from async"
+
+    @pytest.mark.asyncio
+    async def test_callback_return_type_validation_valid_none(self):
+        """Test that callback returning None works correctly."""
+        from tac.models.session import ConversationSession
+
+        tac = TAC(get_test_config())
+
+        # Callback that returns None (valid)
+        def good_callback(user_message, context, memory_response):
+            # Manual send_response flow
+            pass
+
+        tac.on_message_ready(good_callback)
+
+        session = ConversationSession(
+            conversation_id="CH123",
+            profile_id="prof123",
+            channel="sms",
+        )
+
+        result = await tac.trigger_message_ready("test message", session, None)
+        assert result is None

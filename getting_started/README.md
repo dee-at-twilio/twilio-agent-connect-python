@@ -116,7 +116,7 @@ See `examples/.env.example` for all available configuration options. Key variabl
 ## Next Steps
 
 - Start with `examples/overview.py` to learn the core memory injection pattern
-- Try the `examples/openai/` example for a production-ready OpenAI integration
+- Try the `examples/openai/` examples for production-ready OpenAI integration
 - Customize the agent's behavior by modifying the message handler
 - Add tool calling to enable agent actions beyond text responses
 - Explore the main [README](../README.md) for advanced features

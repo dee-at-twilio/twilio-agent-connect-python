@@ -619,3 +619,118 @@ class TestSMSChannel:
 
         await channel.process_webhook(webhook)
         assert len(captured) == 0
+
+    @pytest.mark.asyncio
+    async def test_callback_auto_send_response(self) -> None:
+        """Test callback returning string automatically sends response via send_communication."""
+        tac = TAC(get_test_config(with_memory=False))
+        channel = SMSChannel(tac, config={"auto_retrieve_memory": False})
+
+        # Callback that returns a string (should auto-send)
+        async def message_callback(
+            user_message: str,
+            context: ConversationSession,
+            memory_response: TACMemoryResponse | None,
+        ) -> str:
+            return "This is my automated response"
+
+        tac.on_message_ready(message_callback)
+
+        # Start conversation via participant added
+        await channel.process_webhook(
+            create_participant_added_webhook(
+                "CH_AUTO_SEND", "PA_AUTO", "prof_auto", "2025-11-18T00:00:00.000Z"
+            )
+        )
+
+        from tac.models.conversation import ParticipantAddress, ParticipantResponse
+
+        # Mock participants for send_response
+        mock_agent_participant = ParticipantResponse(
+            **{  # type: ignore[arg-type]
+                "id": "PA_AGENT",
+                "accountId": "ACtest123",
+                "conversationId": "CH_AUTO_SEND",
+                "name": "Test Agent",
+                "type": "AI_AGENT",
+                "addresses": [
+                    ParticipantAddress(channel="SMS", address="+15551234567").model_dump(
+                        by_alias=True
+                    )
+                ],
+            }
+        )
+
+        mock_customer_participant = ParticipantResponse(
+            **{  # type: ignore[arg-type]
+                "id": "PA_CUSTOMER",
+                "accountId": "ACtest123",
+                "conversationId": "CH_AUTO_SEND",
+                "name": "+12345678901",
+                "type": "CUSTOMER",
+                "addresses": [
+                    ParticipantAddress(channel="SMS", address="+12345678901").model_dump(
+                        by_alias=True
+                    )
+                ],
+            }
+        )
+
+        with (
+            patch.object(
+                tac.conversation_orchestrator_client,
+                "list_participants",
+                return_value=[mock_agent_participant, mock_customer_participant],
+            ),
+            patch.object(
+                tac.conversation_orchestrator_client, "send_communication"
+            ) as mock_send_comm,
+        ):
+            # Process message that triggers callback
+            message_webhook = create_communication_created_webhook(
+                "CH_AUTO_SEND", "PA_AUTO", "Test message", "2025-11-18T00:00:01.000Z"
+            )
+            await channel.process_webhook(message_webhook)
+
+            # Verify send_communication was called once with auto-sent response
+            mock_send_comm.assert_called_once()
+            call_args = mock_send_comm.call_args
+            assert call_args[0][0] == "CH_AUTO_SEND"
+            request = call_args[0][1]
+            assert request.content.text == "This is my automated response"
+
+    @pytest.mark.asyncio
+    async def test_callback_no_auto_send_on_none(self) -> None:
+        """Test that callback returning None does not auto-send (manual send_response required)."""
+        tac = TAC(get_test_config(with_memory=False))
+        channel = SMSChannel(tac, config={"auto_retrieve_memory": False})
+
+        # Callback that returns None (manual send_response flow)
+        async def message_callback(
+            user_message: str,
+            context: ConversationSession,
+            memory_response: TACMemoryResponse | None,
+        ) -> None:
+            # User will manually call channel.send_response() later
+            pass
+
+        tac.on_message_ready(message_callback)
+
+        # Start conversation via participant added
+        await channel.process_webhook(
+            create_participant_added_webhook(
+                "CH_NO_AUTO", "PA_NO_AUTO", "prof_no_auto", "2025-11-18T00:00:00.000Z"
+            )
+        )
+
+        with patch.object(
+            tac.conversation_orchestrator_client, "send_communication"
+        ) as mock_send_comm:
+            # Process message that triggers callback
+            message_webhook = create_communication_created_webhook(
+                "CH_NO_AUTO", "PA_NO_AUTO", "Test message", "2025-11-18T00:00:01.000Z"
+            )
+            await channel.process_webhook(message_webhook)
+
+            # Verify send_communication was NOT called (callback returned None)
+            mock_send_comm.assert_not_called()

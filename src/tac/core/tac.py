@@ -82,8 +82,8 @@ class TAC:
             self.logger.info("Conversation Intelligence processor initialized")
 
         self._message_ready_callback: (
-            Callable[[str, ConversationSession, TACMemoryResponse | None], None]
-            | Callable[[str, ConversationSession, TACMemoryResponse | None], Awaitable[None]]
+            Callable[[str, ConversationSession, TACMemoryResponse | None], str | None]
+            | Callable[[str, ConversationSession, TACMemoryResponse | None], Awaitable[str | None]]
             | None
         ) = None
 
@@ -208,26 +208,28 @@ class TAC:
     def on_message_ready(
         self,
         callback: (
-            Callable[[str, ConversationSession, TACMemoryResponse | None], None]
-            | Callable[[str, ConversationSession, TACMemoryResponse | None], Awaitable[None]]
+            Callable[[str, ConversationSession, TACMemoryResponse | None], str | None]
+            | Callable[[str, ConversationSession, TACMemoryResponse | None], Awaitable[str | None]]
         ),
     ) -> None:
         """Register callback invoked when a message is ready.
 
+        Callback can return a string (TAC auto-sends to channel) or None (manual handling).
+
         Example:
             ```python
-            def handle_message(
+            async def handle_message(
                 message: str, context: ConversationSession, memory: TACMemoryResponse | None
-            ):
-                # Process message and respond...
-                pass
+            ) -> str:
+                response = await openai_client.responses.create(...)
+                return response.output_text  # TAC routes to appropriate channel
 
 
             tac.on_message_ready(handle_message)
             ```
 
         Args:
-            callback: Function to call with (message, context, memory). Supports sync and async.
+            callback: Function with (message, context, memory). Returns str or None.
         """
         self._message_ready_callback = callback
 
@@ -305,20 +307,36 @@ class TAC:
         user_message: str,
         conversation_context: ConversationSession,
         memory_response: TACMemoryResponse | None = None,
-    ) -> None:
+    ) -> str | None:
         """Trigger the registered message ready callback.
 
         Args:
             user_message: User's message text.
             conversation_context: Session containing conversation information.
             memory_response: Optional memory data to pass to callback.
+
+        Returns:
+            Response string if callback returns one (for auto-send), None otherwise.
+
+        Raises:
+            TypeError: If callback returns a value that is neither None nor str.
         """
         if self._message_ready_callback:
             result = self._message_ready_callback(
                 user_message, conversation_context, memory_response
             )
             if inspect.isawaitable(result):
-                await result
+                result = await result
+
+            # Validate callback return type (must be str or None)
+            if result is not None and not isinstance(result, str):
+                raise TypeError(
+                    f"on_message_ready callback must return str or None, "
+                    f"got {type(result).__name__}. "
+                    f"To send responses manually, return None and call channel.send_response()."
+                )
+            return result
+        return None
 
     def trigger_interrupt(
         self,

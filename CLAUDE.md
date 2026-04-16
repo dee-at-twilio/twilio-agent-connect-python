@@ -50,6 +50,7 @@ Tests are in `tests/` — one test file per module (e.g., `test_tac.py`, `test_s
 ## Key Architecture Concepts
 
 - **Channel-based**: SMS and Voice channels process Twilio webhooks, manage conversation lifecycle, and trigger `on_message_ready` / `on_conversation_ended` callbacks
+- **Callback responses**: Callbacks return `str` (auto-sent) or `None` (manual `channel.send_response()`)
 - **Memory fallback**: `TAC.retrieve_memory()` tries Conversation Memory first, gracefully falls back to Conversation Orchestrator's `list_communications()` on any failure
 - **Profile resolution**: Automatic profile lookup by phone/email if `profile_id` not present in webhook
 - **Memory auto-init**: Memory client is always initialized from Conversation Orchestrator configuration's `memory_store_id`

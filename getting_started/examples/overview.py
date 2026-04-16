@@ -47,7 +47,7 @@ async def handle_message_ready(
     user_message: str,
     context: ConversationSession,
     memory_response: TACMemoryResponse | None,
-) -> None:
+) -> str:
     """
     Process incoming messages using manual memory injection.
 
@@ -99,14 +99,11 @@ async def handle_message_ready(
 
         conversation_messages[conv_id].append({"role": "assistant", "content": llm_response})
 
-        # Send response through appropriate channel
-        if context.channel == "voice":
-            await voice_channel.send_response(conv_id, llm_response, role="assistant")
-        elif context.channel == "sms":
-            await sms_channel.send_response(conv_id, llm_response, role="assistant")
+        return llm_response
 
     except Exception as e:
         logger.error("Error processing message", conversation_id=conv_id, error=str(e))
+        return "Sorry, I encountered an error processing your message."
 
 
 # Register the message handler
@@ -116,17 +113,11 @@ if __name__ == "__main__":
     """
     Key Takeaways:
 
-    1. TAC provides memory via `memory_response` and `context` parameters when you
-       register a callback with `tac.on_message_ready()`
+    1. TAC provides memory via `memory_response` and `context` parameters
 
-    2. Use `MemoryPromptBuilder.build()` to format memory and profile data:
-       - Formats observations (key facts)
-       - Formats summaries (conversation insights)
-       - Formats communications (conversation history)
-       - Formats profile traits (customer info)
+    2. Use `MemoryPromptBuilder.build()` to format memory and profile data
 
-    3. Inject the formatted prompt into your agent's system prompt, context, or
-       wherever your framework expects it:
+    3. Inject the formatted prompt into your agent's system prompt:
        - OpenAI: Add to system message
        - AWS Bedrock: Add to system prompt
        - Azure AI: Add to system message

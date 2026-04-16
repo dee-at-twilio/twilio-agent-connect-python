@@ -256,6 +256,77 @@ class TestVoiceChannel:
         assert captured_user_message == "Test message"
 
     @pytest.mark.asyncio
+    async def test_callback_auto_send_response(self) -> None:
+        """Test that callback returning a string automatically sends response via websocket."""
+        tac = TAC(get_test_config())
+        channel = VoiceChannel(tac)
+
+        # Callback that returns a string (should auto-send)
+        async def message_callback(
+            user_message: str,
+            context: ConversationSession,
+            memory_response: TACMemoryResponse | None,
+        ) -> str:
+            return "This is my automated response"
+
+        tac.on_message_ready(message_callback)
+
+        # Setup conversation
+        channel._start_conversation("CALL_AUTO_SEND", "profile_auto_send")
+
+        # Mock websocket and register it
+        mock_websocket = AsyncMock()
+        channel._websocket_manager.add_websocket("CALL_AUTO_SEND", mock_websocket)
+
+        # Create and handle prompt message
+        prompt_msg = PromptMessage(
+            type="prompt",
+            conversationId="CALL_AUTO_SEND",
+            voicePrompt="Test message",
+        )
+        await channel._handle_prompt("CALL_AUTO_SEND", prompt_msg)
+
+        # Verify websocket.send_text was called once with the auto-sent response
+        assert mock_websocket.send_text.call_count == 1
+        call_args = mock_websocket.send_text.call_args[0][0]
+        assert "This is my automated response" in call_args
+
+    @pytest.mark.asyncio
+    async def test_callback_no_auto_send_on_none(self) -> None:
+        """Test that callback returning None does not auto-send (manual send_response required)."""
+        tac = TAC(get_test_config())
+        channel = VoiceChannel(tac)
+
+        # Callback that returns None (manual send_response flow)
+        async def message_callback(
+            user_message: str,
+            context: ConversationSession,
+            memory_response: TACMemoryResponse | None,
+        ) -> None:
+            # User will manually call channel.send_response() later
+            pass
+
+        tac.on_message_ready(message_callback)
+
+        # Setup conversation
+        channel._start_conversation("CALL_NO_AUTO", "profile_no_auto")
+
+        # Mock websocket and register it
+        mock_websocket = AsyncMock()
+        channel._websocket_manager.add_websocket("CALL_NO_AUTO", mock_websocket)
+
+        # Create and handle prompt message
+        prompt_msg = PromptMessage(
+            type="prompt",
+            conversationId="CALL_NO_AUTO",
+            voicePrompt="Test message",
+        )
+        await channel._handle_prompt("CALL_NO_AUTO", prompt_msg)
+
+        # Verify websocket.send_text was NOT called (callback returned None)
+        assert mock_websocket.send_text.call_count == 0
+
+    @pytest.mark.asyncio
     async def test_handle_incoming_call(self) -> None:
         """Test handle_incoming_call generates valid TwiML with conversation_configuration."""
         tac = TAC(get_test_config())

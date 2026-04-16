@@ -119,10 +119,7 @@ async def handle_message_ready(user_message, context, memory_response):
     llm_response = response.output_text
     conversation_history[conv_id].append({"role": "assistant", "content": llm_response})
 
-    if context.channel == "voice":
-        await voice_channel.send_response(conv_id, llm_response)
-    elif context.channel == "sms":
-        await sms_channel.send_response(conv_id, llm_response)
+    return llm_response
 
 tac.on_message_ready(handle_message_ready)
 TACFastAPIServer(tac=tac, voice_channel=voice_channel, messaging_channels=[sms_channel]).start()
@@ -148,7 +145,7 @@ TAC simplifies building AI agents by handling the integration between Twilio's c
 2. **Channel Processing**: Channel validates and processes the incoming event
 3. **Memory Retrieval**: TAC optionally retrieves user memories and profile from Memory
 4. **Callback Invoked**: Your `on_message_ready` callback receives user message, context, and optional memory response
-5. **LLM Integration**: Your code calls LLM with message and memories, sends response through the appropriate channel
+5. **Response Handling**: Your callback returns a response string that TAC routes to the appropriate channel
 
 For detailed architecture and advanced usage, see [CLAUDE.md](CLAUDE.md).
 

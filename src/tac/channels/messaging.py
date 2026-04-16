@@ -238,7 +238,10 @@ class MessagingChannel(BaseChannel):
         memory_response = await self._retrieve_memory_if_enabled(session, message_text, conv_id)
 
         try:
-            await self.tac.trigger_message_ready(message_text, session, memory_response)
+            response = await self.tac.trigger_message_ready(message_text, session, memory_response)
+            # Auto-send if callback returned a string (None = manual send_response flow)
+            if response is not None:
+                await self.send_response(conv_id, response, role="assistant")
         except Exception as e:
             self.logger.error(
                 "Error in message ready callback",

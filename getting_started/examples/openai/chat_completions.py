@@ -52,7 +52,7 @@ async def handle_message_ready(
     user_message: str,
     context: ConversationSession,
     memory_response: TACMemoryResponse | None,
-) -> None:
+) -> str:
     """
     Callback invoked when a message is ready to be processed.
 
@@ -62,6 +62,9 @@ async def handle_message_ready(
         user_message: The customer's message text
         context: Session data (conversation_id, channel, profile, etc.)
         memory_response: Optional retrieved memories (observations, summaries, communications)
+
+    Returns:
+        Response string to send to the channel
     """
     conv_id = context.conversation_id
 
@@ -84,7 +87,7 @@ async def handle_message_ready(
             messages=conversation_history[conv_id],
         )
 
-        llm_response = response.choices[0].message.content
+        llm_response = response.choices[0].message.content or ""
 
         # Save assistant response to conversation history
         assistant_msg: ChatCompletionAssistantMessageParam = {
@@ -93,14 +96,11 @@ async def handle_message_ready(
         }
         conversation_history[conv_id].append(assistant_msg)
 
-        # Route response to the appropriate channel
-        if context.channel == "voice":
-            await voice_channel.send_response(conv_id, llm_response, role="assistant")
-        elif context.channel == "sms":
-            await sms_channel.send_response(conv_id, llm_response, role="assistant")
+        return llm_response
 
     except Exception as e:
         logger.error("Error processing message", conversation_id=conv_id, error=str(e))
+        return "Sorry, I encountered an error processing your message."
 
 
 # Register the message handler callback

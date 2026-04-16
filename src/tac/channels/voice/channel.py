@@ -520,7 +520,10 @@ class VoiceChannel(BaseChannel):
 
         # Trigger message ready callback
         try:
-            await self.tac.trigger_message_ready(message_body, session, memory_response)
+            response = await self.tac.trigger_message_ready(message_body, session, memory_response)
+            # Auto-send if callback returned a string (None = manual send_response flow)
+            if response is not None:
+                await self.send_response(conv_id, response, role="assistant")
         except Exception as e:
             self.logger.error(
                 "Error in message ready callback",
