@@ -9,16 +9,7 @@ Messages flow through Twilio's infrastructure:
     Conversation Orchestrator Send API -> Twilio Conversations ->
     Browser (Conversations JS SDK)
 
-Usage:
-    uv run python getting_started/examples/chat/app.py
-    Then open http://localhost:8000 in a browser.
-
-Required env vars (in addition to standard TAC vars):
-    TWILIO_TAC_ACCOUNT_SID             - Twilio Account SID
-    TWILIO_TAC_API_KEY                 - API Key SID (starts with SK)
-    TWILIO_TAC_API_TOKEN               - API Key Secret
-    TWILIO_CONVERSATIONS_SERVICE_SID    - Conversations v1 Service SID (starts with IS)
-    OPENAI_API_KEY          - OpenAI API key
+See README.md in this directory for setup and usage instructions.
 """
 
 import asyncio
@@ -53,7 +44,7 @@ openai_client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 # Initialize TAC and chat channel
 # Note: TAC.__init__ calls setup_logging with config.log_level, so set it here
-# or use TWILIO_TAC_LOG_LEVEL=DEBUG in your .env
+# or use TWILIO_LOG_LEVEL=DEBUG in your .env
 tac = TAC(config=TACConfig.from_env())
 
 # Override logging to DEBUG after TAC init (which resets it to config.log_level)
@@ -148,9 +139,9 @@ def create_app() -> Any:
         if not identity:
             return JSONResponse({"error": "Identity is required"}, status_code=400)
 
-        account_sid = os.environ.get("TWILIO_TAC_ACCOUNT_SID")
-        api_key = os.environ.get("TWILIO_TAC_API_KEY")
-        api_secret = os.environ.get("TWILIO_TAC_API_TOKEN")
+        account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
+        api_key = os.environ.get("TWILIO_API_KEY")
+        api_secret = os.environ.get("TWILIO_API_TOKEN")
         service_sid = os.environ.get("TWILIO_CONVERSATIONS_SERVICE_SID")
 
         if not all([account_sid, api_key, api_secret, service_sid]):

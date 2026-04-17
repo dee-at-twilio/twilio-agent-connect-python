@@ -86,6 +86,7 @@ def get_test_config_with_trait_groups(trait_groups: list[str] | None = None) -> 
         trait_groups=trait_groups,
     )
     return TACConfig(
+        twilio_account_sid="ACtest123",
         conversation_configuration_id="conv_configuration_test123",
         twilio_auth_token="test_token_123",
         api_key="SK123",

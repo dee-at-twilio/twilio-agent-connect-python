@@ -53,7 +53,7 @@ class SMSChannel(MessagingChannel):
         if not tac.config.twilio_phone_number:
             raise ValueError(
                 "twilio_phone_number is required for SMS channel. "
-                "Please set TWILIO_TAC_PHONE_NUMBER environment variable or "
+                "Please set TWILIO_PHONE_NUMBER environment variable or "
                 "provide twilio_phone_number in TACConfig."
             )
 

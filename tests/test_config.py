@@ -16,6 +16,7 @@ class TestTACConfig:
             twilio_auth_token="test_token_123",
             api_key="SK123",
             api_token="test_api_token",
+            twilio_account_sid="ACtest123",
             conversation_configuration_id="conv_configuration_test123",
             twilio_phone_number="+15551234567",
         )
@@ -31,6 +32,7 @@ class TestTACConfig:
             twilio_auth_token="test_token_123",
             api_key="SK123",
             api_token="test_api_token",
+            twilio_account_sid="ACtest123",
             conversation_configuration_id="conv_configuration_test123",
             twilio_phone_number="+15551234567",
             log_level="DEBUG",
@@ -47,6 +49,7 @@ class TestTACConfig:
             twilio_auth_token="test_token_123",
             api_key="SK123",
             api_token="test_api_token",
+            twilio_account_sid="ACtest123",
             conversation_configuration_id="conv_configuration_test123",
             twilio_phone_number="+15551234567",
             twilio_memory_config=memory_config,
@@ -60,6 +63,7 @@ class TestTACConfig:
             twilio_auth_token="test_token_123",
             api_key="SK123",
             api_token="test_api_token",
+            twilio_account_sid="ACtest123",
             conversation_configuration_id="conv_configuration_test123",
             twilio_phone_number="+15551234567",
             twilio_memory_config=TwilioMemoryConfig(trait_groups=["Contact", "Preferences"]),
@@ -81,6 +85,7 @@ class TestTACConfig:
     def test_config_from_dict(self):
         """Test creating config from dictionary."""
         config_data = {
+            "twilio_account_sid": "ACtest123",
             "twilio_auth_token": "test_token_123",
             "api_key": "SK123",
             "api_token": "test_api_token",
@@ -114,10 +119,12 @@ class TestTACConfig:
         assert "conversation_configuration_id" in required_fields
         assert "twilio_phone_number" in required_fields
         assert "twilio_auth_token" in required_fields
+        assert "twilio_account_sid" in required_fields
 
     def test_config_equality(self):
         """Test config equality comparison."""
         base_config = {
+            "twilio_account_sid": "ACtest123",
             "twilio_auth_token": "test_token_123",
             "api_key": "SK123",
             "api_token": "test_api_token",
@@ -143,6 +150,7 @@ class TestTACConfig:
         assert "api_key" in str(error)
         assert "api_token" in str(error)
         assert "twilio_auth_token" in str(error)
+        assert "twilio_account_sid" in str(error)
 
     def test_partial_config_fails(self):
         """Test that partial config raises validation error."""

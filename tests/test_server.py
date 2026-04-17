@@ -10,6 +10,7 @@ from tac.server.config import TACServerConfig
 def get_test_config() -> dict:
     """Get a valid test configuration."""
     return {
+        "twilio_account_sid": "ACtest123",
         "twilio_auth_token": "test_token_123",
         "api_key": "SK123",
         "api_token": "test_api_token",
@@ -51,18 +52,18 @@ class TestTACServerConfig:
         assert config.cintel_webhook_path == "/ci"
 
     def test_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("TWILIO_TAC_VOICE_PUBLIC_DOMAIN", "my.ngrok.io")
-        monkeypatch.setenv("TWILIO_TAC_SERVER_HOST", "127.0.0.1")
-        monkeypatch.setenv("TWILIO_TAC_SERVER_PORT", "3000")
+        monkeypatch.setenv("TWILIO_VOICE_PUBLIC_DOMAIN", "my.ngrok.io")
+        monkeypatch.setenv("TWILIO_SERVER_HOST", "127.0.0.1")
+        monkeypatch.setenv("TWILIO_SERVER_PORT", "3000")
         config = TACServerConfig.from_env()
         assert config.public_domain == "my.ngrok.io"
         assert config.host == "127.0.0.1"
         assert config.port == 3000
 
     def test_from_env_defaults(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.delenv("TWILIO_TAC_VOICE_PUBLIC_DOMAIN", raising=False)
-        monkeypatch.delenv("TWILIO_TAC_SERVER_HOST", raising=False)
-        monkeypatch.delenv("TWILIO_TAC_SERVER_PORT", raising=False)
+        monkeypatch.delenv("TWILIO_VOICE_PUBLIC_DOMAIN", raising=False)
+        monkeypatch.delenv("TWILIO_SERVER_HOST", raising=False)
+        monkeypatch.delenv("TWILIO_SERVER_PORT", raising=False)
         config = TACServerConfig.from_env()
         assert config.public_domain == ""
         assert config.host == "0.0.0.0"

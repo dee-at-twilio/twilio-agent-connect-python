@@ -41,23 +41,26 @@ class ConversationIntelligenceConfig(BaseModel):
         Create ConversationIntelligenceConfig from environment variables.
 
         Loads configuration from the following environment variables:
-        - TWILIO_TAC_CI_CONFIGURATION_ID: CI Configuration ID (required)
-        - TWILIO_TAC_CI_OBSERVATION_OPERATOR_SID: Operator SID for observations (optional)
-        - TWILIO_TAC_CI_SUMMARY_OPERATOR_SID: Operator SID for summaries (optional)
+        - CONVERSATION_INTELLIGENCE_CONFIGURATION_ID: CI Configuration ID (required)
+        - CONVERSATION_INTELLIGENCE_OBSERVATION_OPERATOR_SID: Operator SID for
+          observations (optional)
+        - CONVERSATION_INTELLIGENCE_SUMMARY_OPERATOR_SID: Operator SID for summaries (optional)
 
         Returns:
             ConversationIntelligenceConfig instance if configuration_id is set,
             None otherwise.
         """
-        configuration_id = os.environ.get("TWILIO_TAC_CI_CONFIGURATION_ID")
+        configuration_id = os.environ.get("CONVERSATION_INTELLIGENCE_CONFIGURATION_ID")
 
         if not configuration_id:
             return None
 
         return cls(
             configuration_id=configuration_id,
-            observation_operator_sid=os.environ.get("TWILIO_TAC_CI_OBSERVATION_OPERATOR_SID"),
-            summary_operator_sid=os.environ.get("TWILIO_TAC_CI_SUMMARY_OPERATOR_SID"),
+            observation_operator_sid=os.environ.get(
+                "CONVERSATION_INTELLIGENCE_OBSERVATION_OPERATOR_SID"
+            ),
+            summary_operator_sid=os.environ.get("CONVERSATION_INTELLIGENCE_SUMMARY_OPERATOR_SID"),
         )
 
 
@@ -89,7 +92,7 @@ class TwilioMemoryConfig(BaseModel):
         Create TwilioMemoryConfig from environment variables.
 
         Loads configuration from the following environment variables:
-        - TWILIO_TAC_TRAIT_GROUPS: Comma-separated list of trait groups (optional)
+        - MEMORY_PROFILE_TRAIT_GROUPS: Comma-separated list of trait groups (optional)
 
         Returns:
             TwilioMemoryConfig instance with parsed trait groups from environment,
@@ -105,7 +108,7 @@ class TwilioMemoryConfig(BaseModel):
             >>> # Without trait groups (all traits included)
             >>> config = TwilioMemoryConfig()
         """
-        trait_groups_str = os.environ.get("TWILIO_TAC_TRAIT_GROUPS")
+        trait_groups_str = os.environ.get("MEMORY_PROFILE_TRAIT_GROUPS")
 
         # Parse trait groups from environment variable
         trait_groups = None
@@ -128,6 +131,7 @@ class TACConfig(BaseModel):
         "this only configures trait group filtering.",
     )
 
+    twilio_account_sid: str = Field(description="Twilio Account SID")
     twilio_auth_token: str = Field(description="Twilio Auth Token")
     api_key: str = Field(description="Twilio API Key SID (starts with SK)")
     api_token: str = Field(description="Twilio API Key Secret")
@@ -157,6 +161,7 @@ class TACConfig(BaseModel):
         json_schema_extra={
             "example": {
                 "conversation_configuration_id": "conv_configuration_xxxxxxxxxxxxxxxxxx",
+                "twilio_account_sid": "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
                 "twilio_auth_token": "your_auth_token_here",
                 "api_key": "SKxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
                 "api_token": "your_api_token_here",
@@ -179,23 +184,24 @@ class TACConfig(BaseModel):
         Create TACConfig from environment variables.
 
         Loads configuration from the following environment variables:
-        - TWILIO_TAC_CONVERSATION_CONFIGURATION_ID: Twilio Conversation Configuration ID
-        - TWILIO_TAC_API_KEY: Twilio API Key SID (starts with SK)
-        - TWILIO_TAC_API_TOKEN: Twilio API Key Secret
-        - TWILIO_TAC_PHONE_NUMBER: Twilio Phone Number for Voice and SMS channels
-        - TWILIO_TAC_AUTH_TOKEN: Twilio Auth Token
-        - TWILIO_TAC_KNOWLEDGE_BASE_ID: Knowledge Base ID (optional)
-        - TWILIO_TAC_LOG_LEVEL: Logging level (optional, defaults to INFO)
+        - CONVERSATION_CONFIGURATION_ID: Twilio Conversation Configuration ID
+        - TWILIO_ACCOUNT_SID: Twilio Account SID
+        - TWILIO_AUTH_TOKEN: Twilio Auth Token
+        - TWILIO_API_KEY: Twilio API Key SID (starts with SK)
+        - TWILIO_API_TOKEN: Twilio API Key Secret
+        - TWILIO_PHONE_NUMBER: Twilio Phone Number for Voice and SMS channels
+        - TWILIO_KNOWLEDGE_BASE_ID: Knowledge Base ID (optional)
+        - TWILIO_LOG_LEVEL: Logging level (optional, defaults to INFO)
 
         Memory configuration is automatically loaded via TwilioMemoryConfig.from_env()
         from these environment variables (all optional):
-        - TWILIO_TAC_TRAIT_GROUPS: Comma-separated list of trait groups
+        - MEMORY_PROFILE_TRAIT_GROUPS: Comma-separated list of trait groups
 
         Conversation Intelligence configuration is automatically loaded via
         ConversationIntelligenceConfig.from_env() from these environment variables (all optional):
-        - TWILIO_TAC_CI_CONFIGURATION_ID: CI Configuration ID (TTID format)
-        - TWILIO_TAC_CI_OBSERVATION_OPERATOR_SID: Operator SID for observations
-        - TWILIO_TAC_CI_SUMMARY_OPERATOR_SID: Operator SID for summaries
+        - CONVERSATION_INTELLIGENCE_CONFIGURATION_ID: CI Configuration ID (TTID format)
+        - CONVERSATION_INTELLIGENCE_OBSERVATION_OPERATOR_SID: Operator SID for observations
+        - CONVERSATION_INTELLIGENCE_SUMMARY_OPERATOR_SID: Operator SID for summaries
 
         Returns:
 
@@ -215,13 +221,14 @@ class TACConfig(BaseModel):
         conversation_intelligence_config = ConversationIntelligenceConfig.from_env()
 
         return cls(
-            conversation_configuration_id=os.environ["TWILIO_TAC_CONVERSATION_CONFIGURATION_ID"],
-            twilio_auth_token=os.environ["TWILIO_TAC_AUTH_TOKEN"],
-            api_key=os.environ["TWILIO_TAC_API_KEY"],
-            api_token=os.environ["TWILIO_TAC_API_TOKEN"],
-            twilio_phone_number=os.environ["TWILIO_TAC_PHONE_NUMBER"],
-            knowledge_base_id=os.environ.get("TWILIO_TAC_KNOWLEDGE_BASE_ID"),
-            log_level=os.environ.get("TWILIO_TAC_LOG_LEVEL", "INFO"),
+            conversation_configuration_id=os.environ["CONVERSATION_CONFIGURATION_ID"],
+            twilio_account_sid=os.environ["TWILIO_ACCOUNT_SID"],
+            twilio_auth_token=os.environ["TWILIO_AUTH_TOKEN"],
+            api_key=os.environ["TWILIO_API_KEY"],
+            api_token=os.environ["TWILIO_API_TOKEN"],
+            twilio_phone_number=os.environ["TWILIO_PHONE_NUMBER"],
+            knowledge_base_id=os.environ.get("TWILIO_KNOWLEDGE_BASE_ID"),
+            log_level=os.environ.get("TWILIO_LOG_LEVEL", "INFO"),
             twilio_memory_config=twilio_memory_config,
             conversation_intelligence_config=conversation_intelligence_config,
         )

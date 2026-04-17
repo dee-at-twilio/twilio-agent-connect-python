@@ -42,21 +42,21 @@ class TACServerConfig(BaseModel):
         """Create config from environment variables.
 
         Environment variables:
-            TWILIO_TAC_VOICE_PUBLIC_DOMAIN: Public domain for WebSocket URLs (required for voice)
-            TWILIO_TAC_SERVER_HOST: Host to bind to (default: 0.0.0.0)
-            TWILIO_TAC_SERVER_PORT: Port to bind to (default: 8000)
+            TWILIO_VOICE_PUBLIC_DOMAIN: Public domain for WebSocket URLs (required for voice)
+            TWILIO_SERVER_HOST: Host to bind to (default: 0.0.0.0)
+            TWILIO_SERVER_PORT: Port to bind to (default: 8000)
         """
         kwargs: dict[str, object] = {}
 
-        public_domain = os.environ.get("TWILIO_TAC_VOICE_PUBLIC_DOMAIN")
+        public_domain = os.environ.get("TWILIO_VOICE_PUBLIC_DOMAIN")
         if public_domain:
             kwargs["public_domain"] = public_domain
 
-        host = os.environ.get("TWILIO_TAC_SERVER_HOST")
+        host = os.environ.get("TWILIO_SERVER_HOST")
         if host:
             kwargs["host"] = host
 
-        port = os.environ.get("TWILIO_TAC_SERVER_PORT")
+        port = os.environ.get("TWILIO_SERVER_PORT")
         if port:
             kwargs["port"] = int(port)
 

@@ -37,7 +37,7 @@ voice_channel = VoiceChannel(tac, config=VoiceChannelConfig(auto_retrieve_memory
 sms_channel = SMSChannel(tac, config=SMSChannelConfig(auto_retrieve_memory=True))
 
 # Initialize OpenAI client
-openai_client = AsyncOpenAI(api_key=os.environ.get("TWILIO_TAC_OPENAI_API_KEY"))
+openai_client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 # Store conversation history per conversation
 conversation_history: dict[str, list[ChatCompletionMessageParam]] = {}

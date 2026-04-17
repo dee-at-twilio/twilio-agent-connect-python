@@ -33,7 +33,7 @@ voice_channel = VoiceChannel(tac, config=VoiceChannelConfig(auto_retrieve_memory
 sms_channel = SMSChannel(tac, config=SMSChannelConfig(auto_retrieve_memory=True))
 
 # Initialize your LLM client (OpenAI in this example)
-openai_client = AsyncOpenAI(api_key=os.environ.get("TWILIO_TAC_OPENAI_API_KEY"))
+openai_client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 # Store conversation history per conversation
 # This maintains context across multiple turns in a conversation

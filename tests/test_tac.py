@@ -8,6 +8,7 @@ from tac import TAC, TACConfig
 def get_test_config(with_memory=False):
     """Get a valid test configuration."""
     config = {
+        "twilio_account_sid": "ACtest123",
         "twilio_auth_token": "test_token_123",
         "api_key": "SK123",
         "api_token": "test_api_token",

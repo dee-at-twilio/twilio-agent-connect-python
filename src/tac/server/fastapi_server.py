@@ -118,7 +118,7 @@ class TACFastAPIServer:
             if not config.public_domain:
                 logger.warning(
                     "public_domain is not set — voice URLs will be malformed. "
-                    "Set TWILIO_TAC_VOICE_PUBLIC_DOMAIN environment variable."
+                    "Set TWILIO_VOICE_PUBLIC_DOMAIN environment variable."
                 )
 
             @app.post(config.twiml_path)

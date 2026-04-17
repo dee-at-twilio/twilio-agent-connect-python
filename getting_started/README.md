@@ -92,7 +92,7 @@ ngrok http 8000
 # Copy the ngrok URL (e.g., abc123.ngrok.io)
 ```
 
-Update `TWILIO_TAC_VOICE_PUBLIC_DOMAIN` in your `.env` file with the ngrok URL (without `https://`).
+Update `TWILIO_VOICE_PUBLIC_DOMAIN` in your `.env` file with the ngrok URL (without `https://`).
 
 Restart the server to pick up the new configuration.
 
@@ -101,17 +101,18 @@ Restart the server to pick up the new configuration.
 See `examples/.env.example` for all available configuration options. Key variables:
 
 ### Required
-- `TWILIO_TAC_AUTH_TOKEN`: Twilio auth token
-- `TWILIO_TAC_API_KEY`: Twilio API key SID (starts with SK)
-- `TWILIO_TAC_API_TOKEN`: Twilio API key secret
-- `TWILIO_TAC_PHONE_NUMBER`: Your Twilio phone number
-- `TWILIO_TAC_CONVERSATION_CONFIGURATION_ID`: Conversation Configuration ID
+- `TWILIO_ACCOUNT_SID`: Twilio Account SID
+- `TWILIO_AUTH_TOKEN`: Twilio auth token
+- `TWILIO_API_KEY`: Twilio API key SID (starts with SK)
+- `TWILIO_API_TOKEN`: Twilio API key secret
+- `TWILIO_PHONE_NUMBER`: Your Twilio phone number
+- `CONVERSATION_CONFIGURATION_ID`: Conversation Configuration ID
 
 ### Optional (Voice Channel)
-- `TWILIO_TAC_VOICE_PUBLIC_DOMAIN`: Your ngrok domain (required for voice)
+- `TWILIO_VOICE_PUBLIC_DOMAIN`: Your ngrok domain (required for voice)
 
 ### Optional (OpenAI Example)
-- `TWILIO_TAC_OPENAI_API_KEY`: Your OpenAI API key (only needed to run OpenAI examples)
+- `OPENAI_API_KEY`: Your OpenAI API key (only needed to run OpenAI examples)
 
 ## Next Steps
 

@@ -28,6 +28,7 @@ from tac.models.tac import TACMemoryResponse
 def get_test_config_without_memory():
     """Get test configuration without Twilio Memory."""
     return {
+        "twilio_account_sid": "ACtest123",
         "twilio_auth_token": "test_token_123",
         "api_key": "SK123",
         "api_token": "test_api_token",

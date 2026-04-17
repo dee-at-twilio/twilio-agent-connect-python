@@ -18,6 +18,7 @@ def test_imports():
 def test_basic_tac_functionality():
     """Test basic TAC functionality works."""
     config = {
+        "twilio_account_sid": "ACtest123",
         "twilio_auth_token": "test_token_123",
         "api_key": "SK123",
         "api_token": "test_api_token",

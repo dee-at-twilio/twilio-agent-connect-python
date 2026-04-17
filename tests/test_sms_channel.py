@@ -115,6 +115,7 @@ def create_conversation_updated_webhook(
 def get_test_config(with_memory: bool = True) -> dict[str, Any]:
     """Get a valid test configuration."""
     config: dict[str, Any] = {
+        "twilio_account_sid": "ACtest123",
         "twilio_auth_token": "test_token_123",
         "api_key": "SK123",
         "api_token": "test_api_token",

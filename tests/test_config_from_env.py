@@ -10,7 +10,7 @@ class TestTwilioMemoryConfigFromEnv:
 
     def test_from_env_no_vars_set(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test from_env() returns empty config when no environment variables are set."""
-        monkeypatch.delenv("TWILIO_TAC_TRAIT_GROUPS", raising=False)
+        monkeypatch.delenv("MEMORY_PROFILE_TRAIT_GROUPS", raising=False)
 
         config = TwilioMemoryConfig.from_env()
 
@@ -18,8 +18,8 @@ class TestTwilioMemoryConfigFromEnv:
         assert config.trait_groups is None
 
     def test_from_env_with_trait_groups_env_var(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Test from_env() parses TWILIO_TAC_TRAIT_GROUPS from environment."""
-        monkeypatch.setenv("TWILIO_TAC_TRAIT_GROUPS", "Contact, Preferences, Custom")
+        """Test from_env() parses MEMORY_PROFILE_TRAIT_GROUPS from environment."""
+        monkeypatch.setenv("MEMORY_PROFILE_TRAIT_GROUPS", "Contact, Preferences, Custom")
 
         config = TwilioMemoryConfig.from_env()
 
@@ -27,8 +27,8 @@ class TestTwilioMemoryConfigFromEnv:
         assert config.trait_groups == ["Contact", "Preferences", "Custom"]
 
     def test_from_env_empty_trait_groups(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Test from_env() handles empty TWILIO_TAC_TRAIT_GROUPS environment variable."""
-        monkeypatch.setenv("TWILIO_TAC_TRAIT_GROUPS", "")
+        """Test from_env() handles empty MEMORY_PROFILE_TRAIT_GROUPS environment variable."""
+        monkeypatch.setenv("MEMORY_PROFILE_TRAIT_GROUPS", "")
 
         config = TwilioMemoryConfig.from_env()
 
@@ -41,11 +41,12 @@ class TestTACConfigFromEnv:
 
     def _set_all_env_vars(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Helper to set all TACConfig environment variables."""
-        monkeypatch.setenv("TWILIO_TAC_CONVERSATION_CONFIGURATION_ID", "conv_configuration_123")
-        monkeypatch.setenv("TWILIO_TAC_AUTH_TOKEN", "test_auth_token")
-        monkeypatch.setenv("TWILIO_TAC_API_KEY", "SK123")
-        monkeypatch.setenv("TWILIO_TAC_API_TOKEN", "test_api_token")
-        monkeypatch.setenv("TWILIO_TAC_PHONE_NUMBER", "+1234567890")
+        monkeypatch.setenv("CONVERSATION_CONFIGURATION_ID", "conv_configuration_123")
+        monkeypatch.setenv("TWILIO_ACCOUNT_SID", "AC123")
+        monkeypatch.setenv("TWILIO_AUTH_TOKEN", "test_auth_token")
+        monkeypatch.setenv("TWILIO_API_KEY", "SK123")
+        monkeypatch.setenv("TWILIO_API_TOKEN", "test_api_token")
+        monkeypatch.setenv("TWILIO_PHONE_NUMBER", "+1234567890")
 
     def test_from_env_with_all_required_vars(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test from_env() creates config when all required env vars are set."""
@@ -54,6 +55,7 @@ class TestTACConfigFromEnv:
         config = TACConfig.from_env()
 
         assert config.conversation_configuration_id == "conv_configuration_123"
+        assert config.twilio_account_sid == "AC123"
         assert config.twilio_auth_token == "test_auth_token"
         assert config.api_key == "SK123"
         assert config.api_token == "test_api_token"
@@ -66,7 +68,7 @@ class TestTACConfigFromEnv:
     def test_from_env_with_memory_config(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test from_env() includes memory config when memory env vars are set."""
         self._set_all_env_vars(monkeypatch)
-        monkeypatch.setenv("TWILIO_TAC_TRAIT_GROUPS", "Contact, Preferences")
+        monkeypatch.setenv("MEMORY_PROFILE_TRAIT_GROUPS", "Contact, Preferences")
 
         config = TACConfig.from_env()
 
@@ -74,9 +76,9 @@ class TestTACConfigFromEnv:
         assert config.twilio_memory_config.trait_groups == ["Contact", "Preferences"]
 
     def test_from_env_with_custom_log_level(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Test from_env() respects custom TWILIO_TAC_LOG_LEVEL."""
+        """Test from_env() respects custom TWILIO_LOG_LEVEL."""
         self._set_all_env_vars(monkeypatch)
-        monkeypatch.setenv("TWILIO_TAC_LOG_LEVEL", "DEBUG")
+        monkeypatch.setenv("TWILIO_LOG_LEVEL", "DEBUG")
 
         config = TACConfig.from_env()
 
@@ -86,50 +88,58 @@ class TestTACConfigFromEnv:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Test from_env() raises KeyError when
-        TWILIO_TAC_CONVERSATION_CONFIGURATION_ID is missing."""
+        CONVERSATION_CONFIGURATION_ID is missing."""
         self._set_all_env_vars(monkeypatch)
-        monkeypatch.delenv("TWILIO_TAC_CONVERSATION_CONFIGURATION_ID", raising=False)
+        monkeypatch.delenv("CONVERSATION_CONFIGURATION_ID", raising=False)
 
-        with pytest.raises(KeyError, match="TWILIO_TAC_CONVERSATION_CONFIGURATION_ID"):
+        with pytest.raises(KeyError, match="CONVERSATION_CONFIGURATION_ID"):
+            TACConfig.from_env()
+
+    def test_from_env_missing_twilio_account_sid(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Test from_env() raises KeyError when TWILIO_ACCOUNT_SID is missing."""
+        self._set_all_env_vars(monkeypatch)
+        monkeypatch.delenv("TWILIO_ACCOUNT_SID", raising=False)
+
+        with pytest.raises(KeyError, match="TWILIO_ACCOUNT_SID"):
             TACConfig.from_env()
 
     def test_from_env_missing_twilio_auth_token(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Test from_env() raises KeyError when TWILIO_TAC_AUTH_TOKEN is missing."""
+        """Test from_env() raises KeyError when TWILIO_AUTH_TOKEN is missing."""
         self._set_all_env_vars(monkeypatch)
-        monkeypatch.delenv("TWILIO_TAC_AUTH_TOKEN", raising=False)
+        monkeypatch.delenv("TWILIO_AUTH_TOKEN", raising=False)
 
-        with pytest.raises(KeyError, match="TWILIO_TAC_AUTH_TOKEN"):
+        with pytest.raises(KeyError, match="TWILIO_AUTH_TOKEN"):
             TACConfig.from_env()
 
     def test_from_env_missing_twilio_phone_number(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Test from_env() raises KeyError when TWILIO_TAC_PHONE_NUMBER is missing."""
+        """Test from_env() raises KeyError when TWILIO_PHONE_NUMBER is missing."""
         self._set_all_env_vars(monkeypatch)
-        monkeypatch.delenv("TWILIO_TAC_PHONE_NUMBER", raising=False)
+        monkeypatch.delenv("TWILIO_PHONE_NUMBER", raising=False)
 
-        with pytest.raises(KeyError, match="TWILIO_TAC_PHONE_NUMBER"):
+        with pytest.raises(KeyError, match="TWILIO_PHONE_NUMBER"):
             TACConfig.from_env()
 
     def test_from_env_missing_api_key(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Test from_env() raises KeyError when TWILIO_TAC_API_KEY is missing."""
+        """Test from_env() raises KeyError when TWILIO_API_KEY is missing."""
         self._set_all_env_vars(monkeypatch)
-        monkeypatch.delenv("TWILIO_TAC_API_KEY", raising=False)
+        monkeypatch.delenv("TWILIO_API_KEY", raising=False)
 
-        with pytest.raises(KeyError, match="TWILIO_TAC_API_KEY"):
+        with pytest.raises(KeyError, match="TWILIO_API_KEY"):
             TACConfig.from_env()
 
     def test_from_env_missing_api_token(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Test from_env() raises KeyError when TWILIO_TAC_API_TOKEN is missing."""
+        """Test from_env() raises KeyError when TWILIO_API_TOKEN is missing."""
         self._set_all_env_vars(monkeypatch)
-        monkeypatch.delenv("TWILIO_TAC_API_TOKEN", raising=False)
+        monkeypatch.delenv("TWILIO_API_TOKEN", raising=False)
 
-        with pytest.raises(KeyError, match="TWILIO_TAC_API_TOKEN"):
+        with pytest.raises(KeyError, match="TWILIO_API_TOKEN"):
             TACConfig.from_env()
 
     def test_from_env_missing_multiple_vars(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test from_env() raises KeyError when environment variables are missing."""
-        monkeypatch.delenv("TWILIO_TAC_CONVERSATION_CONFIGURATION_ID", raising=False)
-        monkeypatch.delenv("TWILIO_TAC_AUTH_TOKEN", raising=False)
-        monkeypatch.delenv("TWILIO_TAC_PHONE_NUMBER", raising=False)
+        monkeypatch.delenv("CONVERSATION_CONFIGURATION_ID", raising=False)
+        monkeypatch.delenv("TWILIO_AUTH_TOKEN", raising=False)
+        monkeypatch.delenv("TWILIO_PHONE_NUMBER", raising=False)
 
         with pytest.raises(KeyError):
             TACConfig.from_env()
