@@ -52,6 +52,27 @@ class TestTAC:
         with pytest.raises(ValueError, match="Config must be TACConfig instance or dictionary"):
             TAC("invalid_config")
 
+    def test_region_propagated_to_clients(self):
+        config = TACConfig(**{**get_test_config(), "twilio_region": "au1"})
+        tac = TAC(config)
+        assert (
+            tac.conversation_orchestrator_client.base_url == "https://conversations.au1.twilio.com"
+        )
+        assert tac.conversation_memory_client.base_url == "https://memory.au1.twilio.com"
+
+    def test_region_propagated_to_knowledge_client(self):
+        config = TACConfig(
+            **{**get_test_config(), "twilio_region": "au1", "knowledge_base_id": "know_kb_test"}
+        )
+        tac = TAC(config)
+        assert tac.knowledge_client is not None
+        assert tac.knowledge_client.base_url == "https://knowledge.au1.twilio.com"
+
+    def test_no_region_uses_default_urls(self):
+        tac = TAC(get_test_config())
+        assert tac.conversation_orchestrator_client.base_url == "https://conversations.twilio.com"
+        assert tac.conversation_memory_client.base_url == "https://memory.twilio.com"
+
     @pytest.mark.asyncio
     async def test_callback_return_type_validation_int(self):
         """Test that callback returning int raises TypeError."""

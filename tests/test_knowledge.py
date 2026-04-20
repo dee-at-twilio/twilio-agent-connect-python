@@ -31,6 +31,21 @@ class TestKnowledgeClient:
         assert client.api_key == "test_api_key"
         assert client.api_token == "test_api_token"
 
+    def test_init_with_region(self):
+        client = KnowledgeClient(
+            api_key="test_api_key",
+            api_token="test_api_token",
+            region="au1",
+        )
+        assert client.base_url == "https://knowledge.au1.twilio.com"
+
+    def test_init_without_region(self):
+        client = KnowledgeClient(
+            api_key="test_api_key",
+            api_token="test_api_token",
+        )
+        assert client.base_url == "https://knowledge.twilio.com"
+
     @pytest.mark.asyncio
     async def test_get_knowledge_base_success(self, knowledge_client):
         """Test successful knowledge base retrieval."""

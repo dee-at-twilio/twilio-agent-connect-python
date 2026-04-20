@@ -354,6 +354,23 @@ class TestConversationClient:
         assert client.api_key == "SK123456"
         assert client.api_token == "test_token"
 
+    def test_client_initialization_with_region(self):
+        client = ConversationClient(
+            api_key="SK123456",
+            api_token="test_token",
+            configuration_id="conv_configuration_test123",
+            region="au1",
+        )
+        assert client.base_url == "https://conversations.au1.twilio.com"
+
+    def test_client_initialization_without_region(self):
+        client = ConversationClient(
+            api_key="SK123456",
+            api_token="test_token",
+            configuration_id="conv_configuration_test123",
+        )
+        assert client.base_url == "https://conversations.twilio.com"
+
     @pytest.mark.asyncio
     @patch("httpx.AsyncClient")
     async def test_create_conversation_success(self, mock_async_client_class):

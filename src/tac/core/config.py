@@ -1,8 +1,9 @@
 """Configuration models for the Twilio Agent Connect."""
 
 import os
+import re
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ConversationIntelligenceConfig(BaseModel):
@@ -136,6 +137,29 @@ class TACConfig(BaseModel):
     api_key: str = Field(description="Twilio API Key SID (starts with SK)")
     api_token: str = Field(description="Twilio API Key Secret")
 
+    twilio_region: str | None = Field(
+        default=None,
+        description="Optional Twilio region (e.g., 'au1', 'ie1'). "
+        "When set, API base URLs become https://product.<region>.twilio.com",
+    )
+
+    @field_validator("twilio_region", mode="before")
+    @classmethod
+    def _normalize_and_validate_region(cls, v: object) -> str | None:
+        if v is None:
+            return None
+        if not isinstance(v, str):
+            raise ValueError("twilio_region must be a string or None")
+        v = v.strip()
+        if not v:
+            return None
+        if not re.fullmatch(r"[a-z0-9][a-z0-9-]*[a-z0-9]", v):
+            raise ValueError(
+                f"Invalid Twilio region format: '{v}' (must be a valid DNS label, "
+                "e.g., 'au1', 'ie1')"
+            )
+        return v
+
     twilio_phone_number: str = Field(
         description="Twilio Phone Number for Voice (inbound) and SMS (send/receive).",
     )
@@ -192,6 +216,7 @@ class TACConfig(BaseModel):
         - TWILIO_PHONE_NUMBER: Twilio Phone Number for Voice and SMS channels
         - TWILIO_KNOWLEDGE_BASE_ID: Knowledge Base ID (optional)
         - TWILIO_LOG_LEVEL: Logging level (optional, defaults to INFO)
+        - TWILIO_REGION: Twilio region for data residency (optional, e.g., 'au1', 'ie1')
 
         Memory configuration is automatically loaded via TwilioMemoryConfig.from_env()
         from these environment variables (all optional):
@@ -229,6 +254,7 @@ class TACConfig(BaseModel):
             twilio_phone_number=os.environ["TWILIO_PHONE_NUMBER"],
             knowledge_base_id=os.environ.get("TWILIO_KNOWLEDGE_BASE_ID"),
             log_level=os.environ.get("TWILIO_LOG_LEVEL", "INFO"),
+            twilio_region=os.environ.get("TWILIO_REGION"),
             twilio_memory_config=twilio_memory_config,
             conversation_intelligence_config=conversation_intelligence_config,
         )

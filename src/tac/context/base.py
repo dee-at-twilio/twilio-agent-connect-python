@@ -9,12 +9,11 @@ from tac.core.logging import get_logger
 class BaseAPIClient:
     """Base client for Twilio API interactions with shared HTTP client logic."""
 
-    base_url: str
-
     def __init__(
         self,
         api_key: str,
         api_token: str,
+        region: str | None = None,
     ) -> None:
         """
         Initialize the base API client.
@@ -22,10 +21,18 @@ class BaseAPIClient:
         Args:
             api_key: Twilio API Key SID for authentication
             api_token: Twilio API Key Secret for authentication
+            region: Optional Twilio region (e.g., 'au1', 'ie1')
         """
         self.api_key = api_key
         self.api_token = api_token
+        self.region = region
         self.logger = get_logger(self.__class__.__name__)
+
+    @staticmethod
+    def _build_base_url(product: str, region: str | None) -> str:
+        if region:
+            return f"https://{product}.{region}.twilio.com"
+        return f"https://{product}.twilio.com"
 
     def _get_user_agent(self) -> str:
         """Generate User-Agent header following Twilio SDK conventions."""

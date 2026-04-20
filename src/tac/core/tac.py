@@ -47,6 +47,7 @@ class TAC:
             api_key=self.config.api_key,
             api_token=self.config.api_token,
             configuration_id=self.config.conversation_configuration_id,
+            region=self.config.twilio_region,
         )
 
         try:
@@ -64,6 +65,7 @@ class TAC:
             store_id=configuration.memory_store_id,
             api_key=self.config.api_key,
             api_token=self.config.api_token,
+            region=self.config.twilio_region,
         )
 
         self.knowledge_client: KnowledgeClient | None = None
@@ -71,6 +73,7 @@ class TAC:
             self.knowledge_client = KnowledgeClient(
                 api_key=self.config.api_key,
                 api_token=self.config.api_token,
+                region=self.config.twilio_region,
             )
 
         self.ci_processor: OperatorResultProcessor | None = None

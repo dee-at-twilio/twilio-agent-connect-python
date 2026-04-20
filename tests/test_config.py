@@ -156,3 +156,71 @@ class TestTACConfig:
         """Test that partial config raises validation error."""
         with pytest.raises(ValidationError):
             TACConfig(api_key="SK123")  # Missing other required fields
+
+    def test_config_with_twilio_region(self):
+        config = TACConfig(
+            twilio_account_sid="ACtest123",
+            twilio_auth_token="test_token_123",
+            api_key="SK123",
+            api_token="test_api_token",
+            conversation_configuration_id="conv_configuration_test123",
+            twilio_phone_number="+15551234567",
+            twilio_region="au1",
+        )
+        assert config.twilio_region == "au1"
+
+    def test_config_without_twilio_region(self):
+        config = TACConfig(
+            twilio_account_sid="ACtest123",
+            twilio_auth_token="test_token_123",
+            api_key="SK123",
+            api_token="test_api_token",
+            conversation_configuration_id="conv_configuration_test123",
+            twilio_phone_number="+15551234567",
+        )
+        assert config.twilio_region is None
+
+    def test_config_twilio_region_strips_whitespace(self):
+        config = TACConfig(
+            twilio_account_sid="ACtest123",
+            twilio_auth_token="test_token_123",
+            api_key="SK123",
+            api_token="test_api_token",
+            conversation_configuration_id="conv_configuration_test123",
+            twilio_phone_number="+15551234567",
+            twilio_region="  au1  ",
+        )
+        assert config.twilio_region == "au1"
+
+    def test_config_twilio_region_empty_string_becomes_none(self):
+        config = TACConfig(
+            twilio_account_sid="ACtest123",
+            twilio_auth_token="test_token_123",
+            api_key="SK123",
+            api_token="test_api_token",
+            conversation_configuration_id="conv_configuration_test123",
+            twilio_phone_number="+15551234567",
+            twilio_region="",
+        )
+        assert config.twilio_region is None
+
+    def test_config_twilio_region_rejects_invalid_values(self):
+        invalid_regions = [
+            "has spaces",
+            "has/slash",
+            "has:colon",
+            "UPPERCASE",
+            "-leading-dash",
+            "trailing-dash-",
+        ]
+        for region in invalid_regions:
+            with pytest.raises(ValidationError, match="Invalid Twilio region format"):
+                TACConfig(
+                    twilio_account_sid="ACtest123",
+                    twilio_auth_token="test_token_123",
+                    api_key="SK123",
+                    api_token="test_api_token",
+                    conversation_configuration_id="conv_configuration_test123",
+                    twilio_phone_number="+15551234567",
+                    twilio_region=region,
+                )

@@ -143,3 +143,19 @@ class TestTACConfigFromEnv:
 
         with pytest.raises(KeyError):
             TACConfig.from_env()
+
+    def test_from_env_with_twilio_region(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._set_all_env_vars(monkeypatch)
+        monkeypatch.setenv("TWILIO_REGION", "au1")
+
+        config = TACConfig.from_env()
+
+        assert config.twilio_region == "au1"
+
+    def test_from_env_without_twilio_region(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._set_all_env_vars(monkeypatch)
+        monkeypatch.delenv("TWILIO_REGION", raising=False)
+
+        config = TACConfig.from_env()
+
+        assert config.twilio_region is None

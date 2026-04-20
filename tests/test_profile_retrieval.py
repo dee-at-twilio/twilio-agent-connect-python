@@ -600,3 +600,22 @@ class TestProfileLookup:
             await tac.conversation_memory_client.lookup_profile(
                 id_type="phone", value="+13175556789"
             )
+
+
+class TestMemoryClientRegion:
+    def test_memory_client_with_region(self):
+        client = MemoryClient(
+            store_id="MGtest123",
+            api_key="test_api_key",
+            api_token="test_api_token",
+            region="au1",
+        )
+        assert client.base_url == "https://memory.au1.twilio.com"
+
+    def test_memory_client_without_region(self):
+        client = MemoryClient(
+            store_id="MGtest123",
+            api_key="test_api_key",
+            api_token="test_api_token",
+        )
+        assert client.base_url == "https://memory.twilio.com"
