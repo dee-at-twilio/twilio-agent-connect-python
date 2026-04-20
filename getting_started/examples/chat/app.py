@@ -141,7 +141,7 @@ def create_app() -> Any:
 
         account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
         api_key = os.environ.get("TWILIO_API_KEY")
-        api_secret = os.environ.get("TWILIO_API_TOKEN")
+        api_secret = os.environ.get("TWILIO_API_SECRET")
         service_sid = os.environ.get("TWILIO_CONVERSATIONS_SERVICE_SID")
 
         if not all([account_sid, api_key, api_secret, service_sid]):

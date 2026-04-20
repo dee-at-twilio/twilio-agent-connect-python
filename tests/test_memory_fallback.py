@@ -28,19 +28,19 @@ from tac.models.tac import TACMemoryResponse
 def get_test_config_without_memory():
     """Get test configuration without Twilio Memory."""
     return {
-        "twilio_account_sid": "ACtest123",
-        "twilio_auth_token": "test_token_123",
+        "account_sid": "ACtest123",
+        "auth_token": "test_token_123",
         "api_key": "SK123",
-        "api_token": "test_api_token",
+        "api_secret": "test_api_token",
         "conversation_configuration_id": "conv_configuration_test123",
-        "twilio_phone_number": "+15551234567",
+        "phone_number": "+15551234567",
     }
 
 
 def get_test_config_with_memory():
     """Get test configuration with Twilio Memory."""
     config = get_test_config_without_memory()
-    config["twilio_memory_config"] = TwilioMemoryConfig(trait_groups=["Contact"])
+    config["memory_config"] = TwilioMemoryConfig(trait_groups=["Contact"])
     return config
 
 
@@ -50,7 +50,7 @@ def create_memory_client(tac: TAC) -> MemoryClient:
         base_url=tac.config.memory_base_url,
         store_id="MGtest123",
         api_key=tac.config.api_key,
-        api_token=tac.config.api_token,
+        api_secret=tac.config.api_secret,
     )
 
 
@@ -70,7 +70,7 @@ class TestMemoryFallback:
         tac.conversation_memory_client = MemoryClient(
             store_id="MGtest123",
             api_key=config.api_key,
-            api_token=config.api_token,
+            api_secret=config.api_secret,
         )
 
         tac.conversation_memory_client.retrieve_memory = AsyncMock(

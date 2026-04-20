@@ -124,7 +124,7 @@ class TACConfig(BaseModel):
 
     conversation_configuration_id: str = Field(description="Twilio Conversation Configuration ID")
 
-    twilio_memory_config: TwilioMemoryConfig | None = Field(
+    memory_config: TwilioMemoryConfig | None = Field(
         default=None,
         description="Optional Twilio Memory configuration for controlling which trait groups "
         "to include when fetching profiles. Note: Memory client is always initialized "
@@ -132,24 +132,24 @@ class TACConfig(BaseModel):
         "this only configures trait group filtering.",
     )
 
-    twilio_account_sid: str = Field(description="Twilio Account SID")
-    twilio_auth_token: str = Field(description="Twilio Auth Token")
+    account_sid: str = Field(description="Twilio Account SID")
+    auth_token: str = Field(description="Twilio Auth Token")
     api_key: str = Field(description="Twilio API Key SID (starts with SK)")
-    api_token: str = Field(description="Twilio API Key Secret")
+    api_secret: str = Field(description="Twilio API Key Secret")
 
-    twilio_region: str | None = Field(
+    region: str | None = Field(
         default=None,
         description="Optional Twilio region (e.g., 'au1', 'ie1'). "
         "When set, API base URLs become https://product.<region>.twilio.com",
     )
 
-    @field_validator("twilio_region", mode="before")
+    @field_validator("region", mode="before")
     @classmethod
     def _normalize_and_validate_region(cls, v: object) -> str | None:
         if v is None:
             return None
         if not isinstance(v, str):
-            raise ValueError("twilio_region must be a string or None")
+            raise ValueError("region must be a string or None")
         v = v.strip()
         if not v:
             return None
@@ -160,7 +160,7 @@ class TACConfig(BaseModel):
             )
         return v
 
-    twilio_phone_number: str = Field(
+    phone_number: str = Field(
         description="Twilio Phone Number for Voice (inbound) and SMS (send/receive).",
     )
 
@@ -185,12 +185,12 @@ class TACConfig(BaseModel):
         json_schema_extra={
             "example": {
                 "conversation_configuration_id": "conv_configuration_xxxxxxxxxxxxxxxxxx",
-                "twilio_account_sid": "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-                "twilio_auth_token": "your_auth_token_here",
+                "account_sid": "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+                "auth_token": "your_auth_token_here",
                 "api_key": "SKxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-                "api_token": "your_api_token_here",
-                "twilio_phone_number": "your_phone_number_here",
-                "twilio_memory_config": {
+                "api_secret": "your_api_secret_here",
+                "phone_number": "your_phone_number_here",
+                "memory_config": {
                     "trait_groups": ["Contact", "Preferences"],
                 },
                 "conversation_intelligence_config": {
@@ -208,11 +208,11 @@ class TACConfig(BaseModel):
         Create TACConfig from environment variables.
 
         Loads configuration from the following environment variables:
-        - CONVERSATION_CONFIGURATION_ID: Twilio Conversation Configuration ID
+        - TWILIO_CONVERSATION_CONFIGURATION_ID: Twilio Conversation Configuration ID
         - TWILIO_ACCOUNT_SID: Twilio Account SID
         - TWILIO_AUTH_TOKEN: Twilio Auth Token
         - TWILIO_API_KEY: Twilio API Key SID (starts with SK)
-        - TWILIO_API_TOKEN: Twilio API Key Secret
+        - TWILIO_API_SECRET: Twilio API Key Secret
         - TWILIO_PHONE_NUMBER: Twilio Phone Number for Voice and SMS channels
         - TWILIO_KNOWLEDGE_BASE_ID: Knowledge Base ID (optional)
         - TWILIO_LOG_LEVEL: Logging level (optional, defaults to INFO)
@@ -240,21 +240,21 @@ class TACConfig(BaseModel):
             >>> tac = TAC(config=config)
         """
         # Load optional memory configuration
-        twilio_memory_config = TwilioMemoryConfig.from_env()
+        memory_config = TwilioMemoryConfig.from_env()
 
         # Load optional conversation intelligence configuration
         conversation_intelligence_config = ConversationIntelligenceConfig.from_env()
 
         return cls(
-            conversation_configuration_id=os.environ["CONVERSATION_CONFIGURATION_ID"],
-            twilio_account_sid=os.environ["TWILIO_ACCOUNT_SID"],
-            twilio_auth_token=os.environ["TWILIO_AUTH_TOKEN"],
+            conversation_configuration_id=os.environ["TWILIO_CONVERSATION_CONFIGURATION_ID"],
+            account_sid=os.environ["TWILIO_ACCOUNT_SID"],
+            auth_token=os.environ["TWILIO_AUTH_TOKEN"],
             api_key=os.environ["TWILIO_API_KEY"],
-            api_token=os.environ["TWILIO_API_TOKEN"],
-            twilio_phone_number=os.environ["TWILIO_PHONE_NUMBER"],
+            api_secret=os.environ["TWILIO_API_SECRET"],
+            phone_number=os.environ["TWILIO_PHONE_NUMBER"],
             knowledge_base_id=os.environ.get("TWILIO_KNOWLEDGE_BASE_ID"),
             log_level=os.environ.get("TWILIO_LOG_LEVEL", "INFO"),
-            twilio_region=os.environ.get("TWILIO_REGION"),
-            twilio_memory_config=twilio_memory_config,
+            region=os.environ.get("TWILIO_REGION"),
+            memory_config=memory_config,
             conversation_intelligence_config=conversation_intelligence_config,
         )

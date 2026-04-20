@@ -19,7 +19,7 @@ class MemoryClient(BaseAPIClient):
         self,
         store_id: str,
         api_key: str,
-        api_token: str,
+        api_secret: str,
         region: str | None = None,
     ) -> None:
         """
@@ -28,10 +28,10 @@ class MemoryClient(BaseAPIClient):
         Args:
             store_id: Memory store ID (starts with mem_store_).
             api_key: API Key for Conversation Memory authentication.
-            api_token: API Token for Conversation Memory authentication.
+            api_secret: API Secret for Conversation Memory authentication.
             region: Optional Twilio region (e.g., 'au1', 'ie1')
         """
-        super().__init__(api_key, api_token, region)
+        super().__init__(api_key, api_secret, region)
         self.store_id = store_id
         self.base_url = self._build_base_url("memory", self.region)
 

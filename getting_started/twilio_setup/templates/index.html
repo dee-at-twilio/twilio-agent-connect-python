@@ -1042,9 +1042,9 @@
 TWILIO_ACCOUNT_SID=${credentials.account_sid || 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'}
 TWILIO_AUTH_TOKEN=${credentials.auth_token || 'your_auth_token_here'}
 TWILIO_API_KEY=${credentials.api_key || 'SKxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'}
-TWILIO_API_TOKEN=${credentials.api_secret || 'your_api_token_here'}
+TWILIO_API_SECRET=${credentials.api_secret || 'your_api_secret_here'}
 TWILIO_PHONE_NUMBER=${credentials.twilio_phone || '+1xxxxxxxxxx'}
-CONVERSATION_CONFIGURATION_ID=${conversationConfigurationId || 'conv_configuration_xxxxxxxxxxxxxxxxxxxxxxxxxx'}
+TWILIO_CONVERSATION_CONFIGURATION_ID=${conversationConfigurationId || 'conv_configuration_xxxxxxxxxxxxxxxxxxxxxxxxxx'}
 
 # Optional - Voice Channel (ngrok domain without https://)
 TWILIO_VOICE_PUBLIC_DOMAIN=${credentials.ngrok_domain || 'your-domain.ngrok.app'}

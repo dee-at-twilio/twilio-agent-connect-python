@@ -345,19 +345,19 @@ class TestConversationClient:
         """Test ConversationClient initialization."""
         client = ConversationClient(
             api_key="SK123456",
-            api_token="test_token",
+            api_secret="test_token",
             configuration_id="conv_configuration_test123",
         )
 
         assert client.base_url == "https://conversations.twilio.com"
         assert client.configuration_id == "conv_configuration_test123"
         assert client.api_key == "SK123456"
-        assert client.api_token == "test_token"
+        assert client.api_secret == "test_token"
 
     def test_client_initialization_with_region(self):
         client = ConversationClient(
             api_key="SK123456",
-            api_token="test_token",
+            api_secret="test_token",
             configuration_id="conv_configuration_test123",
             region="au1",
         )
@@ -366,7 +366,7 @@ class TestConversationClient:
     def test_client_initialization_without_region(self):
         client = ConversationClient(
             api_key="SK123456",
-            api_token="test_token",
+            api_secret="test_token",
             configuration_id="conv_configuration_test123",
         )
         assert client.base_url == "https://conversations.twilio.com"
@@ -390,7 +390,7 @@ class TestConversationClient:
 
         client = ConversationClient(
             api_key="SK123456",
-            api_token="test_token",
+            api_secret="test_token",
             configuration_id="conv_configuration_test123",
         )
 
@@ -427,7 +427,7 @@ class TestConversationClient:
 
         client = ConversationClient(
             api_key="SK123456",
-            api_token="test_token",
+            api_secret="test_token",
             configuration_id="conv_configuration_test123",
         )
 
@@ -454,7 +454,7 @@ class TestConversationClient:
 
         client = ConversationClient(
             api_key="SK123456",
-            api_token="test_token",
+            api_secret="test_token",
             configuration_id="conv_configuration_test123",
         )
 
@@ -485,7 +485,7 @@ class TestConversationClient:
 
         client = ConversationClient(
             api_key="SK123456",
-            api_token="test_token",
+            api_secret="test_token",
             configuration_id="conv_configuration_test123",
         )
 
@@ -530,7 +530,7 @@ class TestConversationClient:
 
         client = ConversationClient(
             api_key="SK123456",
-            api_token="test_token",
+            api_secret="test_token",
             configuration_id="conv_configuration_test123",
         )
 
@@ -555,7 +555,7 @@ class TestConversationClient:
 
         client = ConversationClient(
             api_key="SK123456",
-            api_token="test_token",
+            api_secret="test_token",
             configuration_id="conv_configuration_test123",
         )
 
@@ -585,7 +585,7 @@ class TestConversationClient:
 
         client = ConversationClient(
             api_key="SK123456",
-            api_token="test_token",
+            api_secret="test_token",
             configuration_id="conv_configuration_test123",
         )
 
@@ -622,7 +622,7 @@ class TestConversationClient:
 
         client = ConversationClient(
             api_key="SK123456",
-            api_token="test_token",
+            api_secret="test_token",
             configuration_id="conv_configuration_test123",
         )
 
@@ -643,14 +643,14 @@ class TestConversationClient:
         # Credentials are stored as instance variables and passed to httpx.AsyncClient
         client = ConversationClient(
             api_key="SK123456",
-            api_token="test_token",
+            api_secret="test_token",
             configuration_id="conv_configuration_test123",
         )
 
         # Verify credentials are stored
         assert client.api_key == "SK123456"
-        assert client.api_token == "test_token"
-        # Note: These credentials are passed to httpx.AsyncClient as auth=(api_key, api_token)
+        assert client.api_secret == "test_token"
+        # Note: These credentials are passed to httpx.AsyncClient as auth=(api_key, api_secret)
 
     @pytest.mark.asyncio
     @patch("httpx.AsyncClient")
@@ -669,7 +669,7 @@ class TestConversationClient:
 
         client = ConversationClient(
             api_key="SK123456",
-            api_token="test_token",
+            api_secret="test_token",
             configuration_id="conv_configuration_test999",
         )
 
@@ -732,7 +732,7 @@ class TestConversationClient:
 
         client = ConversationClient(
             api_key="SK123456",
-            api_token="test_token",
+            api_secret="test_token",
             configuration_id="conv_configuration_test123",
         )
 
@@ -777,7 +777,7 @@ class TestConversationClient:
 
         client = ConversationClient(
             api_key="SK123456",
-            api_token="test_token",
+            api_secret="test_token",
             configuration_id="conv_configuration_test123",
         )
 
@@ -861,7 +861,7 @@ class TestConversationClient:
 
         client = ConversationClient(
             api_key="SK123456",
-            api_token="test_token",
+            api_secret="test_token",
             configuration_id="conv_configuration_test123",
         )
 
@@ -900,7 +900,7 @@ class TestConversationClient:
 
         client = ConversationClient(
             api_key="SK123456",
-            api_token="test_token",
+            api_secret="test_token",
             configuration_id="conv_configuration_test123",
         )
 
@@ -934,7 +934,7 @@ class TestConversationClient:
 
         client = ConversationClient(
             api_key="SK123456",
-            api_token="test_token",
+            api_secret="test_token",
             configuration_id="conv_configuration_test123",
         )
 
@@ -960,7 +960,7 @@ class TestConversationClient:
 
         client = ConversationClient(
             api_key="SK123456",
-            api_token="test_token",
+            api_secret="test_token",
             configuration_id="conv_configuration_test123",
         )
 
@@ -1012,7 +1012,7 @@ class TestConversationClient:
 
         client = ConversationClient(
             api_key="SK123456",
-            api_token="test_token",
+            api_secret="test_token",
             configuration_id="conv_configuration_test123",
         )
 
@@ -1053,7 +1053,7 @@ class TestConversationClient:
 
         client = ConversationClient(
             api_key="SK123456",
-            api_token="test_token",
+            api_secret="test_token",
             configuration_id="conv_configuration_test123",
         )
 
@@ -1089,7 +1089,7 @@ class TestConversationClient:
 
         client = ConversationClient(
             api_key="SK123456",
-            api_token="test_token",
+            api_secret="test_token",
             configuration_id="conv_configuration_test123",
         )
 
@@ -1119,7 +1119,7 @@ class TestConversationClient:
 
         client = ConversationClient(
             api_key="SK123456",
-            api_token="test_token",
+            api_secret="test_token",
             configuration_id="conv_configuration_test123",
         )
 
@@ -1137,7 +1137,7 @@ class TestConversationClient:
 
         client = ConversationClient(
             api_key="SK123456",
-            api_token="test_token",
+            api_secret="test_token",
             configuration_id="conv_configuration_test123",
         )
 

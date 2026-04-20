@@ -14,7 +14,7 @@ def knowledge_client():
     """Create a KnowledgeClient instance for testing."""
     return KnowledgeClient(
         api_key="test_api_key",
-        api_token="test_api_token",
+        api_secret="test_api_token",
     )
 
 
@@ -25,16 +25,16 @@ class TestKnowledgeClient:
         """Test KnowledgeClient initialization."""
         client = KnowledgeClient(
             api_key="test_api_key",
-            api_token="test_api_token",
+            api_secret="test_api_token",
         )
         assert client.base_url == "https://knowledge.twilio.com"
         assert client.api_key == "test_api_key"
-        assert client.api_token == "test_api_token"
+        assert client.api_secret == "test_api_token"
 
     def test_init_with_region(self):
         client = KnowledgeClient(
             api_key="test_api_key",
-            api_token="test_api_token",
+            api_secret="test_api_token",
             region="au1",
         )
         assert client.base_url == "https://knowledge.au1.twilio.com"
@@ -42,7 +42,7 @@ class TestKnowledgeClient:
     def test_init_without_region(self):
         client = KnowledgeClient(
             api_key="test_api_key",
-            api_token="test_api_token",
+            api_secret="test_api_token",
         )
         assert client.base_url == "https://knowledge.twilio.com"
 

@@ -27,7 +27,7 @@ class ConversationClient(BaseAPIClient):
     def __init__(
         self,
         api_key: str,
-        api_token: str,
+        api_secret: str,
         configuration_id: str,
         region: str | None = None,
     ) -> None:
@@ -36,11 +36,11 @@ class ConversationClient(BaseAPIClient):
 
         Args:
             api_key: Twilio API Key SID for authentication
-            api_token: Twilio API Key Secret for authentication
+            api_secret: Twilio API Key Secret for authentication
             configuration_id: Conversation Configuration ID for API requests
             region: Optional Twilio region (e.g., 'au1', 'ie1')
         """
-        super().__init__(api_key, api_token, region)
+        super().__init__(api_key, api_secret, region)
         self.configuration_id = configuration_id
         self.base_url = self._build_base_url("conversations", self.region)
 

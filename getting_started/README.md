@@ -104,9 +104,9 @@ See `examples/.env.example` for all available configuration options. Key variabl
 - `TWILIO_ACCOUNT_SID`: Twilio Account SID
 - `TWILIO_AUTH_TOKEN`: Twilio auth token
 - `TWILIO_API_KEY`: Twilio API key SID (starts with SK)
-- `TWILIO_API_TOKEN`: Twilio API key secret
+- `TWILIO_API_SECRET`: Twilio API key secret
 - `TWILIO_PHONE_NUMBER`: Your Twilio phone number
-- `CONVERSATION_CONFIGURATION_ID`: Conversation Configuration ID
+- `TWILIO_CONVERSATION_CONFIGURATION_ID`: Conversation Configuration ID
 
 ### Optional (Voice Channel)
 - `TWILIO_VOICE_PUBLIC_DOMAIN`: Your ngrok domain (required for voice)

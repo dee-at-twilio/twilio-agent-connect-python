@@ -12,7 +12,7 @@ class KnowledgeClient(BaseAPIClient):
     def __init__(
         self,
         api_key: str,
-        api_token: str,
+        api_secret: str,
         region: str | None = None,
     ) -> None:
         """
@@ -20,10 +20,10 @@ class KnowledgeClient(BaseAPIClient):
 
         Args:
             api_key: API Key for Knowledge Base authentication.
-            api_token: API Token for Knowledge Base authentication.
+            api_secret: API Secret for Knowledge Base authentication.
             region: Optional Twilio region (e.g., 'au1', 'ie1')
         """
-        super().__init__(api_key, api_token, region)
+        super().__init__(api_key, api_secret, region)
         self.base_url = self._build_base_url("knowledge", self.region)
 
     async def get_knowledge_base(self, knowledge_base_id: str) -> KnowledgeBase:

@@ -8,15 +8,15 @@ from tac import TAC, TACConfig
 def get_test_config(with_memory=False):
     """Get a valid test configuration."""
     config = {
-        "twilio_account_sid": "ACtest123",
-        "twilio_auth_token": "test_token_123",
+        "account_sid": "ACtest123",
+        "auth_token": "test_token_123",
         "api_key": "SK123",
-        "api_token": "test_api_token",
+        "api_secret": "test_api_token",
         "conversation_configuration_id": "conv_configuration_test123",
-        "twilio_phone_number": "+15551234567",
+        "phone_number": "+15551234567",
     }
     if with_memory:
-        config["twilio_memory_config"] = {
+        config["memory_config"] = {
             "memory_store_id": "MGtest123",
         }
     return config
@@ -31,7 +31,7 @@ class TestTAC:
         tac = TAC(config_dict)
 
         assert isinstance(tac.config, TACConfig)
-        assert tac.config.twilio_auth_token == "test_token_123"
+        assert tac.config.auth_token == "test_token_123"
 
     def test_init_with_config_object(self):
         """Test TAC initialization with TACConfig object."""
@@ -39,7 +39,7 @@ class TestTAC:
         tac = TAC(config)
 
         assert isinstance(tac.config, TACConfig)
-        assert tac.config.twilio_auth_token == "test_token_123"
+        assert tac.config.auth_token == "test_token_123"
 
     def test_init_with_empty_config_dict_fails(self):
         """Test TAC initialization with empty configuration dictionary fails."""
@@ -53,7 +53,7 @@ class TestTAC:
             TAC("invalid_config")
 
     def test_region_propagated_to_clients(self):
-        config = TACConfig(**{**get_test_config(), "twilio_region": "au1"})
+        config = TACConfig(**{**get_test_config(), "region": "au1"})
         tac = TAC(config)
         assert (
             tac.conversation_orchestrator_client.base_url == "https://conversations.au1.twilio.com"
@@ -62,7 +62,7 @@ class TestTAC:
 
     def test_region_propagated_to_knowledge_client(self):
         config = TACConfig(
-            **{**get_test_config(), "twilio_region": "au1", "knowledge_base_id": "know_kb_test"}
+            **{**get_test_config(), "region": "au1", "knowledge_base_id": "know_kb_test"}
         )
         tac = TAC(config)
         assert tac.knowledge_client is not None

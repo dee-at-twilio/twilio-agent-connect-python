@@ -12,7 +12,7 @@ class BaseAPIClient:
     def __init__(
         self,
         api_key: str,
-        api_token: str,
+        api_secret: str,
         region: str | None = None,
     ) -> None:
         """
@@ -20,11 +20,11 @@ class BaseAPIClient:
 
         Args:
             api_key: Twilio API Key SID for authentication
-            api_token: Twilio API Key Secret for authentication
+            api_secret: Twilio API Key Secret for authentication
             region: Optional Twilio region (e.g., 'au1', 'ie1')
         """
         self.api_key = api_key
-        self.api_token = api_token
+        self.api_secret = api_secret
         self.region = region
         self.logger = get_logger(self.__class__.__name__)
 
@@ -47,7 +47,7 @@ class BaseAPIClient:
     def _get_client(self) -> httpx.AsyncClient:
         """Create a new httpx.AsyncClient for each request to avoid event loop issues."""
         return httpx.AsyncClient(
-            auth=(self.api_key, self.api_token),
+            auth=(self.api_key, self.api_secret),
             headers={"User-Agent": self._get_user_agent()},
             timeout=30.0,
         )
@@ -55,7 +55,7 @@ class BaseAPIClient:
     def _get_sync_client(self) -> httpx.Client:
         """Create a new synchronous httpx.Client."""
         return httpx.Client(
-            auth=(self.api_key, self.api_token),
+            auth=(self.api_key, self.api_secret),
             headers={"User-Agent": self._get_user_agent()},
             timeout=30.0,
         )

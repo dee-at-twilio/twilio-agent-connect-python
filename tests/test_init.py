@@ -18,14 +18,14 @@ def test_imports():
 def test_basic_tac_functionality():
     """Test basic TAC functionality works."""
     config = {
-        "twilio_account_sid": "ACtest123",
-        "twilio_auth_token": "test_token_123",
+        "account_sid": "ACtest123",
+        "auth_token": "test_token_123",
         "api_key": "SK123",
-        "api_token": "test_api_token",
+        "api_secret": "test_api_token",
         "conversation_configuration_id": "conv_configuration_test123",
-        "twilio_phone_number": "+15551234567",
+        "phone_number": "+15551234567",
     }
     tac = TAC(config)
-    assert tac.config.twilio_auth_token == "test_token_123"
+    assert tac.config.auth_token == "test_token_123"
     assert tac.config.api_key == "SK123"
-    assert tac.config.api_token == "test_api_token"
+    assert tac.config.api_secret == "test_api_token"

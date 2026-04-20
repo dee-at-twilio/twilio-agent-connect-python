@@ -13,12 +13,12 @@ def get_test_config() -> TACConfig:
     """Get test configuration."""
     return TACConfig(
         environment="prod",
-        twilio_account_sid="ACtest123",
+        account_sid="ACtest123",
         conversation_configuration_id="conv_configuration_test123",
-        twilio_auth_token="test_token_123",
+        auth_token="test_token_123",
         api_key="SK123",
-        api_token="test_api_token",
-        twilio_phone_number="+15551234567",
+        api_secret="test_api_token",
+        phone_number="+15551234567",
     )
 
 

@@ -50,11 +50,11 @@ class SMSChannel(MessagingChannel):
             auto_retrieve_memory=config.auto_retrieve_memory,
         )
 
-        if not tac.config.twilio_phone_number:
+        if not tac.config.phone_number:
             raise ValueError(
-                "twilio_phone_number is required for SMS channel. "
+                "phone_number is required for SMS channel. "
                 "Please set TWILIO_PHONE_NUMBER environment variable or "
-                "provide twilio_phone_number in TACConfig."
+                "provide phone_number in TACConfig."
             )
 
     def get_channel_name(self) -> str:
@@ -64,7 +64,7 @@ class SMSChannel(MessagingChannel):
         return "SMS"
 
     def is_own_message(self, author_address: str) -> bool:
-        return author_address == self.tac.config.twilio_phone_number
+        return author_address == self.tac.config.phone_number
 
     async def send_response(
         self,
@@ -103,10 +103,7 @@ class SMSChannel(MessagingChannel):
         for participant in participants:
             if not agent_participant and participant.type in ("AI_AGENT", "HUMAN_AGENT", "AGENT"):
                 for address in participant.addresses:
-                    if (
-                        address.channel == "SMS"
-                        and address.address == self.tac.config.twilio_phone_number
-                    ):
+                    if address.channel == "SMS" and address.address == self.tac.config.phone_number:
                         agent_participant = participant
                         break
             elif not customer_participant and participant.type == "CUSTOMER":
@@ -120,7 +117,7 @@ class SMSChannel(MessagingChannel):
             self.logger.error(
                 "Agent participant not found",
                 conversation_id=conversation_id,
-                phone_number=self.tac.config.twilio_phone_number,
+                phone_number=self.tac.config.phone_number,
             )
             return
 
@@ -134,7 +131,7 @@ class SMSChannel(MessagingChannel):
         try:
             send_request = SendCommunicationRequest(
                 author=SendCommunicationParticipantAddress(
-                    address=self.tac.config.twilio_phone_number,
+                    address=self.tac.config.phone_number,
                     channel="SMS",
                     participant_id=agent_participant.id,
                 ),

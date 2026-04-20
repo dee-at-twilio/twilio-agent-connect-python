@@ -45,9 +45,9 @@ class TAC:
 
         self.conversation_orchestrator_client = ConversationClient(
             api_key=self.config.api_key,
-            api_token=self.config.api_token,
+            api_secret=self.config.api_secret,
             configuration_id=self.config.conversation_configuration_id,
-            region=self.config.twilio_region,
+            region=self.config.region,
         )
 
         try:
@@ -64,16 +64,16 @@ class TAC:
         self.conversation_memory_client = MemoryClient(
             store_id=configuration.memory_store_id,
             api_key=self.config.api_key,
-            api_token=self.config.api_token,
-            region=self.config.twilio_region,
+            api_secret=self.config.api_secret,
+            region=self.config.region,
         )
 
         self.knowledge_client: KnowledgeClient | None = None
         if self.config.knowledge_base_id:
             self.knowledge_client = KnowledgeClient(
                 api_key=self.config.api_key,
-                api_token=self.config.api_token,
-                region=self.config.twilio_region,
+                api_secret=self.config.api_secret,
+                region=self.config.region,
             )
 
         self.ci_processor: OperatorResultProcessor | None = None
@@ -151,8 +151,8 @@ class TAC:
             if conversation_context.profile_id and not conversation_context.profile:
                 try:
                     trait_groups = (
-                        self.config.twilio_memory_config.trait_groups
-                        if self.config.twilio_memory_config
+                        self.config.memory_config.trait_groups
+                        if self.config.memory_config
                         else None
                     )
 
@@ -202,8 +202,7 @@ class TAC:
         if not self.ci_processor:
             raise ValueError(
                 "Conversation Intelligence processor is not initialized. "
-                "Ensure both twilio_memory_config and conversation_intelligence_config "
-                "are provided when creating TACConfig."
+                "Ensure conversation_intelligence_config is provided when creating TACConfig."
             )
 
         return await self.ci_processor.process_event(payload)

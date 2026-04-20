@@ -18,7 +18,7 @@ class TestUserAgent:
         """Test that BaseAPIClient generates correct User-Agent format."""
         client = ConversationClient(
             api_key="test_key",
-            api_token="test_token",
+            api_secret="test_token",
             configuration_id="test_config",
         )
 
@@ -42,7 +42,7 @@ class TestUserAgent:
         """Test that User-Agent follows Twilio SDK pattern."""
         client = ConversationClient(
             api_key="test_key",
-            api_token="test_token",
+            api_secret="test_token",
             configuration_id="test_config",
         )
 
@@ -60,7 +60,7 @@ class TestUserAgent:
         """Test that ConversationClient includes User-Agent in requests."""
         client = ConversationClient(
             api_key="test_key",
-            api_token="test_token",
+            api_secret="test_token",
             configuration_id="test_configuration",
         )
 
@@ -75,7 +75,7 @@ class TestUserAgent:
         client = MemoryClient(
             store_id="test_store",
             api_key="test_key",
-            api_token="test_token",
+            api_secret="test_token",
         )
 
         async with client._get_client() as http_client:
@@ -88,7 +88,7 @@ class TestUserAgent:
         """Test that KnowledgeClient includes User-Agent in requests."""
         client = KnowledgeClient(
             api_key="test_key",
-            api_token="test_token",
+            api_secret="test_token",
         )
 
         async with client._get_client() as http_client:
@@ -100,7 +100,7 @@ class TestUserAgent:
         """Test that synchronous client includes User-Agent in requests."""
         client = ConversationClient(
             api_key="test_key",
-            api_token="test_token",
+            api_secret="test_token",
             configuration_id="test_config",
         )
 
