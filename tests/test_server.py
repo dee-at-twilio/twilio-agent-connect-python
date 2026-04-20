@@ -203,7 +203,7 @@ class TestTACFastAPIServer:
             config=TACServerConfig(public_domain="test.ngrok.io"),
             messaging_channels=[sms, chat],
         )
-        app = server._create_app()
+        app = server.app
 
         with (
             patch.object(sms, "process_webhook", new_callable=AsyncMock) as mock_sms,
@@ -239,7 +239,7 @@ class TestTACFastAPIServer:
             config=TACServerConfig(public_domain="test.ngrok.io"),
             voice_channel=vc,
         )
-        app = server._create_app()
+        app = server.app
 
         # Check that voice routes are registered
         route_paths = [r.path for r in app.routes if hasattr(r, "path")]
@@ -260,7 +260,7 @@ class TestTACFastAPIServer:
             config=TACServerConfig(public_domain="test.ngrok.io"),
             messaging_channels=[sms],
         )
-        app = server._create_app()
+        app = server.app
 
         route_paths = [r.path for r in app.routes if hasattr(r, "path")]
         assert "/webhook" in route_paths
@@ -278,7 +278,7 @@ class TestTACFastAPIServer:
                 public_domain="test.ngrok.io", cintel_webhook_path="/ci-webhook"
             ),
         )
-        app = server._create_app()
+        app = server.app
 
         route_paths = [r.path for r in app.routes if hasattr(r, "path")]
         assert "/ci-webhook" in route_paths
@@ -301,10 +301,159 @@ class TestTACFastAPIServer:
             voice_channel=VoiceChannel(tac),
             messaging_channels=[SMSChannel(tac)],
         )
-        app = server._create_app()
+        app = server.app
 
         route_paths = [r.path for r in app.routes if hasattr(r, "path")]
         assert "/messaging" in route_paths
         assert "/voice/twiml" in route_paths
         assert "/voice/ws" in route_paths
         assert "/voice/callback" in route_paths
+
+    def test_custom_app_is_used(self) -> None:
+        """User-supplied FastAPI instance is used directly and metadata preserved."""
+        from fastapi import FastAPI
+
+        from tac.server import TACFastAPIServer
+
+        tac = TAC(get_test_config())
+        custom_app = FastAPI(title="My Custom Service", version="9.9.9")
+        server = TACFastAPIServer(
+            tac=tac,
+            config=TACServerConfig(public_domain="test.ngrok.io"),
+            app=custom_app,
+        )
+        assert server.app is custom_app
+        assert server.app.title == "My Custom Service"
+        assert server.app.version == "9.9.9"
+
+    def test_custom_app_has_tac_routes(self) -> None:
+        """TAC routes are registered onto a user-supplied app."""
+        from fastapi import FastAPI
+
+        from tac.channels import SMSChannel
+        from tac.server import TACFastAPIServer
+
+        tac = TAC(get_test_config())
+        custom_app = FastAPI()
+        server = TACFastAPIServer(
+            tac=tac,
+            config=TACServerConfig(public_domain="test.ngrok.io"),
+            messaging_channels=[SMSChannel(tac)],
+            app=custom_app,
+        )
+        route_paths = [r.path for r in server.app.routes if hasattr(r, "path")]
+        assert "/webhook" in route_paths
+
+    def test_default_app_created(self) -> None:
+        """Default FastAPI app is created with TAC Server title when no app is passed."""
+        from fastapi import FastAPI
+
+        from tac.server import TACFastAPIServer
+
+        tac = TAC(get_test_config())
+        server = TACFastAPIServer(
+            tac=tac,
+            config=TACServerConfig(public_domain="test.ngrok.io"),
+        )
+        assert isinstance(server.app, FastAPI)
+        assert server.app.title == "TAC Server"
+
+    @pytest.mark.asyncio
+    async def test_can_add_custom_route_post_construction(self) -> None:
+        """Users can add routes to server.app after construction."""
+        from httpx import ASGITransport, AsyncClient
+
+        from tac.server import TACFastAPIServer
+
+        tac = TAC(get_test_config())
+        server = TACFastAPIServer(
+            tac=tac,
+            config=TACServerConfig(public_domain="test.ngrok.io"),
+        )
+
+        @server.app.get("/health")
+        async def health() -> dict:
+            return {"status": "ok"}
+
+        transport = ASGITransport(app=server.app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.get("/health")
+        assert resp.status_code == 200
+        assert resp.json() == {"status": "ok"}
+
+    @pytest.mark.asyncio
+    async def test_can_add_middleware_post_construction(self) -> None:
+        """Users can add middleware to server.app after construction."""
+        from httpx import ASGITransport, AsyncClient
+        from starlette.middleware.base import BaseHTTPMiddleware
+
+        from tac.server import TACFastAPIServer
+
+        tac = TAC(get_test_config())
+        server = TACFastAPIServer(
+            tac=tac,
+            config=TACServerConfig(public_domain="test.ngrok.io"),
+        )
+
+        class HeaderMiddleware(BaseHTTPMiddleware):
+            async def dispatch(self, request, call_next):  # type: ignore[no-untyped-def]
+                resp = await call_next(request)
+                resp.headers["X-Test"] = "yes"
+                return resp
+
+        server.app.add_middleware(HeaderMiddleware)
+
+        @server.app.get("/ping")
+        async def ping() -> dict:
+            return {"ok": True}
+
+        transport = ASGITransport(app=server.app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.get("/ping")
+        assert resp.headers.get("X-Test") == "yes"
+
+    @pytest.mark.asyncio
+    async def test_can_add_exception_handler(self) -> None:
+        """Users can register exception handlers on server.app."""
+        from fastapi import Request
+        from fastapi.responses import JSONResponse
+        from httpx import ASGITransport, AsyncClient
+
+        from tac.server import TACFastAPIServer
+
+        tac = TAC(get_test_config())
+        server = TACFastAPIServer(
+            tac=tac,
+            config=TACServerConfig(public_domain="test.ngrok.io"),
+        )
+
+        class MyError(Exception):
+            pass
+
+        @server.app.exception_handler(MyError)
+        async def handler(request: Request, exc: MyError) -> JSONResponse:
+            return JSONResponse({"handled": True}, status_code=418)
+
+        @server.app.get("/boom")
+        async def boom() -> None:
+            raise MyError()
+
+        transport = ASGITransport(app=server.app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.get("/boom")
+        assert resp.status_code == 418
+        assert resp.json() == {"handled": True}
+
+    def test_routes_registered_exactly_once(self) -> None:
+        """Routes are not double-registered after refactor to eager registration."""
+        from tac.channels import SMSChannel
+        from tac.server import TACFastAPIServer
+
+        tac = TAC(get_test_config())
+        server = TACFastAPIServer(
+            tac=tac,
+            config=TACServerConfig(public_domain="test.ngrok.io"),
+            messaging_channels=[SMSChannel(tac)],
+        )
+        route_paths = [r.path for r in server.app.routes if hasattr(r, "path")]
+        assert route_paths.count("/webhook") == 1

@@ -67,9 +67,31 @@ class FastAPIWebSocketAdapter:
 class TACFastAPIServer:
     """Batteries-included FastAPI server for TAC channels.
 
-    Creates a FastAPI app with routes for voice, messaging, and CI webhooks,
-    then starts uvicorn. This replaces VoiceChannel.start() and provides
-    a single entry point for multi-channel servers.
+    Creates (or adopts) a FastAPI app and registers routes for voice, messaging,
+    and CI webhooks, then starts uvicorn when start() is called.
+
+    Customization:
+        - Pass your own FastAPI instance via ``app=...`` to control
+          construction-time settings (title, version, lifespan, docs_url, ...).
+          TAC routes are registered onto it immediately in ``__init__``.
+        - Or mutate ``server.app`` after construction: add middleware,
+          exception handlers, routers, or custom routes — before calling
+          ``start()``.
+
+    Example:
+        from fastapi import FastAPI
+        from fastapi.middleware.cors import CORSMiddleware
+
+        app = FastAPI(title="My Service", version="1.2.0")
+        app.add_middleware(CORSMiddleware, allow_origins=["*"])
+
+        server = TACFastAPIServer(tac=tac, voice_channel=vc, app=app)
+
+        @server.app.get("/health")
+        async def health() -> dict:
+            return {"status": "ok"}
+
+        server.start()
     """
 
     def __init__(
@@ -78,15 +100,17 @@ class TACFastAPIServer:
         voice_channel: VoiceChannel | None = None,
         messaging_channels: list[MessagingChannel] | None = None,
         config: TACServerConfig | None = None,
+        app: FastAPI | None = None,
     ) -> None:
         self.tac = tac
         self.config = config or TACServerConfig.from_env()
         self.voice_channel = voice_channel
         self.messaging_channels: list[MessagingChannel] = messaging_channels or []
+        self.app: FastAPI = app if app is not None else FastAPI(title="TAC Server")
+        self._register_routes(self.app)
 
-    def _create_app(self) -> FastAPI:
-        """Create and configure the FastAPI application with routes."""
-        app = FastAPI(title="TAC Server")
+    def _register_routes(self, app: FastAPI) -> None:
+        """Register TAC routes (messaging, voice, CI) onto the given FastAPI app."""
         config = self.config
 
         if self.messaging_channels:
@@ -178,14 +202,11 @@ class TACFastAPIServer:
                 result = await tac.process_cintel_event(payload)
                 return JSONResponse(content=result.model_dump())
 
-        return app
-
     def start(self) -> None:
-        """Create the FastAPI app and start uvicorn."""
-        app = self._create_app()
+        """Start uvicorn serving ``self.app``."""
         logger.info(f"Starting TAC FastAPI Server on {self.config.host}:{self.config.port}")
         uvicorn.run(
-            app,
+            self.app,
             host=self.config.host,
             port=self.config.port,
             log_level="info",

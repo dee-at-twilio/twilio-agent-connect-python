@@ -135,6 +135,30 @@ TACFastAPIServer(tac=tac, voice_channel=voice_channel, messaging_channels=[sms_c
 
 For configuration details and environment variables, see the [getting started guide](getting_started/README.md).
 
+### Customizing the Server
+
+`TACFastAPIServer` exposes its underlying FastAPI app as `server.app` so you can add middleware, exception handlers, or extra routes (e.g. a health check for your load balancer):
+
+```python
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+# Optional: pass your own FastAPI instance to customize title, lifespan, etc.
+app = FastAPI(title="My TAC App", version="1.0.0")
+app.add_middleware(CORSMiddleware, allow_origins=["*"])
+
+server = TACFastAPIServer(
+    tac=tac, voice_channel=voice_channel, messaging_channels=[sms_channel], app=app
+)
+
+# Add routes alongside TAC's voice/messaging/CI webhooks
+@server.app.get("/health")
+async def health() -> dict[str, str]:
+    return {"status": "ok"}
+
+server.start()
+```
+
 ## How It Works
 
 TAC simplifies building AI agents by handling the integration between Twilio's communication channels and your LLM:
