@@ -50,6 +50,7 @@ class BaseAPIClient:
             auth=(self.api_key, self.api_secret),
             headers={"User-Agent": self._get_user_agent()},
             timeout=30.0,
+            follow_redirects=True,
         )
 
     def _get_sync_client(self) -> httpx.Client:
@@ -58,4 +59,5 @@ class BaseAPIClient:
             auth=(self.api_key, self.api_secret),
             headers={"User-Agent": self._get_user_agent()},
             timeout=30.0,
+            follow_redirects=True,
         )
