@@ -113,12 +113,17 @@ class ConversationConfiguration(BaseModel):
         ),
     )
     conversation_grouping_type: Literal[
-        "GROUP_BY_PARTICIPANT_ADDRESSES", "GROUP_BY_PARTICIPANT_ADDRESSES_AND_CHANNEL_TYPE"
+        "GROUP_BY_PROFILE",
+        "GROUP_BY_PARTICIPANT_ADDRESSES",
+        "GROUP_BY_PARTICIPANT_ADDRESSES_AND_CHANNEL_TYPE",
     ] = Field(
         ...,
         alias="conversationGroupingType",
         description=(
             "Type of Conversation grouping strategy:\n"
+            "- GROUP_BY_PROFILE: Groups communications by participant profile. "
+            "Communications with the same profile go to the same conversation, regardless of "
+            "the channel or address.\n"
             "- GROUP_BY_PARTICIPANT_ADDRESSES: Groups communications by participant addresses "
             "across all channels. A customer using +15551234567 will be in the same conversation "
             "whether they contact via SMS, WhatsApp, or RCS.\n"

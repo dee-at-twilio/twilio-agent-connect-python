@@ -24,6 +24,35 @@ from tac.models.conversation import (
 class TestConversationModels:
     """Test Pydantic models for conversation API."""
 
+    def test_conversation_configuration_grouping_types(self):
+        """Test ConversationConfiguration accepts all valid grouping types."""
+        from tac.models.conversation import ConversationConfiguration
+
+        # Test all three valid grouping types
+        grouping_types = [
+            "GROUP_BY_PROFILE",
+            "GROUP_BY_PARTICIPANT_ADDRESSES",
+            "GROUP_BY_PARTICIPANT_ADDRESSES_AND_CHANNEL_TYPE",
+        ]
+
+        for grouping_type in grouping_types:
+            config_data = {
+                "id": "conv_configuration_test",
+                "description": f"Test config with {grouping_type}",
+                "conversationGroupingType": grouping_type,
+                "memoryStoreId": "MGtest123",
+            }
+
+            config = ConversationConfiguration(**config_data)
+
+            assert config.conversation_grouping_type == grouping_type
+            assert config.id == "conv_configuration_test"
+            assert config.memory_store_id == "MGtest123"
+
+            # Verify model_dump uses alias
+            payload = config.model_dump(by_alias=True, exclude_none=True)
+            assert payload["conversationGroupingType"] == grouping_type
+
     def test_conversation_response_model(self):
         """Test ConversationResponse model with all fields."""
         response_data = {
@@ -1144,3 +1173,40 @@ class TestConversationClient:
         with patch.object(client, "_get_sync_client", return_value=mock_client):
             with pytest.raises(httpx.NetworkError, match="Connection failed"):
                 client.get_configuration(configuration_id="conv_configuration_test123")
+
+    @pytest.mark.no_auto_mock
+    def test_get_configuration_with_group_by_profile(self):
+        """Test get_configuration with GROUP_BY_PROFILE grouping type."""
+        from tac.models.conversation import ConversationConfiguration
+
+        mock_response = Mock()
+        mock_response.json.return_value = {
+            "id": "conv_configuration_test456",
+            "memoryStoreId": "MGtest456",
+            "displayName": "Profile-Based Configuration",
+            "description": "Configuration using profile-based grouping",
+            "conversationGroupingType": "GROUP_BY_PROFILE",
+        }
+        mock_response.raise_for_status = Mock()
+
+        mock_client = Mock()
+        mock_client.get = Mock(return_value=mock_response)
+        mock_client.__enter__ = Mock(return_value=mock_client)
+        mock_client.__exit__ = Mock(return_value=False)
+
+        client = ConversationClient(
+            api_key="SK123456",
+            api_secret="test_secret",
+            configuration_id="conv_configuration_test456",
+        )
+
+        with patch.object(client, "_get_sync_client", return_value=mock_client):
+            result = client.get_configuration(configuration_id="conv_configuration_test456")
+
+        # Verify the model parses GROUP_BY_PROFILE correctly
+        assert isinstance(result, ConversationConfiguration)
+        assert result.id == "conv_configuration_test456"
+        assert result.conversation_grouping_type == "GROUP_BY_PROFILE"
+        assert result.memory_store_id == "MGtest456"
+        assert result.display_name == "Profile-Based Configuration"
+        assert result.description == "Configuration using profile-based grouping"
