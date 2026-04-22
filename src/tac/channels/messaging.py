@@ -306,7 +306,7 @@ class MessagingChannel(BaseChannel):
                 addresses=[agent_address],
                 participant_type="AI_AGENT",
             )
-            self.logger.info(
+            self.logger.debug(
                 "Created AI_AGENT participant",
                 conversation_id=conversation_id,
                 participant_id=agent.id,

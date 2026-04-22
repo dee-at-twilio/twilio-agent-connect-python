@@ -661,9 +661,7 @@ class TestChatChannel:
 
     @pytest.mark.asyncio
     async def test_send_response_no_channel_id(self) -> None:
-        """When session has no channel_id, send still proceeds with channel_settings omitted."""
-        from tac.models.conversation import ParticipantAddress, ParticipantResponse
-
+        """When session has no channel_id, send raises without calling create_action."""
         tac = TAC(get_test_config())
         channel = ChatChannel(tac)
 
@@ -674,20 +672,26 @@ class TestChatChannel:
             metadata={},  # No channel_id
         )
 
-        mock_agent = ParticipantResponse(
-            **{  # type: ignore[arg-type]
-                "id": "PA_AGENT",
-                "accountId": "ACtest123",
-                "conversationId": "CH123",
-                "name": "AI Agent",
-                "type": "AI_AGENT",
-                "addresses": [
-                    ParticipantAddress(channel="CHAT", address="ai-assistant").model_dump(
-                        by_alias=True
-                    )
-                ],
-            }
+        with patch.object(tac.conversation_orchestrator_client, "create_action") as mock_send:
+            with pytest.raises(RuntimeError, match=r"session\.metadata\['channel_id'\]"):
+                await channel.send_response("CH123", "Hello!")
+            mock_send.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_send_response_raises_when_ensure_agent_fails(self) -> None:
+        """If no AI_AGENT exists and add_participant + retry both fail, raise."""
+        from tac.models.conversation import ParticipantAddress, ParticipantResponse
+
+        tac = TAC(get_test_config())
+        channel = ChatChannel(tac)
+
+        channel._conversations["CH123"] = ConversationSession(
+            conversation_id="CH123",
+            channel="chat",
+            author_info=AuthorInfo(address="user@example.com", participant_id="PA_USER"),
+            metadata={"channel_id": "CH_CHAT_SID_123"},
         )
+
         mock_customer = ParticipantResponse(
             **{  # type: ignore[arg-type]
                 "id": "PA_USER",
@@ -707,15 +711,16 @@ class TestChatChannel:
             patch.object(
                 tac.conversation_orchestrator_client,
                 "list_participants",
-                return_value=[mock_agent, mock_customer],
+                return_value=[mock_customer],
             ),
-            patch.object(tac.conversation_orchestrator_client, "create_action") as mock_send,
+            patch.object(
+                tac.conversation_orchestrator_client,
+                "add_participant",
+                side_effect=Exception("500 Internal Server Error"),
+            ),
         ):
-            await channel.send_response("CH123", "Hello!")
-
-            mock_send.assert_called_once()
-            request = mock_send.call_args[0][1]
-            assert request.payload.channel_settings is None
+            with pytest.raises(RuntimeError, match="Failed to resolve AI_AGENT participant"):
+                await channel.send_response("CH123", "Hello!")
 
     @pytest.mark.asyncio
     async def test_send_response_rejects_non_string(self) -> None:

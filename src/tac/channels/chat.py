@@ -100,13 +100,17 @@ class ChatChannel(MessagingChannel):
             )
             return
 
+        # channelId (Chat Channel SID) is required for CHAT delivery — the V1
+        # Chat backend uses it to pick the destination thread. Inbound webhooks
+        # always populate it, so a missing value here is a misuse.
         chat_channel_sid = session.metadata.get("channel_id")
         if not chat_channel_sid or not isinstance(chat_channel_sid, str):
-            self.logger.warning(
-                "No channelId found in session metadata; sending without channelSettings",
-                conversation_id=conversation_id,
+            raise RuntimeError(
+                "Missing required session.metadata['channel_id'] for chat send_response; "
+                "this is normally populated by an inbound webhook. Ensure an inbound "
+                "message has been processed before calling send_response, or set "
+                "session.metadata['channel_id'] explicitly in advanced usage."
             )
-            chat_channel_sid = None
 
         try:
             participants = await self.tac.conversation_orchestrator_client.list_participants(
@@ -130,19 +134,18 @@ class ChatChannel(MessagingChannel):
             ),
         )
         if not agent_participant:
-            return
+            raise RuntimeError(
+                f"Failed to resolve AI_AGENT participant for conversation {conversation_id}"
+            )
 
         # TODO(maestro): Drop `chat_service` here once the Actions API resolves the
         # V1 Chat service SID server-side. Maestro team confirmed this should not be
         # required client-side; keep the workaround until the server-side fix ships.
+        # `channel_id` stays — it's a permanent per-conversation requirement.
         chat_service_sid = self.tac.conversations_v1_service_sid
-        channel_settings = (
-            ActionChannelSettings(
-                channel_id=chat_channel_sid,
-                chat_service=chat_service_sid,
-            )
-            if chat_channel_sid or chat_service_sid
-            else None
+        channel_settings = ActionChannelSettings(
+            channel_id=chat_channel_sid,
+            chat_service=chat_service_sid,
         )
 
         try:
@@ -167,7 +170,7 @@ class ChatChannel(MessagingChannel):
                 conversation_id, action_request
             )
 
-            self.logger.debug(
+            self.logger.info(
                 "Sent chat response via Actions API",
                 conversation_id=conversation_id,
                 channel_id=chat_channel_sid,

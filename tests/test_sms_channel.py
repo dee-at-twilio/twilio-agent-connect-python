@@ -8,7 +8,7 @@ import pytest
 from tac import TAC
 from tac.channels.sms import SMSChannel
 from tac.models.memory import MemoryRetrievalMeta, MemoryRetrievalResponse
-from tac.models.session import ConversationSession
+from tac.models.session import AuthorInfo, ConversationSession
 from tac.models.tac import TACMemoryResponse
 
 
@@ -701,6 +701,89 @@ class TestSMSChannel:
             mock_create_action.assert_called_once()
             request = mock_create_action.call_args[0][1]
             assert request.payload.from_.participant_id == "PA_NEW_AGENT"
+
+    @pytest.mark.asyncio
+    async def test_send_response_raises_when_ensure_agent_fails(self) -> None:
+        """If no AI_AGENT exists and add_participant + retry both fail, raise."""
+        from tac.models.conversation import ParticipantAddress, ParticipantResponse
+
+        tac = TAC(get_test_config())
+        channel = SMSChannel(tac)
+
+        channel._conversations["CH123456"] = ConversationSession(
+            conversation_id="CH123456",
+            channel="sms",
+            author_info=AuthorInfo(address="+12345678901", participant_id="PA_CUSTOMER"),
+        )
+
+        mock_customer = ParticipantResponse(
+            **{  # type: ignore[arg-type]
+                "id": "PA_CUSTOMER",
+                "accountId": "ACtest123",
+                "conversationId": "CH123456",
+                "name": "+12345678901",
+                "type": "CUSTOMER",
+                "addresses": [
+                    ParticipantAddress(channel="SMS", address="+12345678901").model_dump(
+                        by_alias=True
+                    )
+                ],
+            }
+        )
+
+        with (
+            patch.object(
+                tac.conversation_orchestrator_client,
+                "list_participants",
+                return_value=[mock_customer],
+            ),
+            patch.object(
+                tac.conversation_orchestrator_client,
+                "add_participant",
+                side_effect=Exception("500 Internal Server Error"),
+            ),
+        ):
+            with pytest.raises(RuntimeError, match="Failed to resolve AI_AGENT participant"):
+                await channel.send_response("CH123456", "Reply")
+
+    @pytest.mark.asyncio
+    async def test_send_response_raises_when_no_customer_on_sms(self) -> None:
+        """When listParticipants returns no CUSTOMER with SMS address, raise."""
+        from tac.models.conversation import ParticipantAddress, ParticipantResponse
+
+        tac = TAC(get_test_config())
+        channel = SMSChannel(tac)
+
+        channel._conversations["CH123456"] = ConversationSession(
+            conversation_id="CH123456",
+            channel="sms",
+            author_info=AuthorInfo(address="+12345678901", participant_id="PA_OTHER"),
+        )
+
+        mock_agent = ParticipantResponse(
+            **{  # type: ignore[arg-type]
+                "id": "PA_AGENT",
+                "accountId": "ACtest123",
+                "conversationId": "CH123456",
+                "name": "AI Agent",
+                "type": "AI_AGENT",
+                "addresses": [
+                    ParticipantAddress(channel="SMS", address="+15551234567").model_dump(
+                        by_alias=True
+                    )
+                ],
+            }
+        )
+
+        with patch.object(
+            tac.conversation_orchestrator_client,
+            "list_participants",
+            return_value=[mock_agent],  # no CUSTOMER
+        ):
+            with pytest.raises(
+                RuntimeError, match="Customer participant with SMS address not found"
+            ):
+                await channel.send_response("CH123456", "Reply")
 
     @pytest.mark.asyncio
     async def test_ignores_chat_messages(self) -> None:

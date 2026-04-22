@@ -118,14 +118,15 @@ class SMSChannel(MessagingChannel):
             agent_address=ParticipantAddress(channel="SMS", address=self.tac.config.phone_number),
         )
         if not agent_participant:
-            return
+            raise RuntimeError(
+                f"Failed to resolve AI_AGENT participant for conversation {conversation_id}"
+            )
 
         if not customer_participant or not customer_address:
-            self.logger.error(
-                "Customer participant with SMS address not found",
-                conversation_id=conversation_id,
+            raise RuntimeError(
+                "Customer participant with SMS address not found for conversation "
+                f"{conversation_id}"
             )
-            return
 
         session = self._conversations.get(conversation_id)
         channel_id = session.metadata.get("channel_id") if session else None
@@ -157,7 +158,7 @@ class SMSChannel(MessagingChannel):
                 conversation_id, action_request
             )
 
-            self.logger.debug(
+            self.logger.info(
                 "Sent SMS response via Actions API",
                 conversation_id=conversation_id,
                 to_address=customer_address,
