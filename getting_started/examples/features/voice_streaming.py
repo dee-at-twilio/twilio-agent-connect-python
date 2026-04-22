@@ -1,0 +1,84 @@
+"""
+Voice Streaming Example with OpenAI
+
+Streaming reduces latency by sending LLM tokens immediately to the caller.
+
+Performance comparison (streaming vs non-streaming):
+- Streaming: Caller hears first words in ~0.5-0.7s (first token latency)
+- Non-streaming: Caller waits ~1.0-1.5s for full LLM response before hearing anything
+- Result: ~40-50% faster time-to-first-audio with streaming
+"""
+
+import os
+from collections.abc import AsyncGenerator
+
+from dotenv import load_dotenv
+from openai import AsyncOpenAI
+from openai.types.chat import ChatCompletionMessageParam
+
+from tac import TAC, TACConfig
+from tac.adapters import MemoryPromptBuilder
+from tac.channels.voice import VoiceChannel, VoiceChannelConfig
+from tac.models.session import ConversationSession
+from tac.models.tac import TACMemoryResponse
+from tac.server import TACFastAPIServer
+
+load_dotenv()
+
+tac = TAC(config=TACConfig.from_env())
+voice_channel = VoiceChannel(tac, config=VoiceChannelConfig(auto_retrieve_memory=True))
+openai_client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+
+conversation_history: dict[str, list[ChatCompletionMessageParam]] = {}
+SYSTEM_MESSAGE: ChatCompletionMessageParam = {
+    "role": "system",
+    "content": "You are a helpful voice assistant. Be conversational and concise.",
+}
+
+
+async def handle_message_ready(
+    user_message: str, context: ConversationSession, memory_response: TACMemoryResponse | None
+) -> None:
+    """Return None and manually call send_response() with an async generator for streaming."""
+    conv_id = context.conversation_id
+
+    if conv_id not in conversation_history:
+        conversation_history[conv_id] = [SYSTEM_MESSAGE.copy()]
+
+    conversation_history[conv_id].append({"role": "user", "content": user_message})
+
+    # Build messages with memory
+    messages = conversation_history[conv_id][:]  # Copy list
+    if memory_response:
+        memory_prompt = MemoryPromptBuilder.build(memory_response, context)
+        if memory_prompt:
+            # Insert memory after system message
+            messages.insert(1, {"role": "system", "content": memory_prompt})
+
+    async def stream_tokens() -> AsyncGenerator[str, None]:
+        response_tokens = []
+
+        # Stream from OpenAI
+        stream = await openai_client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=messages,
+            stream=True,
+        )
+
+        async for chunk in stream:
+            if chunk.choices and chunk.choices[0].delta.content:
+                token = chunk.choices[0].delta.content
+                response_tokens.append(token)
+                yield token
+
+        full_response = "".join(response_tokens)
+        conversation_history[conv_id].append({"role": "assistant", "content": full_response})
+
+    await voice_channel.send_response(conv_id, stream_tokens())
+
+
+tac.on_message_ready(handle_message_ready)
+
+if __name__ == "__main__":
+    server = TACFastAPIServer(tac=tac, voice_channel=voice_channel)
+    server.start()

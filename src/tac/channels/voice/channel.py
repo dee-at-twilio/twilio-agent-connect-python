@@ -337,6 +337,8 @@ class VoiceChannel(BaseChannel):
                     session_state.stream_task = asyncio.create_task(
                         self._handle_prompt(conv_id, prompt_msg)
                     )
+                    # Yield to event loop to let task start
+                    await asyncio.sleep(0)
                 else:
                     await self._handle_prompt(conv_id, prompt_msg)
         except Exception as e:
@@ -564,9 +566,10 @@ class VoiceChannel(BaseChannel):
         if self._websocket_manager.has_websocket(conv_id):
             self._websocket_manager.remove_websocket(conv_id)
 
-        # Cancel any running stream task and cleanup session if session manager is enabled
+        # Cancel running stream task and cleanup session if session manager is enabled
         if self.session_manager is not None and self.session_manager.has_session(conv_id):
             session_state = self.session_manager.get_or_create_session(conv_id)
+            # Cancel any running task (user hung up, no point continuing)
             await session_state.cancel_stream_task()
             self.session_manager.remove_session(conv_id)
 

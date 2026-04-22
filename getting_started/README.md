@@ -50,6 +50,10 @@ Production-ready examples using the OpenAI adapter:
 - Automatic memory injection with `with_tac_memory()`
 - Less boilerplate, more convention-based
 
+### `features/` - Feature Examples
+
+- **`voice_streaming.py`**: Stream LLM responses token-by-token for ~40-50% faster time-to-first-audio
+
 ## Step 3: Run an Example
 
 ### Install Dependencies
@@ -81,6 +85,9 @@ python openai/chat_completions.py
 
 # Or run OpenAI Responses API example
 python openai/responses_api.py
+
+# Or run voice streaming example (low latency)
+python features/voice_streaming.py
 ```
 
 ### Expose Your Server

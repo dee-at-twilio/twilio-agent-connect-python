@@ -1621,3 +1621,82 @@ class TestConversationInitializationFlow:
             status=["ACTIVE"],
         )
         co_client.list_participants.assert_called_once_with("CH_reuse_test")
+
+
+class TestSessionManagerDefaults:
+    """Test session_manager default behavior in VoiceChannelConfig."""
+
+    def test_default_session_manager_is_created(self) -> None:
+        """Test that VoiceChannel creates a session_manager by default."""
+        from tac.session import ThreadSafeSessionManager
+
+        tac = TAC(get_test_config())
+        channel = VoiceChannel(tac)
+
+        # Verify session_manager is created by default
+        assert channel.session_manager is not None
+        assert isinstance(channel.session_manager, ThreadSafeSessionManager)
+
+    def test_session_manager_can_be_set_to_none(self) -> None:
+        """Test that session_manager can be explicitly disabled."""
+        from tac.channels.voice import VoiceChannelConfig
+
+        tac = TAC(get_test_config())
+        config = VoiceChannelConfig(session_manager=None)
+        channel = VoiceChannel(tac, config=config)
+
+        # Verify session_manager is None when explicitly disabled
+        assert channel.session_manager is None
+
+    def test_session_manager_can_be_dict_none(self) -> None:
+        """Test that session_manager can be disabled via config dict."""
+        tac = TAC(get_test_config())
+        channel = VoiceChannel(tac, config={"session_manager": None})
+
+        # Verify session_manager is None when explicitly disabled via dict
+        assert channel.session_manager is None
+
+    @pytest.mark.asyncio
+    async def test_cleanup_cancels_running_task(self) -> None:
+        """Test that cleanup cancels in-flight tasks (user hung up, no point continuing)."""
+        tac = TAC(get_test_config())
+        channel = VoiceChannel(tac)
+
+        # Track if task was cancelled
+        task_cancelled = []
+
+        async def running_callback(message, context, memory):
+            try:
+                await asyncio.sleep(1.0)  # Simulate work
+                return "Should not reach here"
+            except asyncio.CancelledError:
+                task_cancelled.append(True)
+                raise
+
+        tac.on_message_ready(running_callback)
+
+        # Start conversation
+        channel._start_conversation("CONV_CLEANUP_TEST", None)
+        mock_websocket = AsyncMock()
+        channel._websocket_manager.add_websocket("CONV_CLEANUP_TEST", mock_websocket)
+
+        # Create and start a task
+        session_state = channel.session_manager.get_or_create_session("CONV_CLEANUP_TEST")
+        prompt_data = {
+            "type": "prompt",
+            "conversationId": "CONV_CLEANUP_TEST",
+            "voicePrompt": "Test",
+        }
+        await channel._handle_prompt_async("CONV_CLEANUP_TEST", prompt_data, session_state)
+
+        # Give task time to start
+        await asyncio.sleep(0.05)
+        assert session_state.stream_task is not None
+        assert not session_state.stream_task.done()
+
+        # Cleanup should cancel the task
+        await channel._cleanup_connection("CONV_CLEANUP_TEST")
+
+        # Verify task was cancelled
+        assert task_cancelled == [True]
+        assert session_state.stream_task.done()

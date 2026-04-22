@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel, Field
 
-from tac.session import SessionManager
+from tac.session import SessionManager, ThreadSafeSessionManager
 
 
 class VoiceChannelConfig(BaseModel):
@@ -10,11 +10,9 @@ class VoiceChannelConfig(BaseModel):
     Configuration for Voice channel.
 
     Attributes:
-        session_manager: Optional SessionManager for tracking and
-            canceling in-flight streaming tasks. The SessionManager
-            encapsulates the stream_generator for LLM responses.
-            If provided, enables task cancellation on interrupts
-            and new prompts.
+        session_manager: SessionManager for tracking and canceling in-flight tasks.
+            Defaults to ThreadSafeSessionManager for automatic task cancellation on
+            interrupts and new prompts. Set to None only for debugging/testing.
         auto_retrieve_memory: If True, automatically retrieve memory
             before invoking the on_message_ready callback. Default is False.
             Set to True to enable automatic memory retrieval.
@@ -23,8 +21,11 @@ class VoiceChannelConfig(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
 
     session_manager: SessionManager | None = Field(
-        default=None,
-        description="SessionManager for tracking and canceling in-flight streaming tasks",
+        default_factory=ThreadSafeSessionManager,
+        description=(
+            "SessionManager for task cancellation. Defaults to ThreadSafeSessionManager. "
+            "Set to None only for debugging/testing."
+        ),
     )
     auto_retrieve_memory: bool = Field(
         default=False,
