@@ -32,26 +32,26 @@ Example demonstrating ChatChannel integration with Twilio Agent Connect. Uses th
 
 2. **Backend**: FastAPI server with TAC + ChatChannel + OpenAI
    - `POST /token` — generates Conversations SDK access token
-   - `POST /conversation` — Conversation Orchestrator webhook endpoint
+   - `POST /webhook` — Conversation Orchestrator webhook endpoint
    - Routes webhook events to ChatChannel
    - Calls OpenAI gpt-5.4-mini for responses
-   - Sends responses via Conversation Orchestrator Send API
+   - Sends responses via Conversation Orchestrator Actions API
 
 ## Architecture
 
 ```
 Browser (Conversations JS SDK) -> Twilio Conversations ->
   Conversation Orchestrator -> webhook -> server -> AI ->
-  Conversation Orchestrator Send API -> Twilio Conversations ->
+  Conversation Orchestrator Actions API -> Twilio Conversations ->
   Browser (Conversations JS SDK)
 ```
 
 1. Browser fetches access token from `POST /token`
 2. Browser creates conversation and sends message via Conversations JS SDK
 3. Twilio Conversations passes messages to Conversation Orchestrator (passively)
-4. Conversation Orchestrator sends `COMMUNICATION_CREATED` webhook to `POST /conversation`
+4. Conversation Orchestrator sends `COMMUNICATION_CREATED` webhook to `POST /webhook`
 5. Server calls OpenAI for a response
-6. Server sends response via Conversation Orchestrator Send API
+6. Server sends response via Conversation Orchestrator Actions API (`SEND_MESSAGE`)
 7. Conversation Orchestrator delivers message to Twilio Conversations
 8. Twilio Conversations pushes message to browser via Conversations JS SDK
 

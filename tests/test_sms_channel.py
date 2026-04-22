@@ -350,27 +350,92 @@ class TestSMSChannel:
                 return_value=[mock_agent_participant, mock_customer_participant],
             ),
             patch.object(
-                tac.conversation_orchestrator_client, "send_communication"
-            ) as mock_send_comm,
+                tac.conversation_orchestrator_client, "create_action"
+            ) as mock_create_action,
         ):
             await channel.send_response("CH123456", "Test response")
 
-            # Verify send_communication was called
-            mock_send_comm.assert_called_once()
-            call_args = mock_send_comm.call_args
+            # Verify create_action was called
+            mock_create_action.assert_called_once()
+            call_args = mock_create_action.call_args
             assert call_args[0][0] == "CH123456"  # conversation_id
 
             # Verify request structure
             request = call_args[0][1]
-            assert request.author.address == "+15551234567"
-            assert request.author.channel == "SMS"
-            assert request.author.participant_id == "PA_AGENT"
-            assert request.content.type == "TEXT"
-            assert request.content.text == "Test response"
-            assert len(request.recipients) == 1
-            assert request.recipients[0].address == "+12345678901"
-            assert request.recipients[0].channel == "SMS"
-            assert request.recipients[0].participant_id == "PA_CUSTOMER"
+            assert request.type == "SEND_MESSAGE"
+            # from/to send participantId + channel only (no address) for Mode 1 resolution
+            assert request.payload.from_.participant_id == "PA_AGENT"
+            assert request.payload.from_.channel == "SMS"
+            assert request.payload.from_.address is None
+            assert request.payload.content.text == "Test response"
+            assert len(request.payload.to) == 1
+            assert request.payload.to[0].participant_id == "PA_CUSTOMER"
+            assert request.payload.to[0].channel == "SMS"
+            assert request.payload.to[0].address is None
+            # No session / no channel_id in metadata → channelSettings omitted
+            assert request.payload.channel_settings is None
+
+    @pytest.mark.asyncio
+    async def test_send_response_forwards_channel_id_when_present(self) -> None:
+        """When session.metadata has channel_id, it's forwarded as channelSettings.channelId."""
+        tac = TAC(get_test_config())
+        channel = SMSChannel(tac)
+
+        from tac.models.conversation import ParticipantAddress, ParticipantResponse
+
+        mock_agent_participant = ParticipantResponse(
+            **{  # type: ignore[arg-type]
+                "id": "PA_AGENT",
+                "accountId": "ACtest123",
+                "conversationId": "CH_WITH_CH_ID",
+                "name": "Test Agent",
+                "type": "AI_AGENT",
+                "addresses": [
+                    ParticipantAddress(channel="SMS", address="+15551234567").model_dump(
+                        by_alias=True
+                    )
+                ],
+            }
+        )
+        mock_customer_participant = ParticipantResponse(
+            **{  # type: ignore[arg-type]
+                "id": "PA_CUSTOMER",
+                "accountId": "ACtest123",
+                "conversationId": "CH_WITH_CH_ID",
+                "name": "+12345678901",
+                "type": "CUSTOMER",
+                "addresses": [
+                    ParticipantAddress(channel="SMS", address="+12345678901").model_dump(
+                        by_alias=True
+                    )
+                ],
+            }
+        )
+
+        # Seed a session with channel_id in metadata (as inbound ingestion would)
+        await channel.process_webhook(
+            create_participant_added_webhook(
+                "CH_WITH_CH_ID", "PA_C", "prof_c", "2025-11-18T00:00:00.000Z"
+            )
+        )
+        channel._conversations["CH_WITH_CH_ID"].metadata["channel_id"] = "SMabcdef"
+
+        with (
+            patch.object(
+                tac.conversation_orchestrator_client,
+                "list_participants",
+                return_value=[mock_agent_participant, mock_customer_participant],
+            ),
+            patch.object(
+                tac.conversation_orchestrator_client, "create_action"
+            ) as mock_create_action,
+        ):
+            await channel.send_response("CH_WITH_CH_ID", "Test response")
+
+            mock_create_action.assert_called_once()
+            request = mock_create_action.call_args[0][1]
+            assert request.payload.channel_settings is not None
+            assert request.payload.channel_settings.channel_id == "SMabcdef"
 
     @pytest.mark.asyncio
     async def test_multiple_concurrent_conversations(self) -> None:
@@ -558,32 +623,84 @@ class TestSMSChannel:
                 return_value=[mock_agent_participant, mock_customer_participant],
             ),
             patch.object(
-                tac.conversation_orchestrator_client, "send_communication"
-            ) as mock_send_comm,
+                tac.conversation_orchestrator_client, "create_action"
+            ) as mock_create_action,
         ):
             await channel.send_response("CH123456", "Test response")
 
-            # Verify send_communication was called successfully
-            mock_send_comm.assert_called_once()
-            call_args = mock_send_comm.call_args
+            # Verify create_action was called successfully
+            mock_create_action.assert_called_once()
+            call_args = mock_create_action.call_args
             assert call_args[0][0] == "CH123456"
 
             # Verify the AGENT participant was selected as author
             request = call_args[0][1]
-            assert request.author.address == "+15551234567"
-            assert request.author.participant_id == "PA_AGENT"
+            assert request.payload.from_.participant_id == "PA_AGENT"
+            assert request.payload.from_.channel == "SMS"
 
     @pytest.mark.asyncio
-    async def test_send_response_agent_participant_not_found(self) -> None:
-        """Test sending response when agent participant is not found."""
+    async def test_send_response_lazily_creates_agent_participant(self) -> None:
+        """When no AI_AGENT exists, the SMS channel creates one lazily (like Chat)."""
+        from tac.models.conversation import ParticipantAddress, ParticipantResponse
+
         tac = TAC(get_test_config())
         channel = SMSChannel(tac)
 
-        with patch.object(
-            tac.conversation_orchestrator_client, "list_participants", return_value=[]
+        mock_customer = ParticipantResponse(
+            **{  # type: ignore[arg-type]
+                "id": "PA_CUSTOMER",
+                "accountId": "ACtest123",
+                "conversationId": "CH123456",
+                "name": "+12345678901",
+                "type": "CUSTOMER",
+                "addresses": [
+                    ParticipantAddress(channel="SMS", address="+12345678901").model_dump(
+                        by_alias=True
+                    )
+                ],
+            }
+        )
+        mock_new_agent = ParticipantResponse(
+            **{  # type: ignore[arg-type]
+                "id": "PA_NEW_AGENT",
+                "accountId": "ACtest123",
+                "conversationId": "CH123456",
+                "name": "AI Agent",
+                "type": "AI_AGENT",
+                "addresses": [
+                    ParticipantAddress(channel="SMS", address="+15551234567").model_dump(
+                        by_alias=True
+                    )
+                ],
+            }
+        )
+
+        with (
+            patch.object(
+                tac.conversation_orchestrator_client,
+                "list_participants",
+                return_value=[mock_customer],  # No agent
+            ),
+            patch.object(
+                tac.conversation_orchestrator_client,
+                "add_participant",
+                return_value=mock_new_agent,
+            ) as mock_add,
+            patch.object(
+                tac.conversation_orchestrator_client, "create_action"
+            ) as mock_create_action,
         ):
-            # Should log error but not raise
             await channel.send_response("CH123456", "Test response")
+
+            mock_add.assert_called_once()
+            add_args = mock_add.call_args
+            assert add_args[1]["participant_type"] == "AI_AGENT"
+            assert add_args[1]["addresses"][0].channel == "SMS"
+            assert add_args[1]["addresses"][0].address == "+15551234567"
+
+            mock_create_action.assert_called_once()
+            request = mock_create_action.call_args[0][1]
+            assert request.payload.from_.participant_id == "PA_NEW_AGENT"
 
     @pytest.mark.asyncio
     async def test_ignores_chat_messages(self) -> None:
@@ -623,7 +740,7 @@ class TestSMSChannel:
 
     @pytest.mark.asyncio
     async def test_callback_auto_send_response(self) -> None:
-        """Test callback returning string automatically sends response via send_communication."""
+        """Test callback returning string automatically sends response via create_action."""
         tac = TAC(get_test_config(with_memory=False))
         channel = SMSChannel(tac, config={"auto_retrieve_memory": False})
 
@@ -684,8 +801,8 @@ class TestSMSChannel:
                 return_value=[mock_agent_participant, mock_customer_participant],
             ),
             patch.object(
-                tac.conversation_orchestrator_client, "send_communication"
-            ) as mock_send_comm,
+                tac.conversation_orchestrator_client, "create_action"
+            ) as mock_create_action,
         ):
             # Process message that triggers callback
             message_webhook = create_communication_created_webhook(
@@ -693,12 +810,14 @@ class TestSMSChannel:
             )
             await channel.process_webhook(message_webhook)
 
-            # Verify send_communication was called once with auto-sent response
-            mock_send_comm.assert_called_once()
-            call_args = mock_send_comm.call_args
+            # Verify create_action was called once with auto-sent response
+            mock_create_action.assert_called_once()
+            call_args = mock_create_action.call_args
             assert call_args[0][0] == "CH_AUTO_SEND"
             request = call_args[0][1]
-            assert request.content.text == "This is my automated response"
+            assert request.payload.content.text == "This is my automated response"
+            # Webhook fixture has channelId=None, so channel_settings should be omitted
+            assert request.payload.channel_settings is None
 
     @pytest.mark.asyncio
     async def test_callback_no_auto_send_on_none(self) -> None:
@@ -725,13 +844,13 @@ class TestSMSChannel:
         )
 
         with patch.object(
-            tac.conversation_orchestrator_client, "send_communication"
-        ) as mock_send_comm:
+            tac.conversation_orchestrator_client, "create_action"
+        ) as mock_create_action:
             # Process message that triggers callback
             message_webhook = create_communication_created_webhook(
                 "CH_NO_AUTO", "PA_NO_AUTO", "Test message", "2025-11-18T00:00:01.000Z"
             )
             await channel.process_webhook(message_webhook)
 
-            # Verify send_communication was NOT called (callback returned None)
-            mock_send_comm.assert_not_called()
+            # Verify create_action was NOT called (callback returned None)
+            mock_create_action.assert_not_called()

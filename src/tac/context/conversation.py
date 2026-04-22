@@ -5,6 +5,7 @@ from pydantic import ValidationError
 
 from tac.context.base import BaseAPIClient
 from tac.models.conversation import (
+    ActionResponse,
     Communication,
     CommunicationRequest,
     CommunicationsListResponse,
@@ -15,8 +16,7 @@ from tac.models.conversation import (
     ParticipantAddress,
     ParticipantRequest,
     ParticipantResponse,
-    SendCommunicationRequest,
-    SendCommunicationResponse,
+    SendMessageActionRequest,
     UpdateConversationRequest,
 )
 
@@ -366,35 +366,29 @@ class ConversationClient(BaseAPIClient):
             )
             raise
 
-    async def send_communication(
+    async def create_action(
         self,
         conversation_id: str,
-        request: SendCommunicationRequest,
-    ) -> SendCommunicationResponse:
+        request: SendMessageActionRequest,
+    ) -> ActionResponse:
         """
-        Send a communication via POST /v2/Communications.
+        Create an action via POST /v2/Conversations/{conversationId}/Actions.
 
-        This endpoint sets up necessary conversation infrastructure and sends the message.
-        Returns 202 Accepted. The Communication record is created asynchronously after
-        delivery.
+        Currently supports SEND_MESSAGE actions. Returns 202 Accepted; the action is
+        processed asynchronously and its status can be polled via getAction.
 
         Args:
-            conversation_id: The conversation ID to send the communication to
-            request: SendCommunicationRequest with author, content, and recipients
+            conversation_id: The conversation ID to create the action in
+            request: SendMessageActionRequest with `from`, `to`, and content
 
         Returns:
-            SendCommunicationResponse with message, conversationId, and channelId
+            ActionResponse with id, type, status, and conversationId
 
         Raises:
             httpx.HTTPError: If the API request fails
         """
-        url = f"{self.base_url}/v2/Communications"
-
-        # Merge conversationId into the request body
-        request_payload = {
-            "conversationId": conversation_id,
-            **request.model_dump(by_alias=True, exclude_none=True),
-        }
+        url = f"{self.base_url}/v2/Conversations/{conversation_id}/Actions"
+        request_payload = request.model_dump(by_alias=True, exclude_none=True)
 
         try:
             async with self._get_client() as client:
@@ -409,8 +403,7 @@ class ConversationClient(BaseAPIClient):
                         status_code=response.status_code,
                     )
 
-                send_response = SendCommunicationResponse(**response.json())
-                return send_response
+                return ActionResponse(**response.json())
 
         except httpx.HTTPError as e:
             response_text = (
@@ -419,9 +412,10 @@ class ConversationClient(BaseAPIClient):
                 else "No response"
             )
             self.logger.error(
-                f"Failed to send communication: {e}\n"
+                f"Failed to create action: {e}\n"
                 f"URL: {url}\n"
                 f"ConversationId: {conversation_id}\n"
+                f"Request body: {request_payload}\n"
                 f"Response: {response_text}"
             )
             raise

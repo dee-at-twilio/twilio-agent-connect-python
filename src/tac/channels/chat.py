@@ -8,10 +8,12 @@ from pydantic import Field
 from tac import TAC
 from tac.channels.messaging import MessagingChannel, MessagingChannelConfig
 from tac.models.conversation import (
-    CommunicationContent,
+    ActionChannelSettings,
+    ActionParticipantRef,
+    ActionTextContent,
     ParticipantAddress,
-    SendCommunicationParticipantAddress,
-    SendCommunicationRequest,
+    SendMessageActionPayload,
+    SendMessageActionRequest,
 )
 
 
@@ -100,11 +102,11 @@ class ChatChannel(MessagingChannel):
 
         chat_channel_sid = session.metadata.get("channel_id")
         if not chat_channel_sid or not isinstance(chat_channel_sid, str):
-            self.logger.error(
-                "No channelId found in session metadata",
+            self.logger.warning(
+                "No channelId found in session metadata; sending without channelSettings",
                 conversation_id=conversation_id,
             )
-            return
+            chat_channel_sid = None
 
         try:
             participants = await self.tac.conversation_orchestrator_client.list_participants(
@@ -118,94 +120,61 @@ class ChatChannel(MessagingChannel):
             )
             return
 
-        agent_participant = next(
-            (p for p in participants if p.type in ("AI_AGENT", "AGENT")),
-            None,
+        agent_participant = await self._ensure_agent_participant(
+            conversation_id,
+            existing_participants=participants,
+            agent_address=ParticipantAddress(
+                channel="CHAT",
+                address=self.agent_address,
+                channel_id=chat_channel_sid,
+            ),
+        )
+        if not agent_participant:
+            return
+
+        # TODO(maestro): Drop `chat_service` here once the Actions API resolves the
+        # V1 Chat service SID server-side. Maestro team confirmed this should not be
+        # required client-side; keep the workaround until the server-side fix ships.
+        chat_service_sid = self.tac.conversations_v1_service_sid
+        channel_settings = (
+            ActionChannelSettings(
+                channel_id=chat_channel_sid,
+                chat_service=chat_service_sid,
+            )
+            if chat_channel_sid or chat_service_sid
+            else None
         )
 
-        # Lazy AI_AGENT creation if not found
-        if not agent_participant:
-            self.logger.debug(
-                "No AI_AGENT participant found, creating one",
-                conversation_id=conversation_id,
-                agent_address=self.agent_address,
-            )
-            try:
-                agent_participant = await self.tac.conversation_orchestrator_client.add_participant(
-                    conversation_id,
-                    addresses=[
-                        ParticipantAddress(
+        try:
+            action_request = SendMessageActionRequest(
+                payload=SendMessageActionPayload(
+                    from_=ActionParticipantRef(
+                        channel="CHAT",
+                        participant_id=agent_participant.id,
+                    ),
+                    to=[
+                        ActionParticipantRef(
                             channel="CHAT",
-                            address=self.agent_address,
-                            channel_id=chat_channel_sid,
+                            participant_id=session.author_info.participant_id,
                         )
                     ],
-                    participant_type="AI_AGENT",
-                )
-                self.logger.info(
-                    "Created AI_AGENT participant",
-                    conversation_id=conversation_id,
-                    participant_id=agent_participant.id,
-                )
-            except Exception:
-                # Race condition: another process may have created it
-                self.logger.warning(
-                    "Failed to create AI_AGENT, retrying participant list",
-                    conversation_id=conversation_id,
-                )
-                try:
-                    retried = await self.tac.conversation_orchestrator_client.list_participants(
-                        conversation_id
-                    )
-                    agent_participant = next(
-                        (p for p in retried if p.type in ("AI_AGENT", "AGENT")),
-                        None,
-                    )
-                except Exception as e:
-                    self.logger.error(
-                        "Failed to retry listing participants",
-                        conversation_id=conversation_id,
-                        error=str(e),
-                    )
-                    return
-
-                if not agent_participant:
-                    self.logger.error(
-                        "Failed to create or find AI_AGENT participant",
-                        conversation_id=conversation_id,
-                    )
-                    return
-
-        try:
-            send_request = SendCommunicationRequest(
-                author=SendCommunicationParticipantAddress(
-                    address=self.agent_address,
-                    channel="CHAT",
-                    participant_id=agent_participant.id,
+                    content=ActionTextContent(text=response),
+                    channel_settings=channel_settings,
                 ),
-                content=CommunicationContent(type="TEXT", text=response),
-                recipients=[
-                    SendCommunicationParticipantAddress(
-                        address=session.author_info.address,
-                        channel="CHAT",
-                        participant_id=session.author_info.participant_id,
-                    )
-                ],
-                channel_id=chat_channel_sid,
             )
 
-            await self.tac.conversation_orchestrator_client.send_communication(
-                conversation_id, send_request
+            await self.tac.conversation_orchestrator_client.create_action(
+                conversation_id, action_request
             )
 
             self.logger.debug(
-                "Sent chat response via Send API",
+                "Sent chat response via Actions API",
                 conversation_id=conversation_id,
                 channel_id=chat_channel_sid,
             )
         except Exception as e:
             self.logger.error(
-                "Failed to send communication",
+                "Failed to create action",
                 conversation_id=conversation_id,
                 error=str(e),
                 exc_info=True,

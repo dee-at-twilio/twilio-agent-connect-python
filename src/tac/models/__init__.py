@@ -1,6 +1,10 @@
 """Shared models for the Twilio Agent Connect."""
 
 from tac.models.conversation import (
+    ActionChannelSettings,
+    ActionParticipantRef,
+    ActionResponse,
+    ActionTextContent,
     Communication,
     CommunicationContent,
     CommunicationParticipant,
@@ -10,9 +14,8 @@ from tac.models.conversation import (
     ParticipantAddress,
     ParticipantRequest,
     ParticipantResponse,
-    SendCommunicationParticipantAddress,
-    SendCommunicationRequest,
-    SendCommunicationResponse,
+    SendMessageActionPayload,
+    SendMessageActionRequest,
 )
 from tac.models.intelligence import (
     CommunicationsRange,
@@ -45,6 +48,10 @@ from tac.models.tac import (
 from tac.models.voice import TwiMLOptions
 
 __all__ = [
+    "ActionChannelSettings",
+    "ActionParticipantRef",
+    "ActionResponse",
+    "ActionTextContent",
     "AuthorInfo",
     "Communication",
     "CommunicationContent",
@@ -73,9 +80,8 @@ __all__ = [
     "ParticipantRequest",
     "ParticipantResponse",
     "ProfileResponse",
-    "SendCommunicationParticipantAddress",
-    "SendCommunicationRequest",
-    "SendCommunicationResponse",
+    "SendMessageActionPayload",
+    "SendMessageActionRequest",
     "SummaryInfo",
     "TACCommunication",
     "TACCommunicationAuthor",

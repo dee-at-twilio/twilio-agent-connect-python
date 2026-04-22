@@ -158,7 +158,7 @@ def create_app() -> Any:
 
         return JSONResponse({"token": jwt})
 
-    @app.post("/conversation")
+    @app.post("/webhook")
     async def conversation_webhook(request: Request) -> JSONResponse:
         """Handle Conversation Orchestrator webhook events."""
         try:

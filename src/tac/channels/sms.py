@@ -8,9 +8,12 @@ from pydantic import Field
 from tac import TAC
 from tac.channels.messaging import MessagingChannel, MessagingChannelConfig
 from tac.models.conversation import (
-    CommunicationContent,
-    SendCommunicationParticipantAddress,
-    SendCommunicationRequest,
+    ActionChannelSettings,
+    ActionParticipantRef,
+    ActionTextContent,
+    ParticipantAddress,
+    SendMessageActionPayload,
+    SendMessageActionRequest,
 )
 
 
@@ -97,28 +100,24 @@ class SMSChannel(MessagingChannel):
             )
             return
 
-        agent_participant = None
         customer_participant = None
         customer_address = None
         for participant in participants:
-            if not agent_participant and participant.type in ("AI_AGENT", "HUMAN_AGENT", "AGENT"):
-                for address in participant.addresses:
-                    if address.channel == "SMS" and address.address == self.tac.config.phone_number:
-                        agent_participant = participant
-                        break
-            elif not customer_participant and participant.type == "CUSTOMER":
+            if participant.type == "CUSTOMER":
                 for address in participant.addresses:
                     if address.channel == "SMS":
                         customer_participant = participant
                         customer_address = address.address
                         break
+                if customer_participant:
+                    break
 
+        agent_participant = await self._ensure_agent_participant(
+            conversation_id,
+            existing_participants=participants,
+            agent_address=ParticipantAddress(channel="SMS", address=self.tac.config.phone_number),
+        )
         if not agent_participant:
-            self.logger.error(
-                "Agent participant not found",
-                conversation_id=conversation_id,
-                phone_number=self.tac.config.phone_number,
-            )
             return
 
         if not customer_participant or not customer_address:
@@ -128,35 +127,44 @@ class SMSChannel(MessagingChannel):
             )
             return
 
+        session = self._conversations.get(conversation_id)
+        channel_id = session.metadata.get("channel_id") if session else None
+        channel_settings = (
+            ActionChannelSettings(channel_id=channel_id)
+            if isinstance(channel_id, str) and channel_id
+            else None
+        )
+
         try:
-            send_request = SendCommunicationRequest(
-                author=SendCommunicationParticipantAddress(
-                    address=self.tac.config.phone_number,
-                    channel="SMS",
-                    participant_id=agent_participant.id,
-                ),
-                content=CommunicationContent(type="TEXT", text=response),
-                recipients=[
-                    SendCommunicationParticipantAddress(
-                        address=customer_address,
+            action_request = SendMessageActionRequest(
+                payload=SendMessageActionPayload(
+                    from_=ActionParticipantRef(
                         channel="SMS",
-                        participant_id=customer_participant.id,
-                    )
-                ],
+                        participant_id=agent_participant.id,
+                    ),
+                    to=[
+                        ActionParticipantRef(
+                            channel="SMS",
+                            participant_id=customer_participant.id,
+                        )
+                    ],
+                    content=ActionTextContent(text=response),
+                    channel_settings=channel_settings,
+                ),
             )
 
-            await self.tac.conversation_orchestrator_client.send_communication(
-                conversation_id, send_request
+            await self.tac.conversation_orchestrator_client.create_action(
+                conversation_id, action_request
             )
 
             self.logger.debug(
-                "Sent SMS response via Send API",
+                "Sent SMS response via Actions API",
                 conversation_id=conversation_id,
                 to_address=customer_address,
             )
         except Exception as e:
             self.logger.error(
-                "Failed to send communication",
+                "Failed to create action",
                 conversation_id=conversation_id,
                 error=str(e),
                 exc_info=True,

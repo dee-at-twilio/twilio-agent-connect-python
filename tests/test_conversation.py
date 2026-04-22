@@ -7,6 +7,10 @@ import pytest
 
 from tac.context.conversation import ConversationClient
 from tac.models.conversation import (
+    ActionChannelSettings,
+    ActionParticipantRef,
+    ActionResponse,
+    ActionTextContent,
     Communication,
     CommunicationContent,
     CommunicationParticipant,
@@ -15,9 +19,8 @@ from tac.models.conversation import (
     ConversationResponse,
     ParticipantRequest,
     ParticipantResponse,
-    SendCommunicationParticipantAddress,
-    SendCommunicationRequest,
-    SendCommunicationResponse,
+    SendMessageActionPayload,
+    SendMessageActionRequest,
 )
 
 
@@ -972,14 +975,16 @@ class TestConversationClient:
 
     @pytest.mark.asyncio
     @patch("httpx.AsyncClient")
-    async def test_send_communication_success(self, mock_async_client_class):
-        """Test successful communication send via POST /v2/Communications."""
+    async def test_create_action_success(self, mock_async_client_class):
+        """Test successful create_action via POST /v2/Conversations/{id}/Actions."""
         mock_response = Mock()
         mock_response.status_code = 202
         mock_response.json.return_value = {
-            "message": "Conversation setup complete",
+            "id": "conv_action_01abcdef",
+            "type": "SEND_MESSAGE",
+            "status": "PENDING",
             "conversationId": "CH123456",
-            "channelId": "SM123456",
+            "createdAt": "2025-01-15T10:30:00Z",
         }
         mock_response.raise_for_status = Mock()
 
@@ -993,42 +998,102 @@ class TestConversationClient:
             configuration_id="conv_configuration_test123",
         )
 
-        # Create send request
-        author = SendCommunicationParticipantAddress(
-            address="+15551234567", channel="SMS", participant_id="comms_participant_agent"
-        )
-        content = CommunicationContent(type="TEXT", text="Hello from agent!")
-        recipient = SendCommunicationParticipantAddress(
-            address="+12025551234", channel="SMS", participant_id="comms_participant_customer"
-        )
-        send_request = SendCommunicationRequest(
-            author=author, content=content, recipients=[recipient]
+        action_request = SendMessageActionRequest(
+            payload=SendMessageActionPayload(
+                from_=ActionParticipantRef(
+                    address="+15551234567", channel="SMS", participant_id="comms_participant_agent"
+                ),
+                to=[
+                    ActionParticipantRef(
+                        address="+12025551234",
+                        channel="SMS",
+                        participant_id="comms_participant_customer",
+                    )
+                ],
+                content=ActionTextContent(text="Hello from agent!"),
+                channel_settings=ActionChannelSettings(channel_id="SM999"),
+            ),
         )
 
-        result = await client.send_communication(conversation_id="CH123456", request=send_request)
+        result = await client.create_action(conversation_id="CH123456", request=action_request)
 
         # Verify API call
-        expected_url = "https://conversations.twilio.com/v2/Communications"
+        expected_url = "https://conversations.twilio.com/v2/Conversations/CH123456/Actions"
         mock_client.post.assert_called_once()
         assert mock_client.post.call_args[0][0] == expected_url
 
-        # Verify request payload includes conversationId
-        payload = mock_client.post.call_args[1]["json"]
-        assert payload["conversationId"] == "CH123456"
-        assert payload["author"]["address"] == "+15551234567"
+        # Verify request body uses the discriminated {type, payload} shape
+        body = mock_client.post.call_args[1]["json"]
+        assert "conversationId" not in body  # now in URL, not body
+        assert body["type"] == "SEND_MESSAGE"
+        payload = body["payload"]
+        assert payload["from"]["address"] == "+15551234567"
+        assert payload["from"]["channel"] == "SMS"
+        assert payload["from"]["participantId"] == "comms_participant_agent"
+        assert len(payload["to"]) == 1
+        assert payload["to"][0]["channel"] == "SMS"
         assert payload["content"]["text"] == "Hello from agent!"
-        assert len(payload["recipients"]) == 1
+        assert "type" not in payload["content"]  # Actions content has no discriminator
+        assert payload["channelSettings"]["channelId"] == "SM999"
 
         # Verify response
-        assert isinstance(result, SendCommunicationResponse)
-        assert result.message == "Conversation setup complete"
+        assert isinstance(result, ActionResponse)
+        assert result.id == "conv_action_01abcdef"
+        assert result.type == "SEND_MESSAGE"
+        assert result.status == "PENDING"
         assert result.conversation_id == "CH123456"
-        assert result.channel_id == "SM123456"
+        assert result.created_at == "2025-01-15T10:30:00Z"
 
     @pytest.mark.asyncio
     @patch("httpx.AsyncClient")
-    async def test_send_communication_api_error(self, mock_async_client_class):
-        """Test send_communication handles API errors."""
+    async def test_create_action_omits_channel_settings_when_none(self, mock_async_client_class):
+        """When channel_settings is not set, it should not appear in the payload."""
+        mock_response = Mock()
+        mock_response.status_code = 202
+        mock_response.json.return_value = {
+            "id": "conv_action_01abcdef",
+            "type": "SEND_MESSAGE",
+            "status": "PENDING",
+            "conversationId": "CH123456",
+            "createdAt": "2025-01-15T10:30:00Z",
+        }
+        mock_response.raise_for_status = Mock()
+
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(return_value=mock_response)
+        mock_async_client_class.return_value.__aenter__.return_value = mock_client
+
+        client = ConversationClient(
+            api_key="SK123456",
+            api_secret="test_token",
+            configuration_id="conv_configuration_test123",
+        )
+
+        action_request = SendMessageActionRequest(
+            payload=SendMessageActionPayload(
+                from_=ActionParticipantRef(
+                    address="+15551234567", channel="SMS", participant_id="comms_participant_agent"
+                ),
+                to=[
+                    ActionParticipantRef(
+                        address="+12025551234",
+                        channel="SMS",
+                        participant_id="comms_participant_customer",
+                    )
+                ],
+                content=ActionTextContent(text="Hello from agent!"),
+            ),
+        )
+
+        await client.create_action(conversation_id="CH123456", request=action_request)
+
+        body = mock_client.post.call_args[1]["json"]
+        assert "channelSettings" not in body["payload"]
+
+    @pytest.mark.asyncio
+    @patch("httpx.AsyncClient")
+    async def test_create_action_api_error(self, mock_async_client_class):
+        """Test create_action handles API errors."""
         mock_client = AsyncMock()
         mock_client.post = AsyncMock(
             side_effect=httpx.HTTPStatusError(
@@ -1045,20 +1110,24 @@ class TestConversationClient:
             configuration_id="conv_configuration_test123",
         )
 
-        # Create send request
-        author = SendCommunicationParticipantAddress(
-            address="+15551234567", channel="SMS", participant_id="comms_participant_agent"
-        )
-        content = CommunicationContent(type="TEXT", text="Hello from agent!")
-        recipient = SendCommunicationParticipantAddress(
-            address="+12025551234", channel="SMS", participant_id="comms_participant_customer"
-        )
-        send_request = SendCommunicationRequest(
-            author=author, content=content, recipients=[recipient]
+        action_request = SendMessageActionRequest(
+            payload=SendMessageActionPayload(
+                from_=ActionParticipantRef(
+                    address="+15551234567", channel="SMS", participant_id="comms_participant_agent"
+                ),
+                to=[
+                    ActionParticipantRef(
+                        address="+12025551234",
+                        channel="SMS",
+                        participant_id="comms_participant_customer",
+                    )
+                ],
+                content=ActionTextContent(text="Hello from agent!"),
+            ),
         )
 
         with pytest.raises(httpx.HTTPStatusError, match="400 Bad Request"):
-            await client.send_communication(conversation_id="CH123456", request=send_request)
+            await client.create_action(conversation_id="CH123456", request=action_request)
 
     @pytest.mark.no_auto_mock
     def test_get_configuration_success(self):

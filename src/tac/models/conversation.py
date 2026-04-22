@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from tac.models.pagination import PaginationMeta
 
@@ -93,6 +93,18 @@ class ParticipantAddress(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+# TODO(maestro): Remove this class once the Actions API resolves the V1 Chat
+# service SID server-side. Currently used to extract `conversationsV1Bridge.serviceId`
+# from the Configuration so the chat channel can forward it as
+# channelSettings.chatService — drop together with the other TODO(maestro) sites.
+class ConversationsV1Bridge(BaseModel):
+    """Conversations V1 bridge settings on a ConversationConfiguration."""
+
+    service_id: str = Field(..., alias="serviceId", description="V1 Conversations service SID")
+
+    model_config = {"populate_by_name": True}
+
+
 class ConversationConfiguration(BaseModel):
     """Configuration settings for a conversation response."""
 
@@ -158,6 +170,13 @@ class ConversationConfiguration(BaseModel):
         alias="intelligenceConfigurationIds",
         max_length=5,
         description="List of Intelligence Configuration IDs for this configuration",
+    )
+    # TODO(maestro): Drop this field once the Actions API resolves the V1 Chat
+    # service SID server-side — see ConversationsV1Bridge above.
+    conversations_v1_bridge: ConversationsV1Bridge | None = Field(
+        None,
+        alias="conversationsV1Bridge",
+        description="V1 Conversations bridge (carries the V1 service SID)",
     )
     created_at: str | None = Field(
         None, alias="createdAt", description="Timestamp when this configuration was created"
@@ -423,38 +442,113 @@ class ConversationsListResponse(BaseModel):
     model_config = {"populate_by_name": True}
 
 
-class SendCommunicationParticipantAddress(BaseModel):
-    """Participant address for sending communications via the Send API."""
+class ActionParticipantRef(BaseModel):
+    """Participant reference for the Actions API (`from`/`to` entries).
 
-    address: str = Field(..., min_length=1, max_length=254, description="Participant address")
-    channel: Literal["VOICE", "SMS", "RCS", "EMAIL", "WHATSAPP", "CHAT", "API", "SYSTEM"] = Field(
-        ..., description="Channel type"
-    )
+    Either `participant_id` or `address` must be supplied; `channel` is always required.
+    When both are provided, Maestro uses `participant_id` and `channel` disambiguates
+    which of the participant's addresses to use.
+    """
+
     participant_id: str | None = Field(
         default=None, alias="participantId", description="Participant ID"
     )
-
-    model_config = {"populate_by_name": True}
-
-
-class SendCommunicationRequest(BaseModel):
-    """Request payload for sending communications via POST /v2/Communications."""
-
-    author: SendCommunicationParticipantAddress = Field(..., description="Message author")
-    content: CommunicationContent = Field(..., description="Message content")
-    recipients: list[SendCommunicationParticipantAddress] = Field(
-        ..., min_length=1, description="Message recipients (minimum 1)"
+    address: str | None = Field(
+        default=None, min_length=1, max_length=254, description="Participant address"
     )
-    channel_id: str | None = Field(default=None, alias="channelId", description="Channel ID")
+    channel: Literal["VOICE", "SMS", "RCS", "EMAIL", "WHATSAPP", "CHAT", "API", "SYSTEM"] = Field(
+        ..., description="Channel type"
+    )
+
+    model_config = {"populate_by_name": True}
+
+    @model_validator(mode="after")
+    def _require_participant_id_or_address(self) -> "ActionParticipantRef":
+        if not self.participant_id and not self.address:
+            raise ValueError("ActionParticipantRef requires at least `participant_id` or `address`")
+        return self
+
+
+class ActionTextContent(BaseModel):
+    """Plain-text content for a SEND_MESSAGE action."""
+
+    text: str = Field(..., max_length=8388608, description="Message text content")
 
     model_config = {"populate_by_name": True}
 
 
-class SendCommunicationResponse(BaseModel):
-    """Response from POST /v2/Communications (202 Accepted)."""
+class ActionChannelSettings(BaseModel):
+    """Channel-specific settings forwarded to the downstream backend.
 
-    message: str = Field(..., description="Status message")
+    Open pass-through: any field not explicitly modeled here (e.g.
+    `messagingServiceSid`, `statusCallback`, `Attributes`) can be set by callers and
+    will be forwarded as-is.
+    """
+
+    channel_id: str | None = Field(
+        default=None,
+        alias="channelId",
+        description="Backend-specific channel identifier (e.g. V1 Chat channel SID)",
+    )
+    # TODO(maestro): Drop `chat_service` once the Actions API resolves the V1 Chat
+    # service SID server-side. Maestro team confirmed this should not be required
+    # client-side; keep the field until the server-side fix ships.
+    chat_service: str | None = Field(
+        default=None,
+        alias="chatService",
+        description="V1 Chat service SID (IS...); required by V1 Chat backend when channel=CHAT",
+    )
+
+    model_config = {"populate_by_name": True, "extra": "allow"}
+
+
+class SendMessageActionPayload(BaseModel):
+    """Inner payload for a SEND_MESSAGE action."""
+
+    from_: ActionParticipantRef = Field(..., alias="from", description="Sender")
+    to: list[ActionParticipantRef] = Field(..., min_length=1, description="Recipients (minimum 1)")
+    content: ActionTextContent = Field(..., description="Message content")
+    channel_settings: ActionChannelSettings | None = Field(
+        default=None,
+        alias="channelSettings",
+        description="Channel-specific pass-through settings",
+    )
+
+    model_config = {"populate_by_name": True}
+
+
+class SendMessageActionRequest(BaseModel):
+    """Request for POST /v2/Conversations/{id}/Actions with type=SEND_MESSAGE.
+
+    Body is discriminated by `type` with the action-specific fields under `payload`.
+    """
+
+    type: Literal["SEND_MESSAGE"] = Field(default="SEND_MESSAGE", description="Action type")
+    payload: SendMessageActionPayload = Field(..., description="SEND_MESSAGE payload")
+
+    model_config = {"populate_by_name": True}
+
+
+class ActionResponse(BaseModel):
+    """Response from POST /v2/Conversations/{id}/Actions (202 Accepted)."""
+
+    id: str = Field(..., description="Action ID")
+    type: str = Field(
+        ...,
+        description=(
+            "Action type. Known values: SEND_MESSAGE. Kept as str to tolerate future additions."
+        ),
+    )
+    status: str = Field(
+        ...,
+        description=(
+            "Current action status. Known values: PENDING, COMPLETED, FAILED. "
+            "Kept as str to tolerate future additions."
+        ),
+    )
     conversation_id: str = Field(..., alias="conversationId", description="Conversation ID")
-    channel_id: str | None = Field(default=None, alias="channelId", description="Channel ID")
+    created_at: str | None = Field(
+        default=None, alias="createdAt", description="Action creation timestamp"
+    )
 
     model_config = {"populate_by_name": True}

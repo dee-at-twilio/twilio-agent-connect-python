@@ -61,6 +61,21 @@ class TAC:
                 "Please check your conversation_configuration_id and credentials."
             ) from e
 
+        # TODO(maestro): Remove once the Actions API resolves the V1 Chat service SID
+        # server-side. Maestro team confirmed this should not be required client-side;
+        # until they ship the fix, CHAT sends fail with
+        #   "chatService attribute is required for CHAT channel"
+        # unless we pass it on channelSettings.chatService. We source it from the
+        # Configuration's conversationsV1Bridge since the inbound webhook's serviceId
+        # is the literal "unused" for CHAT. When the server-side fix lands, drop this
+        # attribute plus ActionChannelSettings.chat_service and the chat channel's
+        # chat_service_sid plumbing.
+        self.conversations_v1_service_sid: str | None = (
+            configuration.conversations_v1_bridge.service_id
+            if configuration.conversations_v1_bridge
+            else None
+        )
+
         self.conversation_memory_client = MemoryClient(
             store_id=configuration.memory_store_id,
             api_key=self.config.api_key,
