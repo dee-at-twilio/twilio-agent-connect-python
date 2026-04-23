@@ -72,7 +72,12 @@ async def handle_message_ready(
         )
 
         # Build your system prompt with memory context
-        base_prompt = "You are a helpful customer service agent."
+        base_prompt = (
+            "You are a customer service agent speaking with a user over voice or SMS. "
+            "Keep responses short and conversational — a sentence or two. "
+            "Do not use markdown, asterisks, bullets, or emojis; your words will be "
+            "spoken aloud or sent as plain text."
+        )
         if memory_context:
             system_prompt = f"{base_prompt}\n\n{memory_context}"
         else:

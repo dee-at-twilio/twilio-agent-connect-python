@@ -4,7 +4,7 @@
 -include Makefile.local
 
 sync:
-	uv sync --all-extras --all-packages
+	uv sync --all-extras --all-groups
 
 # Default target
 help: ## Show this help message

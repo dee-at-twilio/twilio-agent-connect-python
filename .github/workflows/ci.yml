@@ -27,7 +27,7 @@ jobs:
         run: |
           uv venv
           . .venv/bin/activate
-          uv sync --extra dev
+          uv sync --all-extras --all-groups
 
       - name: Run ruff check
         run: |
@@ -69,7 +69,7 @@ jobs:
         run: |
           uv venv
           . .venv/bin/activate
-          uv sync --extra dev
+          uv sync --all-extras --all-groups
 
       - name: Run mypy
         run: |
@@ -108,7 +108,7 @@ jobs:
         run: |
           uv venv
           . .venv/bin/activate
-          uv sync --extra dev
+          uv sync --all-extras --all-groups
 
       - name: Run tests
         run: |

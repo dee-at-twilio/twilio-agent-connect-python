@@ -158,6 +158,27 @@ knowledge_tool = await create_knowledge_tool(
 results = await knowledge_tool(query="What is the return policy?")
 ```
 
+### Handoff Tool
+
+Hand the conversation off to a human agent via a Twilio Studio Flow (e.g. one that routes to Flex). Works on both voice and SMS. Requires `TWILIO_STUDIO_HANDOFF_FLOW_SID` in your environment (or `tac.config.studio_handoff_flow_sid`).
+
+```python
+from tac.tools.handoff import create_studio_handoff_tool
+
+handoff_tool = create_studio_handoff_tool(
+    tac,
+    session,
+    attributes={"department": "support", "priority": "normal"},
+)
+
+# LLM only sees: handoff(reason: str)
+# On digital channels, posts to the Studio Flow Executions API.
+# On voice, stores the payload on the session so the voice channel
+# can send the WS "end" message with handoffData after the final reply.
+```
+
+The tool also sets the conversation to `INACTIVE` and clears status callbacks so TAC stops receiving webhooks while the human handles the conversation. See `getting_started/examples/features/handoff.py` for a complete example.
+
 ## Implementation Property
 
 The `implementation` property returns an async callable with clean signature:

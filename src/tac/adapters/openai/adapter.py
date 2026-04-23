@@ -1,7 +1,9 @@
 """OpenAI adapter for automatic memory injection using wrapper approach."""
 
+from __future__ import annotations
+
 import copy
-from typing import Any, overload
+from typing import TYPE_CHECKING, Any, overload
 
 from tac.adapters.options import AdapterOptions
 from tac.adapters.prompt_builder import MemoryPromptBuilder
@@ -11,13 +13,9 @@ from tac.models.tac import TACMemoryResponse
 
 logger = get_logger(__name__)
 
-try:
+if TYPE_CHECKING:
     from openai import AsyncOpenAI, OpenAI
     from openai.types.chat import ChatCompletionMessageParam
-except ImportError:
-    raise ImportError(
-        "OpenAI SDK is required for this adapter. Install it with: pip install tac[openai]"
-    ) from None
 
 
 class _BaseCompletionsNamespace:
@@ -278,6 +276,13 @@ def with_tac_memory(
         ...     for event in stream:
         ...         print(event.content)
     """
+    try:
+        from openai import AsyncOpenAI
+    except ImportError as e:
+        raise ImportError(
+            "with_tac_memory() requires the openai package. Install with: pip install openai"
+        ) from e
+
     if isinstance(openai_client, AsyncOpenAI):
         return AsyncTACOpenAIClient(openai_client, memory_response, context, options)
     return TACOpenAIClient(openai_client, memory_response, context, options)

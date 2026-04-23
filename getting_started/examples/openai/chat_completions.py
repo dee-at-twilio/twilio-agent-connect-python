@@ -44,7 +44,12 @@ conversation_history: dict[str, list[ChatCompletionMessageParam]] = {}
 
 SYSTEM_MESSAGE: ChatCompletionSystemMessageParam = {
     "role": "system",
-    "content": "You are a helpful customer service agent. Be concise and friendly.",
+    "content": (
+        "You are a customer service agent speaking with a user over voice or SMS. "
+        "Keep responses short and conversational — a sentence or two. "
+        "Do not use markdown, asterisks, bullets, or emojis; your words will be "
+        "spoken aloud or sent as plain text."
+    ),
 }
 
 

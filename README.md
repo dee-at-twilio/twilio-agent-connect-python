@@ -62,7 +62,7 @@ make setup  # Open http://localhost:8080
 
 **Option 2: Manual Setup**
 
-You can also create a Memory Store and Conversation Configuration manually through the [Twilio Console](https://1console.twilio.com).
+You can also create a Memory Store and Conversation Configuration manually through the [Twilio Console](https://1console.twilio.com). For a full walkthrough — credentials, Console navigation, and webhook configuration — see the [TAC Quickstart](https://www.twilio.com/docs/platform/tac/quickstart).
 
 ---
 
@@ -99,7 +99,12 @@ sms_channel = SMSChannel(tac)
 openai_client = AsyncOpenAI()
 
 conversation_history = {}
-SYSTEM_INSTRUCTIONS = "You are a helpful customer service agent. Be concise and friendly."
+SYSTEM_INSTRUCTIONS = (
+    "You are a customer service agent speaking with a user over voice or SMS. "
+    "Keep responses short and conversational — a sentence or two. "
+    "Do not use markdown, asterisks, bullets, or emojis; your words will be "
+    "spoken aloud or sent as plain text."
+)
 
 async def handle_message_ready(user_message, context, memory_response):
     conv_id = context.conversation_id
@@ -201,7 +206,7 @@ uv --version
 make sync
 
 # Or manually with uv
-uv sync --all-extras --all-packages
+uv sync --all-extras --all-groups
 ```
 
 ### Running Tests and Checks

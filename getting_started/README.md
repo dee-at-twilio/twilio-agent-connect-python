@@ -5,7 +5,7 @@ This guide will walk you through setting up and running your first TAC applicati
 ## Prerequisites
 
 1. **Python 3.10+** installed
-2. **Twilio account** with a phone number
+2. **Twilio account** with a phone number that has both **Voice** and **Messaging** capabilities enabled. Messaging requires [A2P 10DLC registration](https://www.twilio.com/docs/messaging/compliance/a2p-10dlc) for US long-code numbers before the number can send SMS.
 3. **API key** for the SDK you're using (e.g., OpenAI API key)
 4. **ngrok** or similar tunneling tool for local development
 
@@ -28,7 +28,7 @@ The wizard will:
 
 **Option 2: Manual Setup**
 
-Create services manually through the [Twilio Console](https://1console.twilio.com/).
+Create services manually through the [Twilio Console](https://1console.twilio.com/). For a complete walkthrough — including which credentials to gather, how to configure SMS and Voice webhooks, and step-by-step Console navigation — see the [TAC Quickstart](https://www.twilio.com/docs/platform/tac/quickstart).
 
 ## Step 2: Choose an Example
 
@@ -53,16 +53,9 @@ Production-ready examples using the OpenAI adapter:
 ### `features/` - Feature Examples
 
 - **`voice_streaming.py`**: Stream LLM responses token-by-token for ~40-50% faster time-to-first-audio
+- **`handoff.py`**: Hand the conversation off to a human agent via a Twilio Studio Flow (works on voice and SMS)
 
 ## Step 3: Run an Example
-
-### Install Dependencies
-
-From the repository root:
-
-```bash
-make sync
-```
 
 ### Configure Environment Variables
 
@@ -76,18 +69,17 @@ See the **Environment Variables** section below for details.
 
 ### Run the Server
 
+`uv run` auto-syncs this repo's default dependency groups (`examples` and
+`dev`) on first use — no separate install step required. `load_dotenv()`
+walks up from the script's directory, so it'll find
+`getting_started/examples/.env` from any working directory.
+
 ```bash
-# Run overview example (framework-agnostic)
-python overview.py
-
-# Or run OpenAI Chat Completions example
-python openai/chat_completions.py
-
-# Or run OpenAI Responses API example
-python openai/responses_api.py
-
-# Or run voice streaming example (low latency)
-python features/voice_streaming.py
+uv run getting_started/examples/overview.py
+uv run getting_started/examples/openai/chat_completions.py
+uv run getting_started/examples/openai/responses_api.py
+uv run getting_started/examples/features/voice_streaming.py
+uv run getting_started/examples/features/handoff.py
 ```
 
 ### Expose Your Server
@@ -120,6 +112,9 @@ See `examples/.env.example` for all available configuration options. Key variabl
 
 ### Optional (OpenAI Example)
 - `OPENAI_API_KEY`: Your OpenAI API key (only needed to run OpenAI examples)
+
+### Optional (Handoff Example)
+- `TWILIO_STUDIO_HANDOFF_FLOW_SID`: Studio Flow SID used by `create_studio_handoff_tool` (required for `features/handoff.py`)
 
 ## Next Steps
 

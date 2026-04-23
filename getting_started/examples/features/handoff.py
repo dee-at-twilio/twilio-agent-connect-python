@@ -27,10 +27,20 @@ set_tracing_disabled(True)
 
 tac = TAC(config=TACConfig.from_env())
 
+# Verify the handoff-specific env var is set.
+if not tac.config.studio_handoff_flow_sid:
+    raise RuntimeError(
+        "TWILIO_STUDIO_HANDOFF_FLOW_SID is required to run the handoff example. "
+        "Set it in your .env (see .env.example)."
+    )
+
 SYSTEM_INSTRUCTIONS = (
-    "You are a helpful customer service agent. "
-    "If the user asks to speak with a human, or if you cannot resolve "
-    "their issue, use the handoff tool to transfer them to a human agent."
+    "You are a customer service agent speaking with a user over voice or SMS. "
+    "Keep responses short and conversational — a sentence or two. "
+    "Do not use markdown, asterisks, bullets, or emojis; your words will be "
+    "spoken aloud or sent as plain text. "
+    "If the user asks to speak with a human, or if you cannot resolve their issue, "
+    "use the handoff tool to transfer them to a human agent."
 )
 
 # Example app-defined routing metadata attached to every handoff. Keys and

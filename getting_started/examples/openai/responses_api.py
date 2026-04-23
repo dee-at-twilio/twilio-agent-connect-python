@@ -39,7 +39,12 @@ openai_client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 # This maintains context across multiple turns in a conversation
 conversation_history: dict[str, list[dict[str, str]]] = {}
 
-SYSTEM_INSTRUCTIONS = "You are a helpful customer service agent. Be concise and friendly."
+SYSTEM_INSTRUCTIONS = (
+    "You are a customer service agent speaking with a user over voice or SMS. "
+    "Keep responses short and conversational — a sentence or two. "
+    "Do not use markdown, asterisks, bullets, or emojis; your words will be "
+    "spoken aloud or sent as plain text."
+)
 
 
 async def handle_message_ready(

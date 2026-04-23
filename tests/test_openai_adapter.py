@@ -1,6 +1,9 @@
 """Tests for OpenAI adapter with memory injection."""
 
+import builtins
 import copy
+import importlib
+import sys
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -745,3 +748,65 @@ async def test_async_responses_api_no_injection_without_memory(
 
     # Should be unchanged
     assert enhanced_instructions == original_instructions
+
+
+class TestOpenAISoftDependency:
+    """Regression tests for the openai soft-dependency contract.
+
+    Importing `tac.adapters.openai` must not require `openai` to be installed;
+    only calling `with_tac_memory()` should raise if it's missing.
+    """
+
+    def test_module_imports_without_openai(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Importing the adapter module should not require `openai`."""
+        # Drop any cached openai/adapter modules so reimport is forced
+        for mod_name in list(sys.modules):
+            if mod_name == "openai" or mod_name.startswith("openai."):
+                monkeypatch.delitem(sys.modules, mod_name, raising=False)
+            if mod_name == "tac.adapters.openai" or mod_name.startswith("tac.adapters.openai."):
+                monkeypatch.delitem(sys.modules, mod_name, raising=False)
+
+        real_import = builtins.__import__
+
+        def blocked_import(
+            name: str,
+            globals: object = None,
+            locals: object = None,
+            fromlist: tuple[str, ...] = (),
+            level: int = 0,
+        ) -> object:
+            if name == "openai" or name.startswith("openai."):
+                raise ImportError(f"No module named '{name}' (blocked for test)")
+            return real_import(name, globals, locals, fromlist, level)
+
+        monkeypatch.setattr(builtins, "__import__", blocked_import)
+
+        # Should succeed — top-level openai imports are under TYPE_CHECKING
+        adapter_mod = importlib.import_module("tac.adapters.openai.adapter")
+        assert hasattr(adapter_mod, "with_tac_memory")
+        assert "openai" not in sys.modules
+
+    def test_with_tac_memory_raises_helpful_import_error(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Calling with_tac_memory() without openai installed should raise
+        ImportError with a pointer to `pip install openai`."""
+        monkeypatch.delitem(sys.modules, "openai", raising=False)
+
+        real_import = builtins.__import__
+
+        def blocked_import(
+            name: str,
+            globals: object = None,
+            locals: object = None,
+            fromlist: tuple[str, ...] = (),
+            level: int = 0,
+        ) -> object:
+            if name == "openai" or name.startswith("openai."):
+                raise ImportError(f"No module named '{name}' (blocked for test)")
+            return real_import(name, globals, locals, fromlist, level)
+
+        monkeypatch.setattr(builtins, "__import__", blocked_import)
+
+        with pytest.raises(ImportError, match="pip install openai"):
+            with_tac_memory(Mock())
