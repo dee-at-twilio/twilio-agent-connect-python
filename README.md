@@ -222,6 +222,3 @@ make test
 # Run all checks at once
 make check
 ```
-
-# TAC E2E Tests
-[![Build status](https://badge.buildkite.com/c1f5e96e9ee98361b2c18d88d21ab22c948353f417d6e06215.svg?branch=main)](https://buildkite.com/twilio/tac-e2e-tests-python)
