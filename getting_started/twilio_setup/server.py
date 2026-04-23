@@ -11,7 +11,6 @@ import logging
 import os
 import re
 import sys
-import uuid
 
 import httpx
 from fastapi import FastAPI, Request
@@ -109,7 +108,7 @@ async def create_memory_store(request: Request) -> dict:
                 timeout=30.0,
             )
 
-            if response.status_code == 201 or response.status_code == 200:
+            if response.status_code in [200, 201]:
                 result = response.json()
                 return {
                     "status": "success",
@@ -118,6 +117,18 @@ async def create_memory_store(request: Request) -> dict:
                     "memory_store_status": result.get("status"),
                     "intelligence_service_id": result.get("intelligenceServiceId"),
                     "message": f"Memory Store created: {result.get('id')}",
+                }
+            elif response.status_code == 202:
+                # Async operation - return status URL for polling
+                result = response.json()
+                logger.info("Memory Store creation accepted (async)")
+                logger.info(f"  Status URL: {result.get('statusUrl')}")
+                return {
+                    "status": "accepted",
+                    "status_url": result.get("statusUrl"),
+                    "message": result.get(
+                        "message", "Memory Store creation accepted for processing"
+                    ),
                 }
             else:
                 error_text = response.text
@@ -142,6 +153,158 @@ async def create_memory_store(request: Request) -> dict:
     except Exception as e:
         logger.exception(f"Error creating Memory Store: {str(e)}")
         return {"status": "error", "message": f"Error creating Memory Store: {str(e)}"}
+
+
+@app.post("/api/poll-operation-status")
+async def poll_operation_status(request: Request) -> dict:
+    """
+    Poll an operation status URL to check if async operation is complete.
+
+    Expected payload:
+    {
+        "status_url": "https://memory.twilio.com/v1/ControlPlane/Operations/...",
+        "api_key": "SK...",
+        "api_secret": "..."
+    }
+    """
+    data = await request.json()
+
+    raw_status_url = data.get("status_url")
+    raw_api_key = data.get("api_key")
+    raw_api_secret = data.get("api_secret")
+
+    # Validate as non-empty strings and normalize
+    if not all(
+        isinstance(value, str) and value.strip()
+        for value in (raw_status_url, raw_api_key, raw_api_secret)
+    ):
+        return {
+            "status": "error",
+            "message": "Missing required fields: status_url, api_key, api_secret",
+        }
+
+    status_url = raw_status_url.strip()
+    api_key = raw_api_key.strip()
+    api_secret = raw_api_secret.strip()
+
+    # Validate status_url to prevent SSRF and credential exfiltration
+    from urllib.parse import urlparse
+
+    try:
+        parsed_url = urlparse(status_url)
+
+        # Must be HTTPS
+        if parsed_url.scheme != "https":
+            return {
+                "status": "error",
+                "message": f"Invalid status_url scheme: {parsed_url.scheme}. Must be https.",
+            }
+
+        # Must be a Twilio domain
+        allowed_hosts = ["memory.twilio.com", "conversations.twilio.com"]
+        hostname = parsed_url.hostname
+        if hostname not in allowed_hosts:
+            return {
+                "status": "error",
+                "message": (
+                    f"Invalid status_url host: {hostname}. Must be one of {allowed_hosts}."
+                ),
+            }
+
+        # Only allow the default HTTPS port (443 or omitted)
+        if parsed_url.port not in (None, 443):
+            return {
+                "status": "error",
+                "message": f"Invalid status_url port: {parsed_url.port}. Must be 443 or omitted.",
+            }
+
+        # Must be an Operations endpoint - validate with normalized path
+        # to prevent path traversal (e.g., /Operations/../Stores)
+        from posixpath import normpath
+
+        normalized_path = normpath(parsed_url.path)
+
+        # Check for path traversal attempts
+        if ".." in parsed_url.path or "%2e" in parsed_url.path.lower():
+            return {
+                "status": "error",
+                "message": "Invalid status_url path: Path traversal detected.",
+            }
+
+        # Must match expected Operations endpoint patterns
+        valid_patterns = [
+            "/v1/ControlPlane/Operations/",  # Memory API
+            "/v2/ControlPlane/Operations/",  # Conversation API
+        ]
+
+        if not any(normalized_path.startswith(pattern) for pattern in valid_patterns):
+            return {
+                "status": "error",
+                "message": (
+                    "Invalid status_url path: Must be a ControlPlane Operations endpoint "
+                    "(e.g., /v1/ControlPlane/Operations/... or /v2/ControlPlane/Operations/...)"
+                ),
+            }
+
+    except Exception as e:
+        return {"status": "error", "message": f"Invalid status_url format: {str(e)}"}
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                status_url,
+                headers={"Authorization": get_basic_auth_header(api_key, api_secret)},
+                timeout=30.0,
+            )
+
+            if response.status_code == 200:
+                result = response.json()
+                operation_status = result.get("status", "").upper()
+
+                if operation_status == "COMPLETED":
+                    # Extract the created resource ID from result
+                    return {
+                        "status": "completed",
+                        "operation_status": operation_status,
+                        "result": result.get("result", {}),
+                        "message": "Operation completed successfully",
+                    }
+                elif operation_status in ["PENDING", "IN_PROGRESS", "QUEUED"]:
+                    return {
+                        "status": "pending",
+                        "operation_status": operation_status,
+                        "message": f"Operation status: {operation_status}",
+                    }
+                elif operation_status == "FAILED":
+                    return {
+                        "status": "error",
+                        "operation_status": operation_status,
+                        "message": f"Operation failed: {result.get('error', 'Unknown error')}",
+                    }
+                else:
+                    return {
+                        "status": "pending",
+                        "operation_status": operation_status,
+                        "message": f"Operation status: {operation_status}",
+                    }
+            else:
+                logger.error("Failed to poll operation status")
+                logger.error(f"  Endpoint: {status_url}")
+                logger.error(f"  Status: {response.status_code}")
+                logger.error(f"  Response: {response.text}")
+                return {
+                    "status": "error",
+                    "message": (
+                        f"Failed to poll operation status: {response.status_code} - {response.text}"
+                    ),
+                    "status_code": response.status_code,
+                }
+
+    except httpx.TimeoutException:
+        return {"status": "error", "message": "Request timed out. Please try again."}
+    except Exception as e:
+        logger.exception(f"Error polling operation status: {str(e)}")
+        return {"status": "error", "message": f"Error polling operation status: {str(e)}"}
 
 
 @app.post("/api/get-memory-store")
@@ -208,6 +371,184 @@ async def get_memory_store(request: Request) -> dict:
     except Exception as e:
         logger.exception(f"Error getting Memory Store: {str(e)}")
         return {"status": "error", "message": f"Error getting Memory Store: {str(e)}"}
+
+
+@app.post("/api/list-memory-stores")
+async def list_memory_stores(request: Request) -> dict:
+    """
+    List all Memory Stores for the account.
+
+    Expected payload:
+    {
+        "api_key": "SK...",
+        "api_secret": "..."
+    }
+    """
+    data = await request.json()
+
+    api_key = data.get("api_key")
+    api_secret = data.get("api_secret")
+
+    if not all([api_key, api_secret]):
+        return {
+            "status": "error",
+            "message": "Missing required fields: api_key, api_secret",
+        }
+
+    try:
+        async with httpx.AsyncClient() as client:
+            # First, get the list of store IDs
+            response = await client.get(
+                f"{MEMORY_API_BASE}/Stores",
+                headers={"Authorization": get_basic_auth_header(api_key, api_secret)},
+                timeout=30.0,
+            )
+
+            if response.status_code == 200:
+                result = response.json()
+                store_ids = result.get("stores", [])
+
+                # Fetch details for each store (in parallel for efficiency)
+                stores = []
+                # Limit to first 100 stores to avoid overwhelming the UI
+                for store_id in store_ids[:100]:
+                    try:
+                        detail_response = await client.get(
+                            f"{MEMORY_API_BASE}/Stores/{store_id}",
+                            headers={"Authorization": get_basic_auth_header(api_key, api_secret)},
+                            timeout=10.0,
+                        )
+                        if detail_response.status_code == 200:
+                            store_data = detail_response.json()
+                            stores.append(
+                                {
+                                    "id": store_data.get("id"),
+                                    "displayName": store_data.get("displayName"),
+                                    "description": store_data.get("description"),
+                                    "status": store_data.get("status"),
+                                }
+                            )
+                    except Exception as e:
+                        logger.warning(f"Failed to fetch details for store {store_id}: {e}")
+                        # Add store with ID only if we can't fetch details
+                        stores.append(
+                            {
+                                "id": store_id,
+                                "displayName": store_id,
+                                "description": None,
+                                "status": "UNKNOWN",
+                            }
+                        )
+
+                return {
+                    "status": "success",
+                    "stores": stores,
+                }
+            else:
+                endpoint = f"{MEMORY_API_BASE}/Stores"
+                logger.error("Failed to list Memory Stores")
+                logger.error(f"  Endpoint: {endpoint}")
+                logger.error(f"  Status: {response.status_code}")
+                logger.error(f"  Response: {response.text}")
+                return {
+                    "status": "error",
+                    "message": (
+                        f"Failed to list Memory Stores: {response.status_code} - {response.text}"
+                    ),
+                    "endpoint": endpoint,
+                    "response": response.text,
+                    "status_code": response.status_code,
+                }
+
+    except httpx.TimeoutException:
+        return {"status": "error", "message": "Request timed out. Please try again."}
+    except Exception as e:
+        logger.exception(f"Error listing Memory Stores: {str(e)}")
+        return {"status": "error", "message": f"Error listing Memory Stores: {str(e)}"}
+
+
+@app.post("/api/delete-memory-store")
+async def delete_memory_store(request: Request) -> dict:
+    """
+    Delete a Memory Store.
+
+    Expected payload:
+    {
+        "memory_store_id": "mem_store_...",
+        "api_key": "SK...",
+        "api_secret": "..."
+    }
+
+    Returns:
+    - 202 with status_url for async deletion (poll with /api/poll-operation-status)
+    - 200/204 for immediate deletion
+    """
+    data = await request.json()
+
+    memory_store_id = data.get("memory_store_id")
+    api_key = data.get("api_key")
+    api_secret = data.get("api_secret")
+
+    if not all([memory_store_id, api_key, api_secret]):
+        return {
+            "status": "error",
+            "message": "Missing required fields: memory_store_id, api_key, api_secret",
+        }
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.delete(
+                f"{MEMORY_API_BASE}/Stores/{memory_store_id}",
+                headers={"Authorization": get_basic_auth_header(api_key, api_secret)},
+                timeout=30.0,
+            )
+
+            if response.status_code in (200, 204):
+                # Immediate deletion
+                return {
+                    "status": "success",
+                    "message": "Memory Store deleted successfully",
+                }
+            elif response.status_code == 202:
+                # Async deletion - return status URL for polling
+                result = response.json()
+                status_url = result.get("statusUrl")
+
+                if not status_url:
+                    logger.error("202 response missing statusUrl")
+                    logger.error(f"  Response: {response.text}")
+                    return {
+                        "status": "error",
+                        "message": "Deletion accepted but no status URL returned",
+                        "response": response.text,
+                    }
+
+                return {
+                    "status": "accepted",
+                    "message": "Memory Store deletion request accepted",
+                    "status_url": status_url,
+                }
+            else:
+                endpoint = f"{MEMORY_API_BASE}/Stores/{memory_store_id}"
+                logger.error("Failed to delete Memory Store")
+                logger.error(f"  Endpoint: {endpoint}")
+                logger.error(f"  Status: {response.status_code}")
+                logger.error(f"  Response: {response.text}")
+                return {
+                    "status": "error",
+                    "message": (
+                        f"Failed to delete Memory Store: {response.status_code} - {response.text}"
+                    ),
+                    "endpoint": endpoint,
+                    "response": response.text,
+                    "status_code": response.status_code,
+                }
+
+    except httpx.TimeoutException:
+        return {"status": "error", "message": "Request timed out. Please try again."}
+    except Exception as e:
+        logger.exception(f"Error deleting Memory Store: {str(e)}")
+        return {"status": "error", "message": f"Error deleting Memory Store: {str(e)}"}
 
 
 @app.post("/api/verify-memory-store")
@@ -572,8 +913,13 @@ async def create_conversation_configuration(request: Request) -> dict:
         "api_secret": "...",
         "memory_store_id": "mem_store_...",
         "twilio_phone": "+18001234567",
-        "ngrok_domain": "your-app.ngrok.app"
+        "ngrok_domain": "your-app.ngrok.app",
+        "configuration_display_name": "my-config",
+        "configuration_description": "Conversation configuration description"
     }
+
+    Required fields: api_key, api_secret, memory_store_id, twilio_phone,
+    ngrok_domain, configuration_display_name, configuration_description
     """
     data = await request.json()
 
@@ -586,36 +932,46 @@ async def create_conversation_configuration(request: Request) -> dict:
     configuration_display_name = data.get("configuration_display_name", "").strip()
     configuration_description = data.get("configuration_description", "").strip()
 
-    if not all([api_key, api_secret, memory_store_id, twilio_phone, ngrok_domain]):
-        return {"status": "error", "message": "Missing required fields"}
+    if not all(
+        [
+            api_key,
+            api_secret,
+            memory_store_id,
+            twilio_phone,
+            ngrok_domain,
+            configuration_display_name,
+        ]
+    ):
+        return {
+            "status": "error",
+            "message": (
+                "Missing required fields: api_key, api_secret, memory_store_id, "
+                "twilio_phone, ngrok_domain, configuration_display_name"
+            ),
+        }
 
-    # Use user's display name as-is, or generate a default
+    # Use user's display name (now required)
     # displayName must be unique, URL-safe, max 32 characters
-    if configuration_display_name:
-        display_name = configuration_display_name
+    display_name = configuration_display_name
 
-        # Validate display name length
-        if len(display_name) > 32:
-            return {
-                "status": "error",
-                "message": "Display name must not exceed 32 characters",
-                "details": f"Current length: {len(display_name)}",
-            }
+    # Validate display name length
+    if len(display_name) > 32:
+        return {
+            "status": "error",
+            "message": "Display name must not exceed 32 characters",
+            "details": f"Current length: {len(display_name)}",
+        }
 
-        # Validate display name is URL-safe (letters, numbers, dot, underscore, tilde, hyphen)
-        if not re.match(r"^[A-Za-z0-9._~-]+$", display_name):
-            return {
-                "status": "error",
-                "message": (
-                    "Display name must be URL-safe: only letters, numbers, "
-                    "dot (.), underscore (_), tilde (~), and hyphen (-) are allowed"
-                ),
-                "details": f"Invalid display name: {display_name}",
-            }
-    else:
-        # Generate default with unique suffix only when not provided
-        unique_suffix = str(uuid.uuid4())[:8]
-        display_name = f"tac-quickstart-{unique_suffix}"
+    # Validate display name is URL-safe (letters, numbers, dot, underscore, tilde, hyphen)
+    if not re.match(r"^[A-Za-z0-9._~-]+$", display_name):
+        return {
+            "status": "error",
+            "message": (
+                "Display name must be URL-safe: only letters, numbers, "
+                "dot (.), underscore (_), tilde (~), and hyphen (-) are allowed"
+            ),
+            "details": f"Invalid display name: {display_name}",
+        }
 
     # Validate description length only when provided
     if configuration_description and len(configuration_description) > 128:
@@ -685,6 +1041,17 @@ async def create_conversation_configuration(request: Request) -> dict:
                     "conversation_configuration_id": result.get("id"),
                     "message": "Conversation Orchestrator configuration"
                     f" created: {result.get('id')}",
+                }
+            elif response.status_code == 202:
+                # Async operation - return status URL for polling
+                result = response.json()
+                logger.info("Conversation Orchestrator configuration creation accepted (async)")
+                logger.info(f"  Status URL: {result.get('statusUrl')}")
+                logger.info(f"  Display name: {display_name}")
+                return {
+                    "status": "accepted",
+                    "status_url": result.get("statusUrl"),
+                    "message": "Configuration creation accepted for processing",
                 }
             else:
                 endpoint = f"{CONVERSATION_API_BASE}/Configurations"
@@ -827,6 +1194,19 @@ async def delete_conversation_configuration(request: Request) -> dict:
                 return {
                     "status": "success",
                     "message": f"Configuration {configuration_id} deleted successfully",
+                }
+            elif response.status_code == 202:
+                # Async deletion - accepted
+                result = response.json()
+                logger.info(
+                    f"Conversation Orchestrator configuration deletion accepted (async): "
+                    f"{configuration_id}"
+                )
+                logger.info(f"  Status URL: {result.get('statusUrl')}")
+                return {
+                    "status": "accepted",
+                    "message": f"Configuration {configuration_id} deletion accepted for processing",
+                    "status_url": result.get("statusUrl"),
                 }
             else:
                 endpoint = f"{CONVERSATION_API_BASE}/Configurations/{configuration_id}"
