@@ -2,19 +2,9 @@
 
 from typing import Annotated
 
-from pydantic import BaseModel
-
 from tac.context.knowledge import KnowledgeClient
 from tac.models.knowledge import KnowledgeChunkResult
 from tac.tools.base import InjectedToolArg, TACTool, function_tool
-
-
-class KnowledgeToolConfig(BaseModel):
-    """Configuration to customize the generated knowledge tool."""
-
-    name: str | None = None
-    description: str | None = None
-    top_k: int = 5  # Number of knowledge chunks to return
 
 
 async def search_knowledge(
@@ -45,7 +35,10 @@ async def search_knowledge(
 async def create_knowledge_tool(
     knowledge_client: KnowledgeClient,
     knowledge_base_id: str,
-    tool_config: KnowledgeToolConfig | None = None,
+    *,
+    name: str | None = None,
+    description: str | None = None,
+    top_k: int = 5,
 ) -> TACTool:
     """
     Create a knowledge search tool for the given knowledge base.
@@ -54,13 +47,17 @@ async def create_knowledge_tool(
     Knowledge Base Search API via KnowledgeClient. The tool uses dependency injection
     to hide the knowledge client and knowledge ID from the LLM schema.
 
-    If tool_config provides name and description, uses them directly (no API call).
-    If either is missing, fetches the knowledge base metadata to use as defaults.
+    If both ``name`` and ``description`` are provided, uses them directly (no API call).
+    If either is missing, fetches the knowledge base metadata to derive defaults.
 
     Args:
         knowledge_client: KnowledgeClient instance for searching knowledge bases
         knowledge_base_id: Knowledge base ID string (e.g., "know_knowledgebase_...")
-        tool_config: Optional configuration for tool name, description, and top-K
+        name: Tool name exposed to the LLM. Defaults to ``search_<kb_display_name>``
+            (fetched from the knowledge base if unset).
+        description: Tool description exposed to the LLM. Defaults to the knowledge
+            base's ``description`` field (fetched if unset).
+        top_k: Number of knowledge chunks to return per query. Defaults to 5.
 
     Returns:
         A configured TACTool that searches the specified knowledge with injected dependencies
@@ -69,42 +66,34 @@ async def create_knowledge_tool(
         >>> tool = await create_knowledge_tool(
         ...     knowledge_client=tac.knowledge_client,
         ...     knowledge_base_id="know_knowledgebase_...",
-        ...     tool_config=KnowledgeToolConfig(
-        ...         name="search_promotions",
-        ...         description="Search for promotions and discounts",
-        ...         top_k=3,
-        ...     ),
+        ...     name="search_promotions",
+        ...     description="Search for promotions and discounts",
+        ...     top_k=3,
         ... )
 
     Example using KB metadata as defaults (fetches KB):
         >>> tool = await create_knowledge_tool(
         ...     knowledge_client=tac.knowledge_client,
         ...     knowledge_base_id="know_knowledgebase_...",
-        ...     tool_config=KnowledgeToolConfig(top_k=3),
+        ...     top_k=3,
         ... )
     """
-    tool_config = tool_config or KnowledgeToolConfig()
-
-    # If name and description are provided, use them directly (no fetch needed)
-    if tool_config.name and tool_config.description:
-        tool_name = tool_config.name
-        tool_description = tool_config.description
+    if name and description:
+        tool_name = name
+        tool_description = description
     else:
-        # Fetch knowledge base metadata to use as fallback
         knowledge_base = await knowledge_client.get_knowledge_base(knowledge_base_id)
-        tool_name = tool_config.name or (
+        tool_name = name or (
             f"search_{knowledge_base.display_name.lower().replace(' ', '_').replace('-', '_')}"
         )
-        tool_description = tool_config.description or (
+        tool_description = description or (
             f"{knowledge_base.description}\n\nThe input MUST be a question in the form of a string."
         )
 
-    # Wrap the standalone search_knowledge function with the tool decorator
     knowledge_tool = function_tool(name=tool_name, description=tool_description)(search_knowledge)
 
-    # Configure injection
     return knowledge_tool.configure_injection(
         knowledge_client=knowledge_client,
         knowledge_base_id=knowledge_base_id,
-        top_k=tool_config.top_k,
+        top_k=top_k,
     )

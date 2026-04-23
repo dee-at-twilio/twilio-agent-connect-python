@@ -17,6 +17,7 @@ from tac.models.conversation import (
     SendMessageActionPayload,
     SendMessageActionRequest,
 )
+from tac.models.handoff import HandoffPayload
 from tac.models.intelligence import (
     CommunicationsRange,
     ExecutionDetails,
@@ -54,6 +55,7 @@ __all__ = [
     "ActionTextContent",
     "AuthorInfo",
     "Communication",
+    "HandoffPayload",
     "CommunicationContent",
     "CommunicationParticipant",
     "CommunicationRequest",

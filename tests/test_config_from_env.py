@@ -159,3 +159,21 @@ class TestTACConfigFromEnv:
         config = TACConfig.from_env()
 
         assert config.region is None
+
+    def test_from_env_with_studio_handoff_flow_sid(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._set_all_env_vars(monkeypatch)
+        monkeypatch.setenv("TWILIO_STUDIO_HANDOFF_FLOW_SID", "FW" + "a" * 32)
+
+        config = TACConfig.from_env()
+
+        assert config.studio_handoff_flow_sid == "FW" + "a" * 32
+
+    def test_from_env_without_studio_handoff_flow_sid(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._set_all_env_vars(monkeypatch)
+        monkeypatch.delenv("TWILIO_STUDIO_HANDOFF_FLOW_SID", raising=False)
+
+        config = TACConfig.from_env()
+
+        assert config.studio_handoff_flow_sid is None

@@ -112,22 +112,6 @@ class VoiceChannel(BaseChannel):
             )
         )
 
-    async def handle_handoff(self, form_data: dict[str, str]) -> str:
-        """
-        Generic handler for handoff webhook. Delegates to registered TAC handoff callback.
-
-        Args:
-            form_data: Dict of form data from the request.
-
-        Returns:
-            TwiML/content string from the handoff callback.
-
-        Raises:
-            ValueError: If no handoff handler is registered.
-        """
-        self.logger.info("Handling handoff webhook (delegated)")
-        return await self.tac.trigger_handoff(form_data)
-
     async def handle_conversation_relay_callback(
         self,
         payload_dict: dict[str, str],
@@ -143,11 +127,10 @@ class VoiceChannel(BaseChannel):
                 Validated internally into ConversationRelayCallbackPayload.
 
         Returns:
-            Content string for handoff responses, or None for simple acknowledgment.
+            None for simple acknowledgment.
 
         Raises:
             ValidationError: If the payload dict fails validation.
-            ValueError: If handoff is triggered but no handler is registered.
         """
         payload = ConversationRelayCallbackPayload(**payload_dict)
 
@@ -155,9 +138,6 @@ class VoiceChannel(BaseChannel):
             f"[ConversationRelay Callback] CallSid: {payload.call_sid}, "
             f"Status: {payload.call_status}"
         )
-
-        if payload.call_status == "in-progress" and payload.handoff_data:
-            return await self.handle_handoff(payload_dict)
 
         # If call is completed, close associated conversations
         if payload.call_status == "completed":
@@ -467,6 +447,23 @@ class VoiceChannel(BaseChannel):
                 await websocket.send_text(
                     json.dumps({"type": "text", "token": response, "last": True})
                 )
+
+            # If a handoff is pending, send the WS "end" message now that the
+            # LLM's final response has been delivered to the caller.
+            if conversation_id in self._conversations:
+                session = self._conversations[conversation_id]
+                if session.pending_handoff_data is not None:
+                    try:
+                        await websocket.send_text(
+                            session.pending_handoff_data.model_dump_json(by_alias=True)
+                        )
+                        session.pending_handoff_data = None
+                    except (WebSocketDisconnectError, RuntimeError):
+                        self.logger.warning(
+                            "WebSocket closed before sending handoff end message; "
+                            "caller will not be transferred",
+                            conversation_id=conversation_id,
+                        )
 
         except asyncio.CancelledError:
             # Re-raise to propagate cancellation up the call stack.

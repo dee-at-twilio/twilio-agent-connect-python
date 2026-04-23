@@ -266,6 +266,47 @@ class ConversationClient(BaseAPIClient):
             )
             raise
 
+    async def clear_status_callbacks(
+        self,
+        conversation_id: str,
+    ) -> None:
+        """
+        Clear statusCallbacks on a conversation's instance configuration.
+
+        This stops the conversation from sending webhook events to TAC,
+        which is needed during handoff so the receiving system can take over.
+
+        Args:
+            conversation_id: The conversation ID to update
+
+        Raises:
+            httpx.HTTPError: If the API request fails
+        """
+        url = f"{self.base_url}/v2/Conversations/{conversation_id}"
+        request_payload: dict[str, Any] = {"configuration": {"statusCallbacks": []}}
+
+        try:
+            async with self._get_client() as client:
+                response = await client.patch(
+                    url,
+                    json=request_payload,
+                )
+                response.raise_for_status()
+
+        except httpx.HTTPError as e:
+            response_text = (
+                getattr(e.response, "text", "No response body")
+                if hasattr(e, "response")
+                else "No response"
+            )
+            self.logger.error(
+                f"Failed to clear status callbacks: {e}\n"
+                f"URL: {url}\n"
+                f"Request body: {request_payload}\n"
+                f"Response: {response_text}"
+            )
+            raise
+
     async def create_communication(
         self,
         conversation_id: str,

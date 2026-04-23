@@ -70,6 +70,19 @@ class TestTACServerConfig:
         assert config.port == 8000
 
 
+class TestTACConfigStudioHandoffFlowSid:
+    """Test TACConfig studio_handoff_flow_sid field."""
+
+    def test_studio_handoff_flow_sid_default_none(self) -> None:
+        tac = TAC(get_test_config())
+        assert tac.config.studio_handoff_flow_sid is None
+
+    def test_studio_handoff_flow_sid_accepts_value(self) -> None:
+        flow_sid = "FW" + "a" * 32
+        tac = TAC({**get_test_config(), "studio_handoff_flow_sid": flow_sid})
+        assert tac.config.studio_handoff_flow_sid == flow_sid
+
+
 class TestWebSocketDisconnectError:
     """Test WebSocketDisconnectError."""
 
@@ -457,3 +470,41 @@ class TestTACFastAPIServer:
         )
         route_paths = [r.path for r in server.app.routes if hasattr(r, "path")]
         assert route_paths.count("/webhook") == 1
+
+
+class TestTwiMLConnectAction:
+    """TwiML <Connect action=...> routes to Studio when the Flow SID is configured,
+    otherwise falls back to the TAC ConversationRelay callback path."""
+
+    def _build_server(self, **tac_overrides: object) -> object:
+        from fastapi.testclient import TestClient
+
+        from tac.channels.voice import VoiceChannel
+        from tac.server import TACFastAPIServer
+
+        tac = TAC({**get_test_config(), **tac_overrides})
+        server = TACFastAPIServer(
+            tac=tac,
+            config=TACServerConfig(public_domain="test.ngrok.io"),
+            voice_channel=VoiceChannel(tac),
+        )
+        return TestClient(server.app)
+
+    def test_connect_action_uses_studio_webhook_when_flow_sid_set(self) -> None:
+        flow_sid = "FW" + "a" * 32
+        client = self._build_server(studio_handoff_flow_sid=flow_sid)
+        resp = client.post("/twiml")  # type: ignore[attr-defined]
+
+        assert resp.status_code == 200
+        expected = (
+            f'action="https://webhooks.twilio.com/v1/Accounts/ACtest123'
+            f'/Flows/{flow_sid}?Trigger=incomingCall"'
+        )
+        assert expected in resp.text
+
+    def test_connect_action_falls_back_to_tac_callback_path(self) -> None:
+        client = self._build_server()  # no studio_handoff_flow_sid
+        resp = client.post("/twiml")  # type: ignore[attr-defined]
+
+        assert resp.status_code == 200
+        assert 'action="https://test.ngrok.io/conversation-relay-callback"' in resp.text

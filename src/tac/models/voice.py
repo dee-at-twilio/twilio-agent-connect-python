@@ -123,11 +123,6 @@ class ConversationRelayCallbackPayload(BaseModel):
     session_duration: str | None = Field(
         None, alias="SessionDuration", description="Session duration in seconds"
     )
-    handoff_data: str | None = Field(
-        None,
-        alias="HandoffData",
-        description="JSON string containing handoff information",
-    )
 
     model_config = {"populate_by_name": True}
 

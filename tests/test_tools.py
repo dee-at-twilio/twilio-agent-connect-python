@@ -17,10 +17,7 @@ from tac.tools.base import (
     create_tool,
     function_tool,
 )
-from tac.tools.knowledge import (
-    KnowledgeToolConfig,
-    create_knowledge_tool,
-)
+from tac.tools.knowledge import create_knowledge_tool
 from tac.tools.memory import create_memory_tool
 
 
@@ -97,6 +94,35 @@ class TestTACTool:
         assert anthropic_format["description"] == "A test tool"
         assert anthropic_format["input_schema"]["type"] == "object"
         assert "x" in anthropic_format["input_schema"]["properties"]
+
+    @pytest.mark.asyncio
+    async def test_to_openai_agents_sdk_tool(self):
+        """Test conversion to OpenAI Agents SDK FunctionTool with live invocation."""
+        from agents import FunctionTool
+
+        async def dummy_func(x: str) -> dict[str, str]:
+            return {"echo": x}
+
+        tool = TACTool(
+            name="test_tool",
+            description="A test tool",
+            params_json_schema={
+                "type": "object",
+                "properties": {"x": {"type": "string"}},
+                "required": ["x"],
+            },
+            _raw_implementation=dummy_func,
+        )
+
+        sdk_tool = tool.to_openai_agents_sdk_tool()
+
+        assert isinstance(sdk_tool, FunctionTool)
+        assert sdk_tool.name == "test_tool"
+        assert sdk_tool.description == "A test tool"
+        assert sdk_tool.params_json_schema == tool.params_json_schema
+
+        result_json = await sdk_tool.on_invoke_tool(None, '{"x": "hello"}')
+        assert json.loads(result_json) == {"echo": "hello"}
 
     def test_to_json(self):
         """Test conversion to JSON string."""
@@ -705,9 +731,8 @@ class TestKnowledgeTools:
         tool = await create_knowledge_tool(
             mock_knowledge_client,
             knowledge_base.id,
-            tool_config=KnowledgeToolConfig(
-                name="search_product_faq", description=knowledge_base.description
-            ),
+            name="search_product_faq",
+            description=knowledge_base.description,
         )
 
         assert isinstance(tool, TACTool)
@@ -731,7 +756,7 @@ class TestKnowledgeTools:
         # Mock get_knowledge_base to return the knowledge base
         mock_knowledge_client.get_knowledge_base = AsyncMock(return_value=knowledge_base)
 
-        # Call without tool_config to trigger default behavior
+        # Call without name/description to trigger the KB-metadata defaults
         tool = await create_knowledge_tool(
             mock_knowledge_client,
             knowledge_base.id,
@@ -753,11 +778,13 @@ class TestKnowledgeTools:
         mock_knowledge_client = MagicMock(spec=KnowledgeClient)
 
         knowledge_base_id = "know_knowledgebase_00000000000000000000000000"
-        tool_config = KnowledgeToolConfig(
-            name="custom_product_search", description="Search product documentation"
-        )
 
-        tool = await create_knowledge_tool(mock_knowledge_client, knowledge_base_id, tool_config)
+        tool = await create_knowledge_tool(
+            mock_knowledge_client,
+            knowledge_base_id,
+            name="custom_product_search",
+            description="Search product documentation",
+        )
 
         assert tool.name == "custom_product_search"
         assert tool.description == "Search product documentation"
@@ -769,13 +796,16 @@ class TestKnowledgeTools:
         mock_knowledge_client = MagicMock(spec=KnowledgeClient)
 
         knowledge_base_id = "know_knowledgebase_00000000000000000000000000"
-        tool_config = KnowledgeToolConfig(
-            name="test_tool", description="Test description", top_k=10
+
+        tool = await create_knowledge_tool(
+            mock_knowledge_client,
+            knowledge_base_id,
+            name="test_tool",
+            description="Test description",
+            top_k=10,
         )
 
-        tool = await create_knowledge_tool(mock_knowledge_client, knowledge_base_id, tool_config)
-
-        # We can't directly access tool_config.top_k from outside,
+        # We can't directly access top_k from outside,
         # but we can verify it's used in the API call via mocking
         assert isinstance(tool, TACTool)
 
@@ -798,9 +828,8 @@ class TestKnowledgeTools:
         tool = await create_knowledge_tool(
             mock_knowledge_client,
             knowledge_base.id,
-            tool_config=KnowledgeToolConfig(
-                name="search_product_faq", description=knowledge_base.description
-            ),
+            name="search_product_faq",
+            description=knowledge_base.description,
         )
 
         assert "query" in tool.params_json_schema["properties"]
@@ -844,9 +873,8 @@ class TestKnowledgeTools:
         tool = await create_knowledge_tool(
             mock_knowledge_client,
             knowledge_base.id,
-            tool_config=KnowledgeToolConfig(
-                name="search_product_faq", description=knowledge_base.description
-            ),
+            name="search_product_faq",
+            description=knowledge_base.description,
         )
         result = await tool(query="What is the return policy?")
 
@@ -874,11 +902,14 @@ class TestKnowledgeTools:
         mock_knowledge_client.search_knowledge_base = MagicMock(side_effect=mock_search)
 
         knowledge_base_id = "know_knowledgebase_00000000000000000000000000"
-        tool_config = KnowledgeToolConfig(
-            name="test_tool", description="Test description", top_k=10
-        )
 
-        tool = await create_knowledge_tool(mock_knowledge_client, knowledge_base_id, tool_config)
+        tool = await create_knowledge_tool(
+            mock_knowledge_client,
+            knowledge_base_id,
+            name="test_tool",
+            description="Test description",
+            top_k=10,
+        )
         await tool(query="test query")
 
         # Verify top-K value
@@ -917,12 +948,14 @@ class TestKnowledgeTools:
         tool1 = await create_knowledge_tool(
             mock_client1,
             knowledge_base1.id,
-            KnowledgeToolConfig(name="tool1", description="Tool 1"),
+            name="tool1",
+            description="Tool 1",
         )
         tool2 = await create_knowledge_tool(
             mock_client2,
             knowledge_base2.id,
-            KnowledgeToolConfig(name="tool2", description="Tool 2"),
+            name="tool2",
+            description="Tool 2",
         )
 
         # Tools share the same raw implementation function but have different injected args
@@ -961,9 +994,8 @@ class TestKnowledgeTools:
         tool = await create_knowledge_tool(
             mock_knowledge_client,
             knowledge_base.id,
-            tool_config=KnowledgeToolConfig(
-                name="search_product_faq", description=knowledge_base.description
-            ),
+            name="search_product_faq",
+            description=knowledge_base.description,
         )
 
         # Only query should be in schema, not the injected params

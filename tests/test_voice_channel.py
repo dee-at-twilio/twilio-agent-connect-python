@@ -8,6 +8,7 @@ import pytest
 from tac import TAC
 from tac.channels.voice import VoiceChannel, generate_twiml
 from tac.models.conversation import ConversationResponse
+from tac.models.handoff import PendingHandoffData
 from tac.models.memory import MemoryRetrievalResponse
 from tac.models.session import ConversationSession
 from tac.models.tac import TACMemoryResponse
@@ -164,6 +165,34 @@ class TestVoiceChannel:
 
         # Verify websocket.send_text was called again
         assert mock_websocket.send_text.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_send_response_flushes_pending_handoff_after_final_response(self) -> None:
+        """After the LLM's final response, a pending handoff end message is flushed
+        and cleared on the session."""
+        import json
+
+        tac = TAC(get_test_config())
+        channel = VoiceChannel(tac)
+
+        channel._start_conversation("CALL123", "profile_test")
+        session = channel._conversations["CALL123"]
+        session.pending_handoff_data = PendingHandoffData(
+            handoff_data='{"conversationId":"CALL123"}',
+        )
+
+        mock_websocket = AsyncMock()
+        channel._websocket_manager.add_websocket("CALL123", mock_websocket)
+
+        await channel.send_response("CALL123", "Transferring you now.")
+
+        assert mock_websocket.send_text.call_count == 2
+        final_call = mock_websocket.send_text.call_args_list[-1][0][0]
+        assert json.loads(final_call) == {
+            "type": "end",
+            "handoffData": '{"conversationId":"CALL123"}',
+        }
+        assert session.pending_handoff_data is None
 
     @pytest.mark.asyncio
     async def test_send_response_without_websocket(self) -> None:
@@ -1111,112 +1140,6 @@ class TestHandleConversationRelayCallback:
         }
         base.update(overrides)
         return base
-
-    @pytest.mark.asyncio
-    async def test_handoff_on_in_progress_with_handoff_data(self) -> None:
-        """Test that in-progress call with HandoffData triggers handoff callback."""
-        tac = TAC(get_test_config())
-        channel = VoiceChannel(tac)
-
-        handoff_result = "<Response><Enqueue/></Response>"
-
-        async def mock_handoff(form_data: dict) -> str:
-            return handoff_result
-
-        tac.on_handoff(mock_handoff)
-
-        payload = self._make_payload(
-            CallStatus="in-progress",
-            HandoffData='{"reason": "customer request"}',
-        )
-
-        result = await channel.handle_conversation_relay_callback(payload)
-        assert result == handoff_result
-
-    @pytest.mark.asyncio
-    async def test_handoff_with_sync_callback(self) -> None:
-        """Test that synchronous handoff callbacks are supported."""
-        tac = TAC(get_test_config())
-        channel = VoiceChannel(tac)
-
-        handoff_result = "<Response><Dial>+15551234567</Dial></Response>"
-
-        def mock_handoff_sync(form_data: dict) -> str:
-            return handoff_result
-
-        tac.on_handoff(mock_handoff_sync)
-
-        payload = self._make_payload(
-            CallStatus="in-progress",
-            HandoffData='{"reason": "customer request"}',
-        )
-
-        result = await channel.handle_conversation_relay_callback(payload)
-        assert result == handoff_result
-
-    @pytest.mark.asyncio
-    async def test_handoff_with_wrapped_async_callback(self) -> None:
-        """Test that wrapped async callbacks (e.g., functools.partial) are supported."""
-        from functools import partial
-
-        tac = TAC(get_test_config())
-        channel = VoiceChannel(tac)
-
-        handoff_result = "<Response><Say>Wrapped async handler</Say></Response>"
-
-        async def mock_handoff_with_extra_arg(extra: str, form_data: dict) -> str:
-            assert extra == "test"
-            return handoff_result
-
-        # Wrap the async function with functools.partial
-        # inspect.iscoroutinefunction() would return False for this
-        wrapped_handler = partial(mock_handoff_with_extra_arg, "test")
-        tac.on_handoff(wrapped_handler)
-
-        payload = self._make_payload(
-            CallStatus="in-progress",
-            HandoffData='{"reason": "customer request"}',
-        )
-
-        result = await channel.handle_conversation_relay_callback(payload)
-        assert result == handoff_result
-
-    @pytest.mark.asyncio
-    async def test_handoff_passes_original_payload_dict(self) -> None:
-        """Test that handoff receives the original payload_dict with all keys."""
-        tac = TAC(get_test_config())
-        channel = VoiceChannel(tac)
-
-        captured_data: dict = {}
-
-        async def mock_handoff(form_data: dict) -> str:
-            captured_data.update(form_data)
-            return "OK"
-
-        tac.on_handoff(mock_handoff)
-
-        payload = self._make_payload(
-            CallStatus="in-progress",
-            HandoffData='{"reason": "test"}',
-            ExtraField="should-be-preserved",
-        )
-
-        await channel.handle_conversation_relay_callback(payload)
-        assert captured_data["ExtraField"] == "should-be-preserved"
-
-    @pytest.mark.asyncio
-    async def test_handoff_raises_without_handler(self) -> None:
-        """Test that handoff raises ValueError when no handler is registered."""
-        tac = TAC(get_test_config())
-        channel = VoiceChannel(tac)
-
-        payload = self._make_payload(
-            CallStatus="in-progress",
-            HandoffData='{"reason": "test"}',
-        )
-
-        with pytest.raises(ValueError, match="No handoff handler registered"):
-            await channel.handle_conversation_relay_callback(payload)
 
     @pytest.mark.asyncio
     async def test_completed_call_closes_conversations(self) -> None:

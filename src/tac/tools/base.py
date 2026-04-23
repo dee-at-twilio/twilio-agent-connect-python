@@ -10,6 +10,7 @@ import json
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import (
+    TYPE_CHECKING,
     Annotated,
     Union,
     get_args,
@@ -18,6 +19,12 @@ from typing import (
 )
 
 from pydantic import TypeAdapter
+
+if TYPE_CHECKING:
+    # Typing-only soft dep: `openai-agents` is optional at runtime. The ignore
+    # silences strict-mode downstream mypy when the package isn't installed
+    # (and is a no-op when it is — `unused-ignore` covers both environments).
+    from agents import FunctionTool  # type: ignore[import-not-found,unused-ignore]
 
 
 # Marker class for injected tool arguments
@@ -263,6 +270,46 @@ class TACTool:
             "description": self.description,
             "input_schema": self.params_json_schema,
         }
+
+    def to_openai_agents_sdk_tool(self) -> "FunctionTool":
+        """
+        Convert this tool to an OpenAI Agents SDK ``FunctionTool`` instance.
+
+        Unlike ``to_openai_format`` and ``to_anthropic_format`` (which return
+        plain dicts consumed by HTTP APIs), the OpenAI Agents SDK dispatches
+        on tool *class*, so this returns a live ``FunctionTool`` object with
+        an ``on_invoke`` closure that calls this tool and JSON-encodes the
+        result.
+
+        Requires the ``openai-agents`` package:
+
+            pip install openai-agents
+
+        Returns:
+            A ``FunctionTool`` ready to pass to ``Agent(tools=[...])``.
+        """
+        try:
+            from agents import FunctionTool
+        except ImportError as e:
+            raise ImportError(
+                "to_openai_agents_sdk_tool() requires the openai-agents package. "
+                "Install with: pip install openai-agents"
+            ) from e
+
+        async def on_invoke(_ctx: object, args_json: str) -> str:
+            args = json.loads(args_json) if args_json else {}
+            result = await self(**args)
+            return json.dumps(result)
+
+        return FunctionTool(
+            name=self.name,
+            description=self.description,
+            params_json_schema=self.params_json_schema,
+            on_invoke_tool=on_invoke,
+            # Disable strict mode: Agents SDK's strict_json_schema rejects
+            # some of the JSON Schema features TAC emits (e.g. unions).
+            strict_json_schema=False,
+        )
 
     def to_json(self) -> str:
         """Convert tool to JSON string (OpenAI format by default)."""

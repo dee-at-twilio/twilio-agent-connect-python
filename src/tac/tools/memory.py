@@ -35,6 +35,9 @@ async def retrieve_profile_memory(
 def create_memory_tool(
     conversation_memory_client: MemoryClient,
     session: ConversationSession,
+    *,
+    name: str | None = None,
+    description: str | None = None,
 ) -> TACTool:
     """
     Create memory tool with injected MemoryClient and session context.
@@ -42,19 +45,25 @@ def create_memory_tool(
     Args:
         conversation_memory_client: MemoryClient instance for retrieving memories
         session: Current session identity with profile and conversation IDs
+        name: Tool name exposed to the LLM. Defaults to the function name
+            (``"retrieve_profile_memory"``).
+        description: Tool description exposed to the LLM. Defaults to the
+            function's docstring.
 
     Returns:
         Configured memory tool
 
     Example:
-        >>> tool = create_memory_tool(conversation_memory_client, session)
-        >>> # LLM only sees: retrieve_profile_memory(query: str)
+        >>> tool = create_memory_tool(
+        ...     conversation_memory_client,
+        ...     session,
+        ...     name="recall_customer_history",
+        ...     description="Recall prior preferences and complaints for this customer.",
+        ... )
         >>> result = await tool(query="user preferences")
     """
-    # Wrap the standalone function with the tool decorator
-    memory_tool = function_tool()(retrieve_profile_memory)
+    memory_tool = function_tool(name=name, description=description)(retrieve_profile_memory)
 
-    # Configure injection with the memory client and profile ID
     return memory_tool.configure_injection(
         conversation_memory_client=conversation_memory_client,
         profile_id=session.profile_id,

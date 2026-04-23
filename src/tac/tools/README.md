@@ -15,6 +15,7 @@ The `TACTool` class represents a tool/function that can be used with LLMs:
 - `configure_injection()`: Configure runtime dependencies to inject when the tool is called
 - `to_openai_format()`: Convert to OpenAI function calling format
 - `to_anthropic_format()`: Convert to Anthropic tool format
+- `to_openai_agents_sdk_tool()`: Convert to an OpenAI Agents SDK `FunctionTool` (requires `pip install openai-agents`)
 
 ### Dependency Injection
 
@@ -143,29 +144,17 @@ result = await memory_tool(query="user preferences about food")
 Search a knowledge base via Twilio Conversation Memory:
 
 ```python
-from tac.tools.knowledge import create_knowledge_tool, KnowledgeToolConfig
-from tac.models.knowledge import KnowledgeBase
+from tac.tools.knowledge import create_knowledge_tool
 
-# Define knowledge base
-knowledge_base = KnowledgeBase(
-    id="know_knowledgebase_000000000000000000000000",
-    name="Product FAQ",
-    description="Frequently asked questions about products",
-)
-
-# Create tool with optional config
-knowledge_tool = create_knowledge_tool(
-    conversation_memory_client=tac.conversation_memory_client,
-    knowledge_base=knowledge_base,
-    tool_config=KnowledgeToolConfig(
-        name="search_product_faq",  # Optional custom name
-        description="Search product FAQs",  # Optional custom description
-        top_k=3  # Number of results to return
-    )
+knowledge_tool = await create_knowledge_tool(
+    knowledge_client=tac.knowledge_client,
+    knowledge_base_id="know_knowledgebase_000000000000000000000000",
+    name="search_product_faq",          # optional; defaults to search_<kb_display_name>
+    description="Search product FAQs",  # optional; defaults to the KB's description
+    top_k=3,
 )
 
 # LLM only sees: search_product_faq(query: str)
-# Execute tool (async)
 results = await knowledge_tool(query="What is the return policy?")
 ```
 

@@ -174,6 +174,16 @@ class TACConfig(BaseModel):
         description="Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)",
     )
 
+    studio_handoff_flow_sid: str | None = Field(
+        default=None,
+        description="Twilio Studio Flow SID (FWxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx) "
+        "for handoff. TAC constructs both the digital-handoff Studio Executions "
+        "URL (studio.twilio.com/v2/Flows/{SID}/Executions) and the voice "
+        "<Connect action> webhook URL "
+        "(webhooks.twilio.com/v1/Accounts/{AccountSid}/Flows/{SID}?Trigger=incomingCall) "
+        "from this SID.",
+    )
+
     conversation_intelligence_config: ConversationIntelligenceConfig | None = Field(
         default=None,
         description="Optional Conversation Intelligence configuration for filtering webhook "
@@ -217,6 +227,7 @@ class TACConfig(BaseModel):
         - TWILIO_KNOWLEDGE_BASE_ID: Knowledge Base ID (optional)
         - TWILIO_LOG_LEVEL: Logging level (optional, defaults to INFO)
         - TWILIO_REGION: Twilio region for data residency (optional, e.g., 'au1', 'ie1')
+        - TWILIO_STUDIO_HANDOFF_FLOW_SID: Studio Flow SID for handoff (optional)
 
         Memory configuration is automatically loaded via TwilioMemoryConfig.from_env()
         from these environment variables (all optional):
@@ -255,6 +266,7 @@ class TACConfig(BaseModel):
             knowledge_base_id=os.environ.get("TWILIO_KNOWLEDGE_BASE_ID"),
             log_level=os.environ.get("TWILIO_LOG_LEVEL", "INFO"),
             region=os.environ.get("TWILIO_REGION"),
+            studio_handoff_flow_sid=os.environ.get("TWILIO_STUDIO_HANDOFF_FLOW_SID"),
             memory_config=memory_config,
             conversation_intelligence_config=conversation_intelligence_config,
         )

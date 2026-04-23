@@ -117,10 +117,6 @@ class TAC:
             | None
         ) = None
 
-        self._handoff_callback: (
-            Callable[[dict[str, str]], str] | Callable[[dict[str, str]], Awaitable[str]] | None
-        ) = None
-
     async def retrieve_memory(
         self,
         conversation_context: ConversationSession,
@@ -297,28 +293,6 @@ class TAC:
         """
         self._conversation_ended_callback = callback
 
-    def on_handoff(
-        self,
-        callback: Callable[[dict[str, str]], str] | Callable[[dict[str, str]], Awaitable[str]],
-    ) -> None:
-        """Register callback invoked on handoff event.
-
-        Example:
-            ```python
-            def handle_handoff(form_data: dict[str, str]) -> str:
-                # Process handoff and return TwiML...
-                return "<Response><Say>Transferring...</Say></Response>"
-
-
-            tac.on_handoff(handle_handoff)
-            ```
-
-        Args:
-            callback: Function to call with form data. Must return TwiML string.
-                Supports sync and async.
-        """
-        self._handoff_callback = callback
-
     async def trigger_message_ready(
         self,
         user_message: str,
@@ -393,22 +367,3 @@ class TAC:
             result = self._conversation_ended_callback(conversation_context)
             if inspect.isawaitable(result):
                 await result
-
-    async def trigger_handoff(self, form_data: dict[str, str]) -> str:
-        """Trigger the registered handoff callback.
-
-        Args:
-            form_data: Form data from handoff webhook.
-
-        Returns:
-            TwiML string to execute handoff action.
-        """
-        if not self._handoff_callback:
-            raise ValueError(
-                "No handoff handler registered. Use tac.on_handoff() to register a callback."
-            )
-
-        result = self._handoff_callback(form_data)
-        if inspect.isawaitable(result):
-            return await result
-        return result
