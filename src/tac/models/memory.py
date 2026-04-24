@@ -36,26 +36,36 @@ class MemoryRetrievalRequest(BaseModel):
     observations_limit: int | None = Field(
         default=20,
         alias="observationsLimit",
-        ge=1,
+        ge=0,
         le=100,
-        description="Maximum number of observation memories to return",
+        description="Max observations to return (0-100). Set to 0 to disable.",
         json_schema_extra={"example": 20},
     )
     summaries_limit: int | None = Field(
         default=5,
         alias="summariesLimit",
-        ge=1,
+        ge=0,
         le=100,
-        description="Maximum number of summary memories to return",
+        description="Max summaries to return (0-100). Set to 0 to disable.",
         json_schema_extra={"example": 5},
     )
     communications_limit: int | None = Field(
-        default=10,
+        default=0,
         alias="communicationsLimit",
-        ge=1,
+        ge=0,
         le=100,
-        description="Maximum number of communication memories to return",
-        json_schema_extra={"example": 10},
+        description="Max communications to return (0-100). Set to 0 to disable.",
+        json_schema_extra={"example": 0},
+    )
+    relevance_threshold: float | None = Field(
+        default=0.0,
+        alias="relevanceThreshold",
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Min relevance score (0.0-1.0). Only applies when results are ranked by relevance."
+        ),
+        json_schema_extra={"example": 0.5},
     )
 
     model_config = {"populate_by_name": True}
