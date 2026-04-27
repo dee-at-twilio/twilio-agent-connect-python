@@ -10,11 +10,18 @@ from pydantic import BaseModel, Field
 from tac import TAC
 from tac.channels.base import BaseChannel
 from tac.models.conversation import (
+    ActionChannelSettings,
+    ActionParticipantRef,
+    ActionTextContent,
     Communication,
     ConversationResponse,
     ParticipantAddress,
+    ParticipantRequest,
     ParticipantResponse,
+    SendMessageActionPayload,
+    SendMessageActionRequest,
 )
+from tac.models.outbound import InitiateConversationResult, InitiateMessagingConversationOptions
 from tac.models.session import AuthorInfo
 
 
@@ -48,7 +55,7 @@ class MessagingChannel(BaseChannel):
     COMMUNICATION_CREATED, and CONVERSATION_UPDATED event types.
 
     Subclasses must implement:
-    - is_own_message(): Check if a message is from the bot itself
+    - is_default_agent_address(): Fast-path check for the channel's default agent address
     - get_channel_type_upper(): Return uppercase channel type ("SMS", "CHAT")
     - send_response(): Send messages back through the channel
     - get_channel_name(): Return lowercase channel name ("sms", "chat")
@@ -65,16 +72,68 @@ class MessagingChannel(BaseChannel):
         self._max_tracked_tokens = dedup_capacity
 
     @abstractmethod
-    def is_own_message(self, author_address: str) -> bool:
-        """Check if a message is from the bot itself.
+    def is_default_agent_address(self, author_address: str) -> bool:
+        """Fast-path check: is the author address this channel's default agent address?
+
+        For example, config.phone_number for SMS, agent_address for Chat.
 
         Args:
             author_address: The address of the message author
 
         Returns:
-            True if the message is from the bot
+            True if the address matches the channel's default agent address
         """
         pass
+
+    async def _is_own_message(
+        self,
+        author_address: str,
+        conversation_id: str,
+        author_participant_id: str | None,
+    ) -> bool:
+        """Check if a message is from the bot itself (3-tier).
+
+        1. Default agent address (stateless, no API call)
+        2. Session metadata from_address (same-process, for custom from)
+        3. API fallback via listParticipants (cross-process / multi-worker)
+        """
+        if self.is_default_agent_address(author_address):
+            return True
+
+        session = self._conversations.get(conversation_id)
+        from_address = session.metadata.get("from_address") if session else None
+        if from_address == author_address:
+            return True
+
+        # If this process knows the outbound sender (from_address is set) and it
+        # didn't match, this is a customer message — skip the API call.
+        if session and from_address:
+            return False
+
+        if author_participant_id:
+            try:
+                participants = await self.tac.conversation_orchestrator_client.list_participants(
+                    conversation_id
+                )
+                author_p = next((p for p in participants if p.id == author_participant_id), None)
+                if author_p:
+                    if author_p.type is None:
+                        self.logger.warning(
+                            "Participant type is undefined",
+                            conversation_id=conversation_id,
+                            participant_id=author_participant_id,
+                        )
+                    if author_p.type in ("AI_AGENT", "HUMAN_AGENT", "AGENT"):
+                        return True
+            except Exception as e:
+                self.logger.warning(
+                    "Failed to look up participant type for self-message check",
+                    conversation_id=conversation_id,
+                    participant_id=author_participant_id,
+                    error=str(e),
+                )
+
+        return False
 
     @abstractmethod
     def get_channel_type_upper(self) -> str:
@@ -215,10 +274,13 @@ class MessagingChannel(BaseChannel):
         conv_id = communication_data.conversation_id
         message_text = communication_data.content.text
 
-        if (
-            self.is_own_message(communication_data.author.address)
-            or not message_text
-            or not message_text.strip()
+        if not message_text or not message_text.strip():
+            return
+
+        if await self._is_own_message(
+            communication_data.author.address,
+            conv_id,
+            communication_data.author.participant_id,
         ):
             return
 
@@ -266,6 +328,138 @@ class MessagingChannel(BaseChannel):
             and self._conversations[conv_id].channel == self.get_channel_name()
         ):
             await self._end_conversation(conv_id)
+
+    async def _initiate_messaging_conversation(
+        self,
+        options: InitiateMessagingConversationOptions,
+        from_address: str,
+        customer_address_kwargs: dict[str, str | None],
+        agent_address_kwargs: dict[str, str | None],
+        extra_metadata: dict[str, str] | None = None,
+        channel_settings: ActionChannelSettings | None = None,
+    ) -> InitiateConversationResult:
+        """Shared outbound initiation logic for messaging channels (SMS, Chat).
+
+        Subclasses call this with channel-specific address kwargs and settings.
+        """
+        channel_type = self.get_channel_type_upper()
+        conversation_id: str | None = None
+        reused = False
+
+        try:
+            (
+                conversation_id,
+                reused,
+            ) = await self.tac.conversation_orchestrator_client.create_or_reuse_conversation(
+                participants=[
+                    ParticipantRequest(
+                        type="CUSTOMER",
+                        addresses=[
+                            ParticipantAddress(
+                                channel=channel_type,
+                                address=options.to,
+                                **customer_address_kwargs,
+                            )
+                        ],
+                    ),
+                    ParticipantRequest(
+                        type="AI_AGENT",
+                        addresses=[
+                            ParticipantAddress(
+                                channel=channel_type,
+                                address=from_address,
+                                **agent_address_kwargs,
+                            )
+                        ],
+                    ),
+                ]
+            )
+
+            participants = await self.tac.conversation_orchestrator_client.list_participants(
+                conversation_id
+            )
+
+            def _match_address(
+                p_addresses: list[ParticipantAddress],
+                addr: str,
+                extra_kwargs: dict[str, str | None],
+            ) -> bool:
+                return any(
+                    a.channel == channel_type
+                    and a.address == addr
+                    and all(getattr(a, k) == v for k, v in extra_kwargs.items() if v)
+                    for a in p_addresses
+                )
+
+            customer = next(
+                (
+                    p
+                    for p in participants
+                    if p.type == "CUSTOMER"
+                    and _match_address(p.addresses, options.to, customer_address_kwargs)
+                ),
+                None,
+            )
+            if not customer:
+                raise RuntimeError("Customer participant not found after conversation creation")
+
+            agent = next(
+                (
+                    p
+                    for p in participants
+                    if p.type in ("AI_AGENT", "HUMAN_AGENT", "AGENT")
+                    and _match_address(p.addresses, from_address, agent_address_kwargs)
+                ),
+                None,
+            )
+            if not agent:
+                raise RuntimeError("Agent participant not found after conversation creation")
+
+            session = self._start_conversation(conversation_id)
+            session.author_info = AuthorInfo(address=options.to, participant_id=customer.id)
+            session.metadata.update(
+                {
+                    **(options.metadata or {}),
+                    **(extra_metadata or {}),
+                    "direction": "outbound",
+                    "from_address": from_address,
+                }
+            )
+
+            action_request = SendMessageActionRequest(
+                payload=SendMessageActionPayload(
+                    from_=ActionParticipantRef(channel=channel_type, participant_id=agent.id),
+                    to=[ActionParticipantRef(channel=channel_type, participant_id=customer.id)],
+                    content=ActionTextContent(text=options.message),
+                    channel_settings=channel_settings,
+                ),
+            )
+            await self.tac.conversation_orchestrator_client.create_action(
+                conversation_id, action_request
+            )
+
+            self.logger.info(
+                f"Outbound {self.get_channel_name()} conversation initiated",
+                conversation_id=conversation_id,
+                to=options.to,
+            )
+            return InitiateConversationResult(conversation_id=conversation_id, session=session)
+
+        except Exception:
+            if conversation_id:
+                self._conversations.pop(conversation_id, None)
+            if conversation_id and not reused:
+                try:
+                    await self.tac.conversation_orchestrator_client.update_conversation(
+                        conversation_id, "CLOSED"
+                    )
+                except Exception as close_err:
+                    self.logger.warning(
+                        "Failed to close orphaned conversation after initiation error",
+                        conversation_id=conversation_id,
+                        error=str(close_err),
+                    )
+            raise
 
     async def _ensure_agent_participant(
         self,

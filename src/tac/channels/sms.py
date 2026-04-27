@@ -15,6 +15,10 @@ from tac.models.conversation import (
     SendMessageActionPayload,
     SendMessageActionRequest,
 )
+from tac.models.outbound import (
+    InitiateConversationResult,
+    InitiateMessagingConversationOptions,
+)
 
 
 class SMSChannelConfig(MessagingChannelConfig):
@@ -66,7 +70,7 @@ class SMSChannel(MessagingChannel):
     def get_channel_type_upper(self) -> str:
         return "SMS"
 
-    def is_own_message(self, author_address: str) -> bool:
+    def is_default_agent_address(self, author_address: str) -> bool:
         return author_address == self.tac.config.phone_number
 
     async def send_response(
@@ -100,6 +104,16 @@ class SMSChannel(MessagingChannel):
             )
             return
 
+        # Use from_address from session metadata (set during outbound initiation),
+        # falling back to the configured phone number for inbound conversations
+        session = self._conversations.get(conversation_id)
+        agent_address = self.tac.config.phone_number
+        if session:
+            from_addr = session.metadata.get("from_address")
+            if isinstance(from_addr, str):
+                agent_address = from_addr
+
+        # Find the CUSTOMER participant by address on the SMS channel
         customer_participant = None
         customer_address = None
         for participant in participants:
@@ -115,7 +129,7 @@ class SMSChannel(MessagingChannel):
         agent_participant = await self._ensure_agent_participant(
             conversation_id,
             existing_participants=participants,
-            agent_address=ParticipantAddress(channel="SMS", address=self.tac.config.phone_number),
+            agent_address=ParticipantAddress(channel="SMS", address=agent_address),
         )
         if not agent_participant:
             raise RuntimeError(
@@ -128,7 +142,6 @@ class SMSChannel(MessagingChannel):
                 f"{conversation_id}"
             )
 
-        session = self._conversations.get(conversation_id)
         channel_id = session.metadata.get("channel_id") if session else None
         channel_settings = (
             ActionChannelSettings(channel_id=channel_id)
@@ -170,3 +183,22 @@ class SMSChannel(MessagingChannel):
                 error=str(e),
                 exc_info=True,
             )
+
+    async def initiate_outbound_conversation(
+        self,
+        options: InitiateMessagingConversationOptions,
+    ) -> InitiateConversationResult:
+        """Initiate an outbound SMS conversation.
+
+        Creates a conversation via Conversation Orchestrator with inline
+        participants, then sends the initial message via the Actions API.
+        If an active conversation with the same addresses already exists
+        (group-by dedup), CO returns 409 and the existing conversation is reused.
+        """
+        from_address = options.from_ or self.tac.config.phone_number
+        return await self._initiate_messaging_conversation(
+            options=options,
+            from_address=from_address,
+            customer_address_kwargs={},
+            agent_address_kwargs={},
+        )

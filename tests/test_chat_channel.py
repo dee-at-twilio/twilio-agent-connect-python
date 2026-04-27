@@ -126,11 +126,11 @@ class TestChatChannel:
         channel = ChatChannel(tac, config={"agent_address": "custom-bot"})
         assert channel.agent_address == "custom-bot"
 
-    def test_is_own_message(self) -> None:
+    def test_is_default_agent_address(self) -> None:
         tac = TAC(get_test_config())
         channel = ChatChannel(tac)
-        assert channel.is_own_message("ai-assistant") is True
-        assert channel.is_own_message("user@example.com") is False
+        assert channel.is_default_agent_address("ai-assistant") is True
+        assert channel.is_default_agent_address("user@example.com") is False
 
     @pytest.mark.asyncio
     async def test_process_participant_added(self) -> None:
