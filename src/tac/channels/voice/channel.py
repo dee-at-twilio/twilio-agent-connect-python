@@ -7,6 +7,7 @@ from tac.channels.base import BaseChannel
 from tac.channels.websocket_manager import WebSocketManager
 from tac.channels.websocket_protocol import WebSocketDisconnectError, WebSocketProtocol
 from tac.core.tac import TAC
+from tac.models.session import AuthorInfo
 from tac.models.voice import (
     ConversationRelayCallbackPayload,
     InterruptMessage,
@@ -259,6 +260,11 @@ class VoiceChannel(BaseChannel):
 
                             self._websocket_manager.add_websocket(conv_id, websocket)
                             self._start_conversation(conv_id, profile_id)
+
+                            if from_number:
+                                self._conversations[conv_id].author_info = AuthorInfo(
+                                    address=from_number,
+                                )
 
                             if self.session_manager is not None:
                                 session_state = self.session_manager.get_or_create_session(conv_id)

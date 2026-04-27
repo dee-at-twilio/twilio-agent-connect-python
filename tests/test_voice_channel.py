@@ -1233,9 +1233,11 @@ class TestConversationInitializationFlow:
 
         # Track conversation initialization via callback
         initialized_conversations = []
+        observed_author_info = []
 
         async def on_message(user_message, context, memory_response):
             initialized_conversations.append(context.conversation_id)
+            observed_author_info.append(context.author_info)
 
         tac.on_message_ready(on_message)
 
@@ -1283,6 +1285,11 @@ class TestConversationInitializationFlow:
             status=["ACTIVE"],
         )
         co_client.list_participants.assert_called_once_with("CH_relay_123")
+
+        # author_info is populated from setup's `from` — parity with SMS so that
+        # memory lookup-by-address and Studio handoff's `To` both work on voice.
+        assert observed_author_info[0] is not None
+        assert observed_author_info[0].address == "+15551234567"
 
     @pytest.mark.asyncio
     async def test_profile_id_retrieval_filters_by_voice_channel(self) -> None:

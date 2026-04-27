@@ -1,6 +1,6 @@
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class MemoryRetrievalRequest(BaseModel):
@@ -408,10 +408,16 @@ class ProfileLookupResponse(BaseModel):
         json_schema_extra={"example": "+13175556789"},
     )
     profiles: list[str] = Field(
-        ...,
+        default_factory=list,
         max_length=100,
         description="Array of profile IDs matching the identifier",
         json_schema_extra={"example": ["mem_profile_00000000000000000000000000"]},
     )
 
     model_config = {"populate_by_name": True}
+
+    @field_validator("profiles", mode="before")
+    @classmethod
+    def _coerce_null_profiles(cls, v: Any) -> Any:
+        # Memora's Lookup response omits or nulls `profiles` when no match; treat both as [].
+        return [] if v is None else v
