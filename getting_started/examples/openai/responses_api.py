@@ -106,8 +106,7 @@ if __name__ == "__main__":
     # TACFastAPIServer creates a FastAPI app with all required endpoints:
     # - /twiml: Voice call webhook (returns TwiML with ConversationRelay)
     # - /ws: WebSocket endpoint for Voice channel
-    # - /webhook: SMS webhook endpoint
-    # - /conversation-relay-callback: Voice status callback
+    # - /webhook: Conversation webhook for all channels
     server = TACFastAPIServer(
         tac=tac, voice_channel=voice_channel, messaging_channels=[sms_channel]
     )
