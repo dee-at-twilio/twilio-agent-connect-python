@@ -101,7 +101,7 @@ class TestVoiceChannel:
             return_value=mock_memory_response
         )
 
-        # Create channel with memory_retrieval enabled (default is False)
+        # Create channel with memory_retrieval="always"
         channel = VoiceChannel(tac, config={"memory_retrieval": "always"})
 
         # Setup conversation with profile_id
@@ -119,6 +119,78 @@ class TestVoiceChannel:
 
         # Verify memory retrieval was called
         tac.conversation_memory_client.retrieve_memory.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_handle_prompt_message_with_once_mode_caches_memory(self) -> None:
+        """Test that memory_retrieval='once' fetches memory only once and reuses cache."""
+        # Create config with memory enabled
+        config = get_test_config()
+        from tac.core.config import TwilioMemoryConfig
+
+        config["memory_config"] = TwilioMemoryConfig(trait_groups=["Contact"])
+        tac = TAC(config)
+
+        # Manually create memory_client for this test
+        from tac.context.memory import MemoryClient
+
+        tac.conversation_memory_client = MemoryClient(
+            store_id="MGtest123",
+            api_key=tac.config.api_key,
+            api_secret=tac.config.api_secret,
+        )
+
+        # Mock the memory retrieval
+        mock_memory_response = MemoryRetrievalResponse(
+            observations=[],
+            summaries=[],
+            communications=[],
+        )
+        tac.conversation_memory_client.retrieve_memory = AsyncMock(
+            return_value=mock_memory_response
+        )
+
+        # Create channel with memory_retrieval='once'
+        channel = VoiceChannel(tac, config={"memory_retrieval": "once"})
+
+        # Setup conversation with profile_id
+        channel._start_conversation("CALL123", "profile_test_123")
+
+        # First prompt - should fetch memory
+        prompt_msg1 = PromptMessage(
+            type="prompt",
+            conversationId="CALL123",
+            voicePrompt="Hello, I need help",
+        )
+        await channel._handle_prompt("CALL123", prompt_msg1)
+
+        # Verify memory retrieval was called once
+        assert tac.conversation_memory_client.retrieve_memory.call_count == 1
+
+        # Second prompt - should use cached memory
+        prompt_msg2 = PromptMessage(
+            type="prompt",
+            conversationId="CALL123",
+            voicePrompt="Can you help me with something else?",
+        )
+        await channel._handle_prompt("CALL123", prompt_msg2)
+
+        # Verify memory retrieval was still only called once (not twice)
+        assert tac.conversation_memory_client.retrieve_memory.call_count == 1
+
+        # Third prompt - should still use cached memory
+        prompt_msg3 = PromptMessage(
+            type="prompt",
+            conversationId="CALL123",
+            voicePrompt="One more question",
+        )
+        await channel._handle_prompt("CALL123", prompt_msg3)
+
+        # Verify memory retrieval was still only called once (not three times)
+        assert tac.conversation_memory_client.retrieve_memory.call_count == 1
+
+        # Verify the cached memory is set
+        session = channel._conversations["CALL123"]
+        assert session.cached_memory is not None
 
     @pytest.mark.asyncio
     async def test_handle_interrupt_message(self) -> None:

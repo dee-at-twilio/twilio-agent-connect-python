@@ -270,10 +270,11 @@ class BaseChannel(ABC):
             )
 
         self.logger.debug(
-            f"Memory retrieval: mode={self.memory_retrieval}, "
-            f"retrieved={memory_response is not None}, "
-            f"from_cache={used_cache}",
+            "Memory retrieval",
             conversation_id=conv_id,
+            mode=self.memory_retrieval,
+            retrieved=memory_response is not None,
+            from_cache=used_cache,
         )
 
         return memory_response
