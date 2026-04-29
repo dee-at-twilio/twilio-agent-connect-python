@@ -1,15 +1,12 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from tac.models.handoff import PendingHandoffData
 from tac.models.memory import ProfileResponse
-
-if TYPE_CHECKING:
-    from tac.models.tac import TACMemoryResponse
+from tac.models.tac import TACMemoryResponse
 
 
 class AuthorInfo(BaseModel):
@@ -110,15 +107,3 @@ class ConversationSession(BaseModel):
             lines.append(f"- {key}: {value}")
 
         return "\n".join(lines)
-
-
-# Resolve forward reference for cached_memory field
-# This must happen after TACMemoryResponse is defined, so we do it here
-# with a runtime import to avoid circular dependencies
-def _rebuild_model() -> None:
-    from tac.models.tac import TACMemoryResponse
-
-    ConversationSession.model_rebuild(_types_namespace={"TACMemoryResponse": TACMemoryResponse})
-
-
-_rebuild_model()
