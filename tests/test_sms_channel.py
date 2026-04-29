@@ -230,7 +230,7 @@ class TestSMSChannel:
         )
 
         channel = SMSChannel(
-            tac, config={"auto_retrieve_memory": True}
+            tac, config={"memory_retrieval": "always"}
         )  # Enable memory retrieval for test
 
         # Start conversation via participant added
@@ -825,7 +825,7 @@ class TestSMSChannel:
     async def test_callback_auto_send_response(self) -> None:
         """Test callback returning string automatically sends response via create_action."""
         tac = TAC(get_test_config(with_memory=False))
-        channel = SMSChannel(tac, config={"auto_retrieve_memory": False})
+        channel = SMSChannel(tac, config={"memory_retrieval": "never"})
 
         # Callback that returns a string (should auto-send)
         async def message_callback(
@@ -906,7 +906,7 @@ class TestSMSChannel:
     async def test_callback_no_auto_send_on_none(self) -> None:
         """Test that callback returning None does not auto-send (manual send_response required)."""
         tac = TAC(get_test_config(with_memory=False))
-        channel = SMSChannel(tac, config={"auto_retrieve_memory": False})
+        channel = SMSChannel(tac, config={"memory_retrieval": "never"})
 
         # Callback that returns None (manual send_response flow)
         async def message_callback(

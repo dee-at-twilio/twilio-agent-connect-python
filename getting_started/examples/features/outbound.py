@@ -64,8 +64,8 @@ SYSTEM_INSTRUCTIONS = (
 )
 
 tac = TAC(config=TACConfig.from_env())
-voice_channel = VoiceChannel(tac, config=VoiceChannelConfig(auto_retrieve_memory=True))
-sms_channel = SMSChannel(tac, config=SMSChannelConfig(auto_retrieve_memory=True))
+voice_channel = VoiceChannel(tac, config=VoiceChannelConfig(memory_retrieval="once"))
+sms_channel = SMSChannel(tac, config=SMSChannelConfig(memory_retrieval="always"))
 
 conversation_history: dict[str, list[Any]] = {}
 

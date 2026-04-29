@@ -241,7 +241,7 @@ class TestProfileInSMSChannel:
         config = get_test_config_with_trait_groups(trait_groups=["Contact"])
         tac = TAC(config)
         tac.conversation_memory_client = create_memory_client(tac)
-        channel = SMSChannel(tac, config={"auto_retrieve_memory": True})  # Enable auto retrieval
+        channel = SMSChannel(tac, config={"memory_retrieval": "always"})  # Enable auto retrieval
 
         # Track callback data
         received_context = None
@@ -335,7 +335,7 @@ class TestProfileInSMSChannel:
         config = get_test_config_with_trait_groups()
         tac = TAC(config)
         tac.conversation_memory_client = create_memory_client(tac)
-        channel = SMSChannel(tac, config={"auto_retrieve_memory": True})  # Enable auto retrieval
+        channel = SMSChannel(tac, config={"memory_retrieval": "always"})  # Enable auto retrieval
 
         mock_profile = get_mock_profile_response()
 
@@ -388,7 +388,7 @@ class TestProfileInSMSChannel:
         config = get_test_config_with_trait_groups()
         tac = TAC(config)
         tac.conversation_memory_client = create_memory_client(tac)
-        channel = SMSChannel(tac, config={"auto_retrieve_memory": True})  # Enable auto retrieval
+        channel = SMSChannel(tac, config={"memory_retrieval": "always"})  # Enable auto retrieval
 
         mock_profile_v1 = ProfileResponse(
             id="profile_test_123",

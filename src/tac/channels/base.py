@@ -3,12 +3,14 @@
 from abc import ABC, abstractmethod
 from collections import OrderedDict
 from collections.abc import AsyncGenerator
-from typing import Any
+from typing import Any, Literal
 
 from tac import TAC
 from tac.core.logging import get_logger
 from tac.models.session import ConversationSession
 from tac.models.tac import TACMemoryResponse
+
+ConversationSession.model_rebuild()
 
 
 class BaseChannel(ABC):
@@ -22,15 +24,21 @@ class BaseChannel(ABC):
     across all channel types.
     """
 
-    def __init__(self, tac: TAC, auto_retrieve_memory: bool = False, dedup_capacity: int = 10000):
+    def __init__(
+        self,
+        tac: TAC,
+        memory_retrieval: Literal["always", "once", "never"] = "never",
+        dedup_capacity: int = 10000,
+    ):
         """
         Initialize base channel.
 
         Args:
             tac: TAC instance for memory/context operations
-            auto_retrieve_memory: If True, automatically retrieve memory
-                before invoking the on_message_ready callback. Default is False.
-                Set to True to enable automatic memory retrieval.
+            memory_retrieval: Memory retrieval strategy.
+                - 'always': Fetch memory on every message using message content as query
+                - 'once': Fetch memory once at conversation start without query
+                - 'never': Do not fetch memory (default)
             dedup_capacity: Maximum number of idempotency tokens to track for
                 webhook deduplication. Default 10000. Must be positive.
         """
@@ -39,7 +47,7 @@ class BaseChannel(ABC):
 
         self.tac = tac
         self.logger = get_logger(self.__class__.__module__)
-        self.auto_retrieve_memory = auto_retrieve_memory
+        self.memory_retrieval = memory_retrieval
 
         # Track active conversations (shared across all channel types)
         self._conversations: dict[str, ConversationSession] = {}
@@ -223,11 +231,11 @@ class BaseChannel(ABC):
                 channel=self.get_channel_name(),
             )
 
-    async def _retrieve_memory_if_enabled(
+    async def _retrieve_memory_by_strategy(
         self, session: ConversationSession, query: str | None, conv_id: str
     ) -> TACMemoryResponse | None:
         """
-        Retrieve memory if auto_retrieve_memory is enabled.
+        Retrieve memory based on configured memory_retrieval strategy.
 
         This method handles the common logic for memory retrieval across all channels,
         including error handling and debug logging.
@@ -241,24 +249,31 @@ class BaseChannel(ABC):
             TACMemoryResponse wrapper if memory was retrieved, None otherwise
         """
         memory_response = None
-        if self.auto_retrieve_memory:
-            try:
+        used_cache = False
+
+        try:
+            if self.memory_retrieval == "always":
                 memory_response = await self.tac.retrieve_memory(session, query=query)
-                self.logger.debug(
-                    "Memory retrieved",
-                    conversation_id=conv_id,
-                )
-            except Exception as e:
-                self.logger.error(
-                    "Failed to retrieve memory",
-                    conversation_id=conv_id,
-                    error=str(e),
-                    exc_info=True,
-                )
-                # Continue without memory rather than failing the entire message processing
-        else:
-            self.logger.debug(
-                "Auto memory retrieval disabled, skipping memory retrieval",
+            elif self.memory_retrieval == "once":
+                if session.cached_memory is not None:
+                    memory_response = session.cached_memory
+                    used_cache = True
+                else:
+                    memory_response = await self.tac.retrieve_memory(session, query=None)
+                    session.cached_memory = memory_response
+        except Exception as e:
+            self.logger.error(
+                "Failed to retrieve memory",
                 conversation_id=conv_id,
+                error=str(e),
+                exc_info=True,
             )
+
+        self.logger.debug(
+            f"Memory retrieval: mode={self.memory_retrieval}, "
+            f"retrieved={memory_response is not None}, "
+            f"from_cache={used_cache}",
+            conversation_id=conv_id,
+        )
+
         return memory_response

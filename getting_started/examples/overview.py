@@ -19,8 +19,8 @@ from dotenv import load_dotenv
 
 from tac import TAC, TACConfig
 from tac.adapters.prompt_builder import MemoryPromptBuilder
-from tac.channels.sms import SMSChannel
-from tac.channels.voice import VoiceChannel
+from tac.channels.sms import SMSChannel, SMSChannelConfig
+from tac.channels.voice import VoiceChannel, VoiceChannelConfig
 from tac.core.logging import get_logger
 from tac.models.session import ConversationSession
 from tac.models.tac import TACMemoryResponse
@@ -32,8 +32,8 @@ logger = get_logger(__name__)
 
 # Initialize TAC and channels
 tac = TAC(config=TACConfig.from_env())
-voice_channel = VoiceChannel(tac)
-sms_channel = SMSChannel(tac)
+voice_channel = VoiceChannel(tac, config=VoiceChannelConfig(memory_retrieval="once"))
+sms_channel = SMSChannel(tac, config=SMSChannelConfig(memory_retrieval="always"))
 
 # Store conversation history per conversation
 conversation_messages: dict[str, list[Any]] = {}

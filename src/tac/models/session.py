@@ -1,9 +1,15 @@
+from __future__ import annotations
+
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from tac.models.handoff import PendingHandoffData
 from tac.models.memory import ProfileResponse
+
+if TYPE_CHECKING:
+    from tac.models.tac import TACMemoryResponse
 
 
 class AuthorInfo(BaseModel):
@@ -48,6 +54,10 @@ class ConversationSession(BaseModel):
         default=None,
         description="Pending handoff payload set by the handoff tool. "
         "Voice channel sends this as a WS 'end' message after the LLM's final response.",
+    )
+    cached_memory: TACMemoryResponse | None = Field(
+        default=None,
+        description="Cached memory response",
     )
 
     model_config = ConfigDict(arbitrary_types_allowed=True)

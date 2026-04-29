@@ -41,6 +41,12 @@ class VoiceChannel(BaseChannel):
     - ConversationRelay callback webhook handling
     - Outbound call initiation
 
+    Memory retrieval modes (configured via VoiceChannelConfig.memory_retrieval):
+    - 'always': Fetch memory on every message using message content as query
+    - 'once': Fetch memory once at first message without query, cache in session.cached_memory,
+              and reuse for all subsequent messages in the conversation
+    - 'never': Do not fetch memory (default)
+
     This channel is framework-agnostic and accepts any WebSocket implementation
     satisfying WebSocketProtocol. For a batteries-included FastAPI server, use
     tac.server.TACFastAPIServer.
@@ -60,7 +66,7 @@ class VoiceChannel(BaseChannel):
                 If None, uses default configuration.
 
         Examples:
-            >>> channel = VoiceChannel(tac, config={"auto_retrieve_memory": True})
+            >>> channel = VoiceChannel(tac, config={"memory_retrieval": "always"})
             >>> channel = VoiceChannel(tac, config=VoiceChannelConfig(session_manager=sm))
             >>> channel = VoiceChannel(tac)  # Use defaults
         """
@@ -70,7 +76,7 @@ class VoiceChannel(BaseChannel):
         elif config is None:
             config = VoiceChannelConfig()
 
-        super().__init__(tac, auto_retrieve_memory=config.auto_retrieve_memory)
+        super().__init__(tac, memory_retrieval=config.memory_retrieval)
         self.session_manager = config.session_manager
         self._websocket_manager = WebSocketManager()
         self._twilio_client: Client | None = None
@@ -621,8 +627,7 @@ class VoiceChannel(BaseChannel):
         message_body = message.voice_prompt or ""
         session = self._conversations[conv_id]
 
-        # Retrieve memory if auto_retrieve_memory is enabled and Twilio Memory is configured
-        memory_response = await self._retrieve_memory_if_enabled(session, message_body, conv_id)
+        memory_response = await self._retrieve_memory_by_strategy(session, message_body, conv_id)
 
         # Trigger message ready callback
         try:

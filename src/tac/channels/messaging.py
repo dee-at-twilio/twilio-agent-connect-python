@@ -2,7 +2,7 @@
 
 from abc import abstractmethod
 from collections.abc import AsyncGenerator
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -31,8 +31,9 @@ class MessagingChannelConfig(BaseModel):
         dedup_capacity: Maximum number of idempotency tokens to track.
             Default 10000 is suitable for most applications.
             Uses Twilio's i-twilio-idempotency-token header for deduplication.
-        auto_retrieve_memory: If True, automatically retrieve memory
-            before invoking the on_message_ready callback.
+        memory_retrieval: Memory retrieval strategy.
+            - 'always': Fetch memory on every message using message content as query
+            - 'never': Do not fetch memory (default)
     """
 
     dedup_capacity: int = Field(
@@ -40,9 +41,13 @@ class MessagingChannelConfig(BaseModel):
         gt=0,
         description="Maximum number of idempotency tokens to track for deduplication",
     )
-    auto_retrieve_memory: bool = Field(
-        default=False,
-        description="Automatically retrieve memory before on_message_ready callback",
+    memory_retrieval: Literal["always", "never"] = Field(
+        default="never",
+        description=(
+            "Memory retrieval strategy: "
+            "'always' - fetch memory on every message using message content as query, "
+            "'never' - do not fetch memory"
+        ),
     )
 
 
@@ -64,11 +69,9 @@ class MessagingChannel(BaseChannel):
         self,
         tac: TAC,
         dedup_capacity: int = 10000,
-        auto_retrieve_memory: bool = False,
+        memory_retrieval: Literal["always", "never"] = "never",
     ):
-        super().__init__(
-            tac, auto_retrieve_memory=auto_retrieve_memory, dedup_capacity=dedup_capacity
-        )
+        super().__init__(tac, memory_retrieval=memory_retrieval, dedup_capacity=dedup_capacity)
 
     @abstractmethod
     def is_default_agent_address(self, author_address: str) -> bool:
@@ -258,7 +261,7 @@ class MessagingChannel(BaseChannel):
         if communication_data.channel_id:
             session.metadata["channel_id"] = communication_data.channel_id
 
-        memory_response = await self._retrieve_memory_if_enabled(session, message_text, conv_id)
+        memory_response = await self._retrieve_memory_by_strategy(session, message_text, conv_id)
 
         try:
             response = await self.tac.trigger_message_ready(message_text, session, memory_response)

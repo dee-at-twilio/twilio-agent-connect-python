@@ -24,7 +24,7 @@ from tac.models.outbound import (
 class SMSChannelConfig(MessagingChannelConfig):
     """Configuration for SMS channel.
 
-    Inherits dedup_capacity and auto_retrieve_memory from MessagingChannelConfig.
+    Inherits dedup_capacity and memory_retrieval from MessagingChannelConfig.
     """
 
     dedup_capacity: int = Field(
@@ -54,7 +54,7 @@ class SMSChannel(MessagingChannel):
         super().__init__(
             tac,
             dedup_capacity=config.dedup_capacity,
-            auto_retrieve_memory=config.auto_retrieve_memory,
+            memory_retrieval=config.memory_retrieval,
         )
 
         if not tac.config.phone_number:

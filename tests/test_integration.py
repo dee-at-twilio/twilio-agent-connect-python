@@ -176,7 +176,7 @@ class TestTACIntegration:
         tac = TAC(get_test_config())
         tac.conversation_memory_client = create_memory_client(tac)
         channel = SMSChannel(
-            tac, config={"auto_retrieve_memory": True}
+            tac, config={"memory_retrieval": "always"}
         )  # Enable memory retrieval for test
 
         # Track callback invocations
