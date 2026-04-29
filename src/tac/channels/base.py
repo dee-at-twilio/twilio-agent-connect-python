@@ -10,8 +10,6 @@ from tac.core.logging import get_logger
 from tac.models.session import ConversationSession
 from tac.models.tac import TACMemoryResponse
 
-ConversationSession.model_rebuild()
-
 
 class BaseChannel(ABC):
     """
