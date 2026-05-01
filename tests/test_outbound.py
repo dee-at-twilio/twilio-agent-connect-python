@@ -1,4 +1,4 @@
-"""Tests for outbound conversation support (SMS, Chat, Voice)."""
+"""Tests for outbound conversation support (SMS, RCS, Chat, Voice)."""
 
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -8,6 +8,7 @@ import pytest
 
 from tac import TAC
 from tac.channels.chat import ChatChannel
+from tac.channels.rcs import RCSChannel
 from tac.channels.sms import SMSChannel
 from tac.channels.voice import VoiceChannel
 from tac.core.config import TwilioMemoryConfig
@@ -32,6 +33,7 @@ def get_test_config() -> dict[str, Any]:
         "api_secret": "test_api_secret",
         "conversation_configuration_id": "conv_configuration_test123",
         "phone_number": "+15551234567",
+        "rcs_sender_id": "rcs:my_agent",
         "memory_config": TwilioMemoryConfig(trait_groups=["Contact"]),
     }
 
@@ -701,3 +703,97 @@ class TestVoiceOutboundErrors:
 
         call_kwargs = mock_client.calls.create.call_args.kwargs
         assert "Hi there!" in call_kwargs["twiml"]
+
+
+# =============================================================================
+# RCS outbound
+# =============================================================================
+
+
+def _mock_rcs_outbound(
+    tac: TAC,
+    conv_id: str = "CHrcs_out",
+    *,
+    to: str = "rcs:+15559876543",
+    from_addr: str = "rcs:my_agent",
+    reused: bool = False,
+) -> None:
+    co = tac.conversation_orchestrator_client
+    co.create_or_reuse_conversation = AsyncMock(return_value=(conv_id, reused))
+    co.list_participants = AsyncMock(
+        return_value=[
+            make_participant(
+                id="PArcscust", conversation_id=conv_id, type="CUSTOMER", channel="RCS", address=to
+            ),
+            make_participant(
+                id="PArcsagent",
+                conversation_id=conv_id,
+                type="AI_AGENT",
+                channel="RCS",
+                address=from_addr,
+            ),
+        ]
+    )
+    co.create_action = AsyncMock(return_value=make_action_response(conv_id))
+
+
+class TestRCSOutbound:
+    @pytest.mark.asyncio
+    async def test_creates_conversation_and_sends_message(self) -> None:
+        tac = TAC(get_test_config())
+        from tac.channels.rcs import RCSChannelConfig
+
+        channel = RCSChannel(tac, config=RCSChannelConfig())
+        _mock_rcs_outbound(tac)
+
+        result = await channel.initiate_outbound_conversation(
+            InitiateMessagingConversationOptions(to="rcs:+15559876543", message="Hello from RCS!")
+        )
+
+        assert result.conversation_id == "CHrcs_out"
+        assert result.session.channel == "rcs"
+        assert result.session.metadata["direction"] == "outbound"
+        assert result.session.author_info is not None
+        assert result.session.author_info.address == "rcs:+15559876543"
+        tac.conversation_orchestrator_client.create_action.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_reuses_conversation_on_409(self) -> None:
+        tac = TAC(get_test_config())
+        from tac.channels.rcs import RCSChannelConfig
+
+        channel = RCSChannel(tac, config=RCSChannelConfig())
+        _mock_rcs_outbound(tac, conv_id="CHrcs_existing", reused=True)
+
+        result = await channel.initiate_outbound_conversation(
+            InitiateMessagingConversationOptions(to="rcs:+15559876543", message="Hello again")
+        )
+
+        assert result.conversation_id == "CHrcs_existing"
+        assert result.session.metadata["direction"] == "outbound"
+
+    @pytest.mark.asyncio
+    async def test_passes_participants_in_create(self) -> None:
+        tac = TAC(get_test_config())
+        from tac.channels.rcs import RCSChannelConfig
+
+        channel = RCSChannel(tac, config=RCSChannelConfig())
+        _mock_rcs_outbound(tac)
+
+        await channel.initiate_outbound_conversation(
+            InitiateMessagingConversationOptions(to="rcs:+15559876543", message="Test")
+        )
+
+        call_args = tac.conversation_orchestrator_client.create_or_reuse_conversation.call_args
+        participants = call_args.kwargs["participants"]
+        assert len(participants) == 2
+        assert participants[0].type == "CUSTOMER"
+        assert participants[0].addresses[0].channel == "RCS"
+        assert participants[0].addresses[0].address == "rcs:+15559876543"
+        assert participants[1].type == "AI_AGENT"
+        assert participants[1].addresses[0].address == "rcs:my_agent"
+
+
+# =============================================================================
+# RCS sendResponse after outbound
+# =============================================================================
