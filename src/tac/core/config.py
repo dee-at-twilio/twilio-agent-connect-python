@@ -97,10 +97,22 @@ class TwilioMemoryConfig(BaseModel):
         description="Min relevance score for observations and summaries (0.0-1.0).",
     )
 
+    phone_trait_group: str = Field(
+        default="Contact",
+        description="Trait group name that holds the phone identifier on newly created profiles. "
+        "Must match the promoted-to-identifier configuration of the Memora store.",
+    )
+    phone_trait_field: str = Field(
+        default="phone",
+        description="Trait field name within phone_trait_group that holds the phone identifier.",
+    )
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
                 "trait_groups": ["Contact", "Preferences"],
+                "phone_trait_group": "Contact",
+                "phone_trait_field": "phone",
                 "observations_limit": 20,
                 "summaries_limit": 5,
                 "communications_limit": 0,
@@ -165,12 +177,21 @@ class TwilioMemoryConfig(BaseModel):
                 f"and TWILIO_MEMORY_RELEVANCE_THRESHOLD is a float. Error: {e}"
             ) from e
 
+        phone_trait_group = (
+            os.environ.get("TWILIO_MEMORY_PHONE_TRAIT_GROUP") or defaults.phone_trait_group
+        )
+        phone_trait_field = (
+            os.environ.get("TWILIO_MEMORY_PHONE_TRAIT_FIELD") or defaults.phone_trait_field
+        )
+
         return cls(
             trait_groups=trait_groups,
             observations_limit=observations_limit,
             summaries_limit=summaries_limit,
             communications_limit=communications_limit,
             relevance_threshold=relevance_threshold,
+            phone_trait_group=phone_trait_group,
+            phone_trait_field=phone_trait_field,
         )
 
 
