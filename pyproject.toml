@@ -116,7 +116,7 @@ exclude = [
 
 # Specify the paths to type check
 [[tool.mypy.overrides]]
-module = ["src.tac.*", "twilio.*", "boto3", "boto3.*", "botocore.*"]
+module = ["twilio.*", "boto3.*", "botocore.*"]
 ignore_missing_imports = true
 
 # Ignore mcp module to avoid syntax errors from newer Python features

@@ -124,8 +124,14 @@ async def handle_message_ready(
         return "Sorry, I encountered an error processing your message."
 
 
-# Register the message handler callback
+# Clean up conversation history when a conversation ends
+async def handle_conversation_ended(context: ConversationSession) -> None:
+    conversation_history.pop(context.conversation_id, None)
+
+
+# Register callbacks
 tac.on_message_ready(handle_message_ready)
+tac.on_conversation_ended(handle_conversation_ended)
 
 if __name__ == "__main__":
     # TACFastAPIServer creates a FastAPI app with all required endpoints:
