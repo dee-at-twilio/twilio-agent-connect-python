@@ -80,18 +80,18 @@ tac = TAC(config=TACConfig.from_env())
 conversation_history: dict[str, list[Any]] = {}
 
 # Create channels based on configuration
-sms_channel = SMSChannel(tac, config=SMSChannelConfig(auto_retrieve_memory=True))
+sms_channel = SMSChannel(tac, config=SMSChannelConfig(memory_mode="always"))
 rcs_channel = (
-    RCSChannel(tac, config=RCSChannelConfig(auto_retrieve_memory=True))
+    RCSChannel(tac, config=RCSChannelConfig(memory_mode="always"))
     if tac.config.rcs_sender_id
     else None
 )
 whatsapp_channel = (
-    WhatsAppChannel(tac, config=WhatsAppChannelConfig(auto_retrieve_memory=True))
+    WhatsAppChannel(tac, config=WhatsAppChannelConfig(memory_mode="always"))
     if tac.config.whatsapp_number
     else None
 )
-voice_channel = VoiceChannel(tac, config=VoiceChannelConfig(auto_retrieve_memory=True))
+voice_channel = VoiceChannel(tac, config=VoiceChannelConfig(memory_mode="always"))
 
 
 async def handle_message_ready(
