@@ -114,7 +114,7 @@ exclude = [
     ".*/site-packages/mcp/.*"
 ]
 
-# Specify the paths to type check
+# Ignore missing type stubs for third-party libraries (does not disable type-checking of src/tac/)
 [[tool.mypy.overrides]]
 module = ["twilio.*", "boto3.*", "botocore.*"]
 ignore_missing_imports = true
