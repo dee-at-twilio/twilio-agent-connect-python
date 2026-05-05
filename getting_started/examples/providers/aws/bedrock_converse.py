@@ -48,7 +48,12 @@ bedrock_client = boto3.client("bedrock-runtime", region_name=AWS_REGION)
 # Store conversation history per conversation (Bedrock Converse message format)
 conversation_history: dict[str, list[dict[str, Any]]] = {}
 
-SYSTEM_PROMPT = "You are a helpful customer service agent. Be concise and friendly."
+SYSTEM_PROMPT = (
+    "You are a customer service agent speaking with a user over voice or SMS. "
+    "Keep responses short and conversational — a sentence or two. "
+    "Do not use markdown, asterisks, bullets, or emojis; your words will be "
+    "spoken aloud or sent as plain text."
+)
 
 
 async def handle_message_ready(

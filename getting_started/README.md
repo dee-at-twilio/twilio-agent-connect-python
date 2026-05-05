@@ -42,15 +42,15 @@ Learn the core pattern for manually extracting and injecting TAC memory into **a
 - Uses TAC's official `MemoryPromptBuilder` utility
 - **Start here** to understand how TAC memory works
 
-### `partners/` - Partner SDK Examples
+### `providers/` - Provider SDK Examples
 
-Production-ready examples using partner SDK adapters:
+Production-ready examples using provider SDK adapters:
 - **`openai_chat_completions.py`**: OpenAI Chat Completions API
 - **`openai_responses_api.py`**: OpenAI Responses API
 - Automatic memory injection with `with_tac_memory()`
 - Less boilerplate, more convention-based
 
-### `aws/` - AWS Bedrock
+### `providers/aws/` - AWS Bedrock
 
 Example using the Bedrock Converse API with manual memory injection:
 - **`bedrock_converse.py`**: Bedrock Converse API with Claude
@@ -90,9 +90,9 @@ walks up from the script's directory, so it'll find
 
 ```bash
 uv run getting_started/examples/overview.py
-uv run getting_started/examples/partners/openai_chat_completions.py
-uv run getting_started/examples/partners/openai_responses_api.py
-uv run getting_started/examples/aws/bedrock_converse.py
+uv run getting_started/examples/providers/openai_chat_completions.py
+uv run getting_started/examples/providers/openai_responses_api.py
+uv run getting_started/examples/providers/aws/bedrock_converse.py
 uv run getting_started/examples/features/voice_streaming.py
 uv run getting_started/examples/features/handoff.py
 uv run getting_started/examples/features/relay_only.py
@@ -145,8 +145,8 @@ See `examples/.env.example` for all available configuration options. Key variabl
 ## Next Steps
 
 - Start with `examples/overview.py` to learn the core memory injection pattern
-- Try the `examples/partners/` examples for production-ready partner SDK integration
-- Try the `examples/aws/` example for AWS Bedrock integration
+- Try the `examples/providers/` examples for production-ready provider SDK integration
+- Try the `examples/providers/aws/` example for AWS Bedrock integration
 - Customize the agent's behavior by modifying the message handler
 - Add tool calling to enable agent actions beyond text responses
 - Explore the main [README](../README.md) for advanced features
