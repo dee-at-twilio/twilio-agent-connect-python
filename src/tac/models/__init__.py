@@ -56,6 +56,15 @@ from tac.models.tac import (
 )
 from tac.models.voice import TwiMLOptions
 
+# Rebuild ConversationSession after importing TACMemoryResponse so Pydantic can
+# resolve the forward reference used by ConversationSession. The session model
+# only imports TACMemoryResponse under TYPE_CHECKING, so that name is not
+# available when ConversationSession is first defined. Doing the rebuild here
+# works because __init__.py imports both ConversationSession and
+# TACMemoryResponse before calling model_rebuild(), satisfying the import-order
+# requirement for forward-ref resolution.
+ConversationSession.model_rebuild()
+
 __all__ = [
     "ActionChannelSettings",
     "ActionParticipantRef",
