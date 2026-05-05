@@ -14,7 +14,7 @@
   <div align="center">
     <a href="https://github.com/twilio/twilio-agent-connect-python"><img alt="Python SDK" src="https://img.shields.io/badge/Python-3.10+-3776AB.svg"/></a>
     <a href="https://github.com/twilio/twilio-agent-connect-typescript"><img alt="TypeScript SDK" src="https://img.shields.io/badge/TypeScript-5.0+-3178C6.svg"/></a>
-    <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache%202.0-green.svg"/></a>
+    <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-green.svg"/></a>
     <a href="https://www.twilio.com/docs/platform/tac/quickstart"><img alt="Getting Started" src="https://img.shields.io/badge/Getting%20Started-Quickstart-F22F46.svg"/></a>
   </div>
   
@@ -26,21 +26,23 @@
   </p>
 </div>
 
-Seamlessly integrate with Twilio's Memory Store and Conversation Orchestrator to build LLM-powered agents with persistent memory and conversation context.
+Seamlessly integrate with Twilio Conversation Memory and Conversation Orchestrator to build LLM-powered agents with persistent memory and conversation context.
+
+> [!TIP]
+> **Building AI agents on AWS or Microsoft?** Connect them to Twilio's voice, messaging, and conversation context with these dedicated packages:
+> - **[TAC for AWS](https://github.com/twilio/twilio-agent-connect-aws)** — Strands, Bedrock Agents, Bedrock AgentCore
+> - **[TAC for Microsoft](https://github.com/twilio/twilio-agent-connect-microsoft)** — Microsoft Agent Framework, Azure AI Foundry (incl. Voice Live), Azure OpenAI
 
 ---
 
 ## Key Features
 
-- **Multi-Channel Support**: Built-in webhook handling for SMS, RCS, WhatsApp, and Chat conversations
-- **Voice Channel Support**: WebSocket protocol handling for Twilio Voice with ConversationRelay
-- **Outbound Conversations**: Agent-initiated conversations via SMS, RCS, WhatsApp, and Voice channels
-- **ConversationRelay-Only Mode**: Get started quickly with TAC's voice plumbing (TwiML, WebSocket, callbacks) before adding Conversation Orchestrator
-- **Memory Management**: Automatic integration with Twilio Memory for persistent user context
+- **Multi-Channel Support**: Built-in handling for Voice (ConversationRelay), SMS, RCS, WhatsApp, and Chat
+- **Outbound Conversations**: Agent-initiated conversations across all supported channels
+- **ConversationRelay-Only Mode**: Get started quickly with TAC's voice plumbing (TwiML, WebSocket, callbacks) before adding Conversation Orchestrator or Conversation Memory
+- **Memory Management**: Automatic integration with Twilio Conversation Memory for persistent user context
 - **Conversation Lifecycle**: Automatic tracking of conversation sessions and state
-- **Type-Safe**: Full type hints and Pydantic models throughout
-- **Callback-Based**: Simple `on_message_ready` callback for LLM integration with optional memory retrieval
-- **Production Ready**: Comprehensive test coverage and error handling
+- **Human Handoff**: Built-in tool to route conversations to human agents via Twilio Studio Flows (including Flex)
 
 ## Get Started
 
@@ -184,6 +186,10 @@ For detailed architecture and advanced usage, see [CLAUDE.md](CLAUDE.md).
 - **[Partner SDK Examples](getting_started/examples/partners/)** - OpenAI Chat Completions and Responses API examples
 - **[ConversationRelay-Only Mode](getting_started/examples/features/relay_only.py)** - Get started with voice using just ConversationRelay
 - More examples coming soon
+
+**AWS and Microsoft connectors:**
+- **[TAC for AWS](https://github.com/twilio/twilio-agent-connect-aws)** — `StrandsConnector`, `BedrockConnector`, `BedrockAgentCoreConnector` for AWS Strands, Bedrock Agents, and Bedrock AgentCore
+- **[TAC for Microsoft](https://github.com/twilio/twilio-agent-connect-microsoft)** — `AgentFrameworkConnector` and `VoiceLiveConnector` for Microsoft Agent Framework, Azure AI Foundry (including Voice Live), and Azure OpenAI
 
 **Documentation:**
 - **[CLAUDE.md](CLAUDE.md)** - Architecture, development guide, and API reference
