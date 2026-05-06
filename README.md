@@ -1,6 +1,6 @@
 <div align="center">
   <div>
-    <img src="logo.svg" alt="TAC Logo" width="120" height="120">
+    <img src="https://raw.githubusercontent.com/twilio/twilio-agent-connect-python/main/logo.svg" alt="TAC Logo" width="120" height="120">
   </div>
 
   <h1>
@@ -13,16 +13,17 @@
 
   <div align="center">
     <a href="https://github.com/twilio/twilio-agent-connect-python"><img alt="Python SDK" src="https://img.shields.io/badge/Python-3.10+-3776AB.svg"/></a>
-    <a href="https://github.com/twilio/twilio-agent-connect-typescript"><img alt="TypeScript SDK" src="https://img.shields.io/badge/TypeScript-5.0+-3178C6.svg"/></a>
-    <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-green.svg"/></a>
-    <a href="https://www.twilio.com/docs/platform/tac/quickstart"><img alt="Getting Started" src="https://img.shields.io/badge/Getting%20Started-Quickstart-F22F46.svg"/></a>
+    <a href="https://pypi.org/project/twilio-agent-connect/"><img alt="PyPI" src="https://img.shields.io/pypi/v/twilio-agent-connect.svg"/></a>
+    <a href="https://github.com/twilio/twilio-agent-connect-python/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/twilio/twilio-agent-connect-python/actions/workflows/ci.yml/badge.svg"/></a>
+    <a href="https://github.com/twilio/twilio-agent-connect-python/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-green.svg"/></a>
+    <a href="https://www.twilio.com/docs/conversations/agent-connect/quickstart"><img alt="Getting Started" src="https://img.shields.io/badge/Getting%20Started-Quickstart-F22F46.svg"/></a>
   </div>
   
   <p>
-    <a href="https://www.twilio.com/docs/platform/tac/overview">Documentation</a>
+    <a href="https://www.twilio.com/docs/conversations/agent-connect">Documentation</a>
     ◆ <a href="https://github.com/twilio/twilio-agent-connect-python">Python SDK</a>
     ◆ <a href="https://github.com/twilio/twilio-agent-connect-typescript">TypeScript SDK</a>
-    ◆ <a href="getting_started/examples">Examples</a>
+    ◆ <a href="https://github.com/twilio/twilio-agent-connect-python/tree/main/getting_started/examples">Examples</a>
   </p>
 </div>
 
@@ -77,7 +78,7 @@ pip install "git+https://github.com/twilio/twilio-agent-connect-python.git[serve
 
 **Option 1: Use the Setup Wizard**
 
-Use the [Twilio Setup Wizard](getting_started/twilio_setup/) to automatically create a Memory Store and Conversation Configuration and generate your `.env` file:
+Use the [Twilio Setup Wizard](https://github.com/twilio/twilio-agent-connect-python/tree/main/getting_started/twilio_setup/) to automatically create a Memory Store and Conversation Configuration and generate your `.env` file:
 
 ```bash
 git clone https://github.com/twilio/twilio-agent-connect-python.git
@@ -87,7 +88,7 @@ make setup  # Open http://localhost:8080
 
 **Option 2: Manual Setup**
 
-You can also create a Memory Store and Conversation Configuration manually through the [Twilio Console](https://1console.twilio.com). For a full walkthrough — credentials, Console navigation, and webhook configuration — see the [TAC Quickstart](https://www.twilio.com/docs/platform/tac/quickstart).
+You can also create a Memory Store and Conversation Configuration manually through the [Twilio Console](https://1console.twilio.com). For a full walkthrough — credentials, Console navigation, and webhook configuration — see the [TAC Quickstart](https://www.twilio.com/docs/conversations/agent-connect/quickstart).
 
 ---
 
@@ -155,7 +156,7 @@ tac.on_message_ready(handle_message_ready)
 TACFastAPIServer(tac=tac, voice_channel=voice_channel, messaging_channels=[sms_channel]).start()
 ```
 
-> **Note**: See the [getting started guide](getting_started/README.md) for complete setup instructions and `.env` configuration details.
+> **Note**: See the [getting started guide](https://github.com/twilio/twilio-agent-connect-python/blob/main/getting_started/README.md) for complete setup instructions and `.env` configuration details.
 
 **That's it!** The server automatically:
 - Creates FastAPI app with `/twiml`, `/ws`, and `/webhook` endpoints
@@ -163,7 +164,7 @@ TACFastAPIServer(tac=tac, voice_channel=voice_channel, messaging_channels=[sms_c
 - Routes responses to the appropriate channel
 - Injects conversation memory and user profile into OpenAI calls
 
-For configuration details and environment variables, see the [getting started guide](getting_started/README.md).
+For configuration details and environment variables, see the [getting started guide](https://github.com/twilio/twilio-agent-connect-python/blob/main/getting_started/README.md).
 
 ## How It Works
 
@@ -177,14 +178,14 @@ TAC simplifies building AI agents by handling the integration between Twilio's c
 4. **Callback Invoked**: Your `on_message_ready` callback receives user message, context, and optional memory response
 5. **Response Handling**: Your callback returns a response string that TAC routes to the appropriate channel
 
-For detailed architecture and advanced usage, see [CLAUDE.md](CLAUDE.md).
+For detailed architecture and advanced usage, see [CLAUDE.md](https://github.com/twilio/twilio-agent-connect-python/blob/main/CLAUDE.md).
 
 ## Learn More
 
 **Examples & Guides:**
-- **[Getting Started Guide](getting_started/)** - Setup wizard, examples, and comprehensive documentation
-- **[Partner SDK Examples](getting_started/examples/partners/)** - OpenAI Chat Completions and Responses API examples
-- **[ConversationRelay-Only Mode](getting_started/examples/features/relay_only.py)** - Get started with voice using just ConversationRelay
+- **[Getting Started Guide](https://github.com/twilio/twilio-agent-connect-python/tree/main/getting_started/)** - Setup wizard, examples, and comprehensive documentation
+- **[Partner SDK Examples](https://github.com/twilio/twilio-agent-connect-python/tree/main/getting_started/examples/partners/)** - OpenAI Chat Completions and Responses API examples
+- **[ConversationRelay-Only Mode](https://github.com/twilio/twilio-agent-connect-python/blob/main/getting_started/examples/features/relay_only.py)** - Get started with voice using just ConversationRelay
 - More examples coming soon
 
 **AWS and Microsoft connectors:**
@@ -192,8 +193,8 @@ For detailed architecture and advanced usage, see [CLAUDE.md](CLAUDE.md).
 - **[TAC for Microsoft](https://github.com/twilio/twilio-agent-connect-microsoft)** — `AgentFrameworkConnector` and `VoiceLiveConnector` for Microsoft Agent Framework, Azure AI Foundry (including Voice Live), and Azure OpenAI
 
 **Documentation:**
-- **[CLAUDE.md](CLAUDE.md)** - Architecture, development guide, and API reference
-- **[Getting Started Guide](getting_started/README.md)** - Setup instructions, environment variables, and troubleshooting
+- **[CLAUDE.md](https://github.com/twilio/twilio-agent-connect-python/blob/main/CLAUDE.md)** - Architecture, development guide, and API reference
+- **[Getting Started Guide](https://github.com/twilio/twilio-agent-connect-python/blob/main/getting_started/README.md)** - Setup instructions, environment variables, and troubleshooting
 
 ---
 
