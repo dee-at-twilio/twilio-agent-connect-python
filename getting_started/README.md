@@ -44,20 +44,10 @@ Learn the core pattern for manually extracting and injecting TAC memory into **a
 
 ### `providers/` - Provider SDK Examples
 
-Production-ready examples using provider SDK adapters:
-- **`openai_chat_completions.py`**: OpenAI Chat Completions API
-- **`openai_responses_api.py`**: OpenAI Responses API
-- Automatic memory injection with `with_tac_memory()`
-- Less boilerplate, more convention-based
-
-### `providers/aws/` - AWS Bedrock
-
-Example using the Bedrock Converse API with manual memory injection:
-- **`bedrock_converse.py`**: Bedrock Converse API with Claude
-- Uses `MemoryPromptBuilder` to inject TAC memory into the Bedrock system prompt
-- Works with any Bedrock foundation model (Claude, Llama, Mistral, etc.)
-- AWS credentials via standard boto3 chain (env vars, `~/.aws/credentials`, IAM role)
-- For production AWS agents, see [Strands Agents SDK](https://github.com/strands-agents/sdk-python)
+Production-ready examples integrating TAC with provider SDKs:
+- **`openai_chat_completions.py`**: OpenAI Chat Completions API with automatic memory injection via `with_tac_memory()`
+- **`openai_responses_api.py`**: OpenAI Responses API with automatic memory injection
+- **`aws_bedrock_converse.py`**: AWS Bedrock Converse API integration (works with Claude, Llama, Mistral, etc.)
 
 ### `features/` - Feature Examples
 
@@ -68,6 +58,7 @@ Example using the Bedrock Converse API with manual memory injection:
 - **`outbound.py`**: Agent-initiated outbound conversations via SMS, RCS, WhatsApp, or Voice channels
 - **`chat/`**: Twilio Conversations (Chat) channel examples
 - **`relay_only.py`**: ConversationRelay-only mode — get started with voice using just ConversationRelay
+- **`dashboard/`**: Real-time observation dashboard for monitoring active sessions, message history, and agent context during development
 
 ## Step 3: Run an Example
 
@@ -92,7 +83,7 @@ walks up from the script's directory, so it'll find
 uv run getting_started/examples/overview.py
 uv run getting_started/examples/providers/openai_chat_completions.py
 uv run getting_started/examples/providers/openai_responses_api.py
-uv run getting_started/examples/providers/aws/bedrock_converse.py
+uv run getting_started/examples/providers/aws_bedrock_converse.py
 uv run getting_started/examples/features/voice_streaming.py
 uv run getting_started/examples/features/handoff.py
 uv run getting_started/examples/features/relay_only.py
@@ -132,8 +123,8 @@ See `examples/.env.example` for all available configuration options. Key variabl
 - `OPENAI_API_KEY`: Your OpenAI API key (only needed to run OpenAI examples)
 
 ### Optional (AWS Bedrock Example)
-- `AWS_REGION`: AWS region for Bedrock (default: `us-east-1`)
-- `AWS_BEDROCK_MODEL_ID`: Bedrock model ID (default: `us.anthropic.claude-3-5-haiku-20241022-v1:0`)
+- `AWS_REGION`: AWS region for Bedrock
+- `AWS_BEDROCK_MODEL_ID`: Bedrock model ID (e.g. `us.anthropic.claude-3-5-haiku-20241022-v1:0`)
 - AWS credentials are resolved via the standard boto3 credential chain (env vars, `~/.aws/credentials`, IAM role)
 
 ### Optional (Channel-Specific)
@@ -146,7 +137,7 @@ See `examples/.env.example` for all available configuration options. Key variabl
 
 - Start with `examples/overview.py` to learn the core memory injection pattern
 - Try the `examples/providers/` examples for production-ready provider SDK integration
-- Try the `examples/providers/aws/` example for AWS Bedrock integration
+- Try the `examples/providers/aws_bedrock_converse.py` example for AWS Bedrock integration
 - Customize the agent's behavior by modifying the message handler
 - Add tool calling to enable agent actions beyond text responses
 - Explore the main [README](../README.md) for advanced features

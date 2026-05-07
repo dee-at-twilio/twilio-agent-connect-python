@@ -53,7 +53,7 @@ async def handle_message_ready(
 
     This pattern works with ANY agent framework:
     - OpenAI (see providers/ examples for adapter)
-    - AWS Bedrock (see providers/aws/bedrock_converse.py)
+    - AWS Bedrock (see providers/aws_bedrock_converse.py)
     - Azure AI (upcoming example)
     - GCP Vertex AI (upcoming example)
     - Custom agents
