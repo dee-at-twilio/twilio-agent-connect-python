@@ -1,11 +1,9 @@
 [project]
 name = "twilio-agent-connect"
-version = "0.0.3"
+version = "1.0.1"
 description = "A Python framework for building agentic applications with Twilio"
 authors = [{ name = "Twilio Conversation AI", email = "team_conversational-ai@twilio.com" }]
 readme = "README.md"
-homepage = "https://github.com/twilio/twilio-agent-connect-python"
-repository = "https://github.com/twilio/twilio-agent-connect-python"
 requires-python = ">=3.10,<4"
 classifiers = [
     "Typing :: Typed",
@@ -26,6 +24,12 @@ dependencies = [
     "twilio>=9.8.3,<10",
 ]
 
+[project.urls]
+Homepage = "https://github.com/twilio/twilio-agent-connect-python"
+Documentation = "https://www.twilio.com/docs/conversations/agent-connect"
+Repository = "https://github.com/twilio/twilio-agent-connect-python"
+Issues = "https://github.com/twilio/twilio-agent-connect-python/issues"
+
 [project.optional-dependencies]
 server = [
     "fastapi>=0.115.0,<1",
@@ -42,9 +46,14 @@ dev = [
     "mypy>=1.0.0,<2",
 ]
 examples = [
+    # OpenAI examples
     "openai>=2.0.0",
     "openai-agents>=0.6.0",
-    "boto3>=1.35.0",
+    # AWS examples (using AWS SDKs directly)
+    "boto3>=1.34.0",
+    "boto3-stubs[bedrock-agent-runtime,bedrock-agentcore]>=1.34.0",
+    "strands-agents>=1.30.0",
+    # Common
     "python-dotenv>=1.0.0,<2",
     "fastapi>=0.115.0,<1",
     "uvicorn[standard]>=0.32.0,<1",
@@ -66,6 +75,14 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/tac"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/README.md",
+    "/LICENSE",
+    "/pyproject.toml",
+]
 
 [tool.ruff]
 line-length = 100

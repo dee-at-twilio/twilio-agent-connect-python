@@ -48,6 +48,9 @@ Production-ready examples integrating TAC with provider SDKs:
 - **`openai_chat_completions.py`**: OpenAI Chat Completions API with automatic memory injection via `with_tac_memory()`
 - **`openai_responses_api.py`**: OpenAI Responses API with automatic memory injection
 - **`aws_bedrock_converse.py`**: AWS Bedrock Converse API integration (works with Claude, Llama, Mistral, etc.)
+- **`aws_bedrock_agent.py`**: AWS Bedrock Agent integration
+- **`aws_bedrock_agentcore.py`**: AWS Bedrock AgentCore integration
+- **`aws_strands.py`**: AWS Strands agents integration
 
 ### `features/` - Feature Examples
 
@@ -81,9 +84,13 @@ walks up from the script's directory, so it'll find
 
 ```bash
 uv run getting_started/examples/overview.py
+<<<<<<< HEAD
 uv run getting_started/examples/providers/openai_chat_completions.py
 uv run getting_started/examples/providers/openai_responses_api.py
 uv run getting_started/examples/providers/aws_bedrock_converse.py
+uv run getting_started/examples/providers/aws_bedrock_agent.py
+uv run getting_started/examples/providers/aws_bedrock_agentcore.py
+uv run getting_started/examples/providers/aws_strands.py
 uv run getting_started/examples/features/voice_streaming.py
 uv run getting_started/examples/features/handoff.py
 uv run getting_started/examples/features/relay_only.py
@@ -141,3 +148,10 @@ See `examples/.env.example` for all available configuration options. Key variabl
 - Customize the agent's behavior by modifying the message handler
 - Add tool calling to enable agent actions beyond text responses
 - Explore the main [README](../README.md) for advanced features
+
+## AWS and Microsoft connectors
+
+Building AI agents on AWS or Microsoft? Connect them to Twilio's voice, messaging, and conversation context with these dedicated packages:
+
+- **[TAC for AWS](https://github.com/twilio/twilio-agent-connect-aws)** — `StrandsConnector`, `BedrockConnector`, `BedrockAgentCoreConnector` for AWS Strands, Bedrock Agents, and Bedrock AgentCore
+- **[TAC for Microsoft](https://github.com/twilio/twilio-agent-connect-microsoft)** — `AgentFrameworkConnector` and `VoiceLiveConnector` for Microsoft Agent Framework, Azure AI Foundry (including Voice Live), and Azure OpenAI
