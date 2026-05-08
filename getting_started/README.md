@@ -84,7 +84,6 @@ walks up from the script's directory, so it'll find
 
 ```bash
 uv run getting_started/examples/overview.py
-<<<<<<< HEAD
 uv run getting_started/examples/partners/openai_chat_completions.py
 uv run getting_started/examples/partners/openai_responses_api.py
 uv run getting_started/examples/partners/aws_bedrock_converse.py
