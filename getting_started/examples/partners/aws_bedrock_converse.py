@@ -41,7 +41,7 @@ logger = get_logger(__name__)
 tac = TAC(config=TACConfig.from_env())
 
 # Create channel handlers for Voice and SMS
-voice_channel = VoiceChannel(tac, config=VoiceChannelConfig(memory_mode="always"))
+voice_channel = VoiceChannel(tac, config=VoiceChannelConfig(memory_mode="once"))
 sms_channel = SMSChannel(tac, config=SMSChannelConfig(memory_mode="always"))
 
 # Get Bedrock configuration
@@ -87,12 +87,12 @@ async def handle_message_ready(
         if conv_id not in conversation_history:
             conversation_history[conv_id] = []
 
-        # Build memory context and combine with system prompt
-        memory_context = MemoryPromptBuilder.build(
+        # Compose system prompt with memory context
+        system_prompt = MemoryPromptBuilder.compose(
+            SYSTEM_PROMPT,
             memory_response=memory_response,
             context=context,
         )
-        system_prompt = f"{SYSTEM_PROMPT}\n\n{memory_context}" if memory_context else SYSTEM_PROMPT
 
         # Add user message in Bedrock Converse format
         conversation_history[conv_id].append({"role": "user", "content": [{"text": user_message}]})
