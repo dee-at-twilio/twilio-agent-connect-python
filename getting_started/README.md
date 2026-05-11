@@ -128,11 +128,6 @@ See `examples/.env.example` for all available configuration options. Key variabl
 ### Optional (OpenAI Example)
 - `OPENAI_API_KEY`: Your OpenAI API key (only needed to run OpenAI examples)
 
-### Optional (AWS Bedrock Example)
-- `AWS_REGION`: AWS region for Bedrock
-- `AWS_BEDROCK_MODEL_ID`: Bedrock model ID (e.g. `us.anthropic.claude-3-5-haiku-20241022-v1:0`)
-- AWS credentials are resolved via the standard boto3 credential chain (env vars, `~/.aws/credentials`, IAM role)
-
 ### Optional (Channel-Specific)
 - `TWILIO_STUDIO_HANDOFF_FLOW_SID`: Studio Flow SID used by `create_studio_handoff_tool` (required for `features/handoff.py`)
 - `TWILIO_RCS_SENDER_ID`: RCS Sender ID (required for `features/rcs.py`)
@@ -143,7 +138,6 @@ See `examples/.env.example` for all available configuration options. Key variabl
 
 - Start with `examples/overview.py` to learn the core memory injection pattern
 - Try the `examples/partners/` examples for production-ready partner SDK integration
-- Try the `examples/partners/aws_bedrock_converse.py` example for AWS Bedrock integration
 - Customize the agent's behavior by modifying the message handler
 - Add tool calling to enable agent actions beyond text responses
 - Explore the main [README](../README.md) for advanced features
