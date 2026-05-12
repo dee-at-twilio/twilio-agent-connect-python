@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from collections.abc import AsyncGenerator
+from contextlib import nullcontext
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -76,6 +78,21 @@ class VoiceChannel(BaseChannel):
         self.session_manager = config.session_manager
         self._websocket_manager = WebSocketManager()
         self._twilio_client: Client | None = None
+
+        # Initialize telemetry clients
+        try:
+            from tac.telemetry.metrics import MetricsClient
+
+            self._metrics = MetricsClient()
+        except ImportError:
+            self._metrics = None
+
+        try:
+            from tac.telemetry.tracer import TracerClient
+
+            self._tracer = TracerClient()
+        except ImportError:
+            self._tracer = None
 
     @staticmethod
     def _caller_address(setup_msg: SetupMessage) -> str | None:
@@ -243,7 +260,18 @@ class VoiceChannel(BaseChannel):
         profile_id = customer_participant.profile_id if customer_participant else None
 
         self._websocket_manager.add_websocket(conv_id, websocket)
-        session = self._start_conversation(conv_id, profile_id)
+
+        # 🔍 Span: Conversation start (session initialization)
+        span_attributes = {"channel": "voice", "conversation_id": conv_id}
+        with self._tracer.start_span("conversation.start", attributes=span_attributes) if self._tracer else nullcontext():
+            start_conv_time = time.time()
+            session = self._start_conversation(conv_id, profile_id)
+
+            if self._metrics:
+                self._metrics.conversation_start_duration.record(
+                    time.time() - start_conv_time, attributes={"channel": "voice"}
+                )
+                self._metrics.conversation_active_count.add(1)
 
         session_state = None
         if self.session_manager is not None:
@@ -331,6 +359,12 @@ class VoiceChannel(BaseChannel):
             self.logger.info("WebSocket connection closed", conversation_id=conv_id)
         except Exception as e:
             self.logger.error(f"WebSocket error: {str(e)}")
+            # Record error metric
+            if self._metrics:
+                self._metrics.message_error_count.add(
+                    1,
+                    attributes={"channel": "voice", "error_type": type(e).__name__},
+                )
         finally:
             if conv_id:
                 self.logger.debug("Cleanup - removing WebSocket", conversation_id=conv_id)
@@ -662,6 +696,8 @@ class VoiceChannel(BaseChannel):
             conv_id: Conversation ID
             message: Parsed PromptMessage containing user's transcribed speech
         """
+        start_time = time.time()
+
         if conv_id not in self._conversations:
             self.logger.error(
                 f"Received prompt for unknown conversation {conv_id}. "
@@ -673,22 +709,55 @@ class VoiceChannel(BaseChannel):
         message_body = message.voice_prompt or ""
         session = self._conversations[conv_id]
 
-        # Retrieve memory if memory_mode is enabled and Twilio Memory is configured
-        memory_response = await self._retrieve_memory_if_enabled(session, message_body, conv_id)
+        span_attributes = {"channel": "voice", "conversation_id": conv_id}
 
-        # Trigger message ready callback
-        try:
-            response = await self.tac.trigger_message_ready(message_body, session, memory_response)
-            # Auto-send if callback returned a string (None = manual send_response flow)
-            if response is not None:
-                await self.send_response(conv_id, response, role="assistant")
-        except Exception as e:
-            self.logger.error(
-                "Error in message ready callback",
-                conversation_id=conv_id,
-                error=str(e),
-                exc_info=True,
-            )
+        # Start root span for entire message processing
+        with self._tracer.start_span("message.processing", attributes=span_attributes) if self._tracer else nullcontext():
+            try:
+                # 📊 Metric: Message received
+                if self._metrics:
+                    self._metrics.message_received_count.add(1, attributes={"channel": "voice"})
+
+                # 🔍 Span: Memory retrieval
+                with self._tracer.start_span("memory.retrieve", attributes=span_attributes) if self._tracer else nullcontext():
+                    memory_response = await self._retrieve_memory_if_enabled(session, message_body, conv_id)
+
+                # 🔍 Span: User callback execution
+                with self._tracer.start_span("conversation.ready", attributes=span_attributes) if self._tracer else nullcontext():
+                    callback_start = time.time()
+                    response = await self.tac.trigger_message_ready(message_body, session, memory_response)
+                    callback_duration = time.time() - callback_start
+
+                    if self._metrics:
+                        self._metrics.conversation_ready_duration.record(
+                            callback_duration, attributes={"channel": "voice"}
+                        )
+
+                # Auto-send if callback returned a string (None = manual send_response flow)
+                if response is not None:
+                    # 🔍 Span: Send response
+                    with self._tracer.start_span("message.send", attributes=span_attributes) if self._tracer else nullcontext():
+                        await self.send_response(conv_id, response, role="assistant")
+
+                        # 📊 Metric: Message sent
+                        if self._metrics:
+                            self._metrics.message_sent_count.add(1, attributes={"channel": "voice"})
+
+            except Exception as e:
+                # 📊 Metric: Message error
+                if self._metrics:
+                    self._metrics.message_error_count.add(
+                        1,
+                        attributes={"channel": "voice", "error_type": type(e).__name__},
+                    )
+
+                self.logger.error(
+                    "Error in message ready callback",
+                    conversation_id=conv_id,
+                    error=str(e),
+                    exc_info=True,
+                )
+                raise
 
     def _handle_interrupt(self, conv_id: str, message: InterruptMessage) -> None:
         """
@@ -735,7 +804,20 @@ class VoiceChannel(BaseChannel):
             self.session_manager.remove_session(conv_id)
 
         if not self.tac.is_orchestrator_enabled() and conv_id in self._conversations:
-            await self._end_conversation(conv_id)
+            # 🔍 Span: Conversation end
+            span_attributes = {"channel": "voice", "conversation_id": conv_id, "reason": "completed"}
+            with self._tracer.start_span("conversation.end", attributes=span_attributes) if self._tracer else nullcontext():
+                end_start_time = time.time()
+
+                if self._metrics:
+                    self._metrics.conversation_active_count.add(-1)
+
+                await self._end_conversation(conv_id)
+
+                if self._metrics:
+                    self._metrics.conversation_end_duration.record(
+                        time.time() - end_start_time, attributes={"channel": "voice", "reason": "completed"}
+                    )
 
         self.logger.debug(
             "Cleaned up WebSocket and session resources",
