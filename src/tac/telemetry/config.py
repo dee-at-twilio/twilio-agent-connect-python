@@ -40,12 +40,21 @@ class TACTelemetry:
     Environment Variables:
         OTEL_EXPORTER_OTLP_ENDPOINT: OTLP endpoint URL (default: http://localhost:4318)
         OTEL_EXPORTER_OTLP_HEADERS: Headers for OTLP requests
+        TAC_TELEMETRY_INCLUDE_MESSAGE_CONTENT: Include input/output in traces (default: false)
+            WARNING: Setting this to 'true' will send message content (user input and LLM output)
+            to your observability backend. This may include PII and should only be enabled
+            if you have proper data handling agreements and comply with privacy regulations.
     """
 
     def __init__(self):
         self.resource = get_otel_resource()
         self.meter_provider: metrics_sdk.MeterProvider | None = None
         self.tracer_provider: TracerProvider | None = None
+
+        # Check if message content should be included in traces (default: False for privacy)
+        self.include_message_content = os.getenv(
+            "TAC_TELEMETRY_INCLUDE_MESSAGE_CONTENT", "false"
+        ).lower() in ("true", "1", "yes")
 
     def setup_meter(
         self,
@@ -82,7 +91,9 @@ class TACTelemetry:
         # OTLP exporter (for Prometheus/Grafana)
         if enable_otlp_exporter:
             try:
-                from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
+                from opentelemetry.exporter.otlp.proto.http.metric_exporter import (
+                    OTLPMetricExporter,
+                )
                 from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 
                 otlp_reader = PeriodicExportingMetricReader(
@@ -172,3 +183,32 @@ class TACTelemetry:
 
         logger.info("TAC tracing configured successfully")
         return self
+
+    def shutdown(self, timeout_millis: int = 30000) -> None:
+        """Shutdown telemetry and flush all pending data
+
+        This ensures all metrics and traces are exported before the application exits.
+        Should be called on application shutdown or when stopping the server.
+
+        Args:
+            timeout_millis: Maximum time to wait for shutdown (default: 30 seconds)
+        """
+        logger.info("Shutting down TAC telemetry...")
+
+        # Shutdown meter provider
+        if self.meter_provider:
+            try:
+                self.meter_provider.shutdown(timeout_millis=timeout_millis)
+                logger.info("Meter provider shutdown complete")
+            except Exception as e:
+                logger.error(f"Error shutting down meter provider: {e}")
+
+        # Shutdown tracer provider (forces span export)
+        if self.tracer_provider:
+            try:
+                self.tracer_provider.shutdown()
+                logger.info("Tracer provider shutdown complete")
+            except Exception as e:
+                logger.error(f"Error shutting down tracer provider: {e}")
+
+        logger.info("TAC telemetry shutdown complete")

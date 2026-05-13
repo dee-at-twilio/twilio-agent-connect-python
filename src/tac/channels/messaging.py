@@ -240,7 +240,6 @@ class MessagingChannel(BaseChannel):
 
     async def _handle_communication_created(self, event_data: Any) -> None:
         """Handle COMMUNICATION_CREATED event (incoming message)."""
-        start_time = time.time()
         communication_data = Communication.model_validate(event_data)
         conv_id = communication_data.conversation_id
         message_text = communication_data.content.text
@@ -256,25 +255,45 @@ class MessagingChannel(BaseChannel):
             return
 
         channel_name = self.get_channel_name()
-        span_attributes = {"channel": channel_name, "conversation_id": conv_id}
+        span_attributes = {
+            "channel": channel_name,
+            "conversation_id": conv_id,
+        }
+
+        # Only include message content if explicitly enabled (privacy-safe by default)
+        if self._tracer and self._tracer.include_message_content:
+            span_attributes["input"] = message_text
 
         # Start root span for entire message processing
-        with self._tracer.start_span("message.processing", attributes=span_attributes) if self._tracer else nullcontext():
+        # We need to manually start the span to be able to add attributes later
+        if self._tracer:
+            from opentelemetry import trace
+
+            message_span = self._tracer.tracer.start_span(
+                "message.processing", attributes=span_attributes
+            )
+            span_context = trace.use_span(message_span, end_on_exit=True)
+        else:
+            message_span = None
+            span_context = nullcontext()
+
+        with span_context:
             try:
                 # 📊 Metric: Message received
                 if self._metrics:
-                    self._metrics.message_received_count.add(1, attributes={"channel": channel_name})
+                    self._metrics.message_received_count.add(
+                        1, attributes={"channel": channel_name}
+                    )
 
                 if conv_id not in self._conversations:
-                    # 🔍 Span: Conversation start
-                    with self._tracer.start_span("conversation.start", attributes=span_attributes) if self._tracer else nullcontext():
-                        start_conv_time = time.time()
-                        self._start_conversation(conv_id, profile_id=None)
-                        if self._metrics:
-                            self._metrics.conversation_start_duration.record(
-                                time.time() - start_conv_time, attributes={"channel": channel_name}
-                            )
-                            self._metrics.conversation_active_count.add(1)
+                    # 📊 Metric: Conversation start
+                    start_conv_time = time.time()
+                    self._start_conversation(conv_id, profile_id=None)
+                    if self._metrics:
+                        self._metrics.conversation_start_duration.record(
+                            time.time() - start_conv_time, attributes={"channel": channel_name}
+                        )
+                        self._metrics.conversation_active_count.add(1)
 
                 session = self._conversations[conv_id]
 
@@ -288,14 +307,15 @@ class MessagingChannel(BaseChannel):
                     session.metadata["channel_id"] = communication_data.channel_id
 
                 # Reconcile participant types pre-LLM so v1-bridge's UNKNOWN gets
-                # promoted to CUSTOMER (with a Conversation Memory profile attached when possible)
-                # and to stash both participant ids on the session for send_response.
-                # If reconciliation can't identify both sides, any eventual reply would
-                # fail too — skip the callback so the LLM doesn't waste a turn on an
-                # un-replyable conversation.
+                # promoted to CUSTOMER (with a Conversation Memory profile attached
+                # when possible) and to stash both participant ids on the session
+                # for send_response. If reconciliation can't identify both sides,
+                # any eventual reply would fail too — skip the callback so the LLM
+                # doesn't waste a turn on an un-replyable conversation.
                 #
-                # Skip reconcile entirely when both sides are already stashed from a
-                # prior turn — Conversation Orchestrator's state was written by us and doesn't drift.
+                # Skip reconcile entirely when both sides are already stashed from
+                # a prior turn — Conversation Orchestrator's state was written by
+                # us and doesn't drift.
                 if session.ai_agent_info is None or session.author_info is None:
                     resolved = await self._reconcile_participants(conv_id)
                     if resolved is None:
@@ -319,14 +339,30 @@ class MessagingChannel(BaseChannel):
                         if customer_participant.profile_id and not session.profile_id:
                             session.profile_id = customer_participant.profile_id
 
+                # Add user ID to span if profile_id is available
+                if message_span and session.profile_id:
+                    message_span.set_attribute("enduser.id", session.profile_id)
+
                 # 🔍 Span: Memory retrieval
-                with self._tracer.start_span("memory.retrieve", attributes=span_attributes) if self._tracer else nullcontext():
-                    memory_response = await self._retrieve_memory_if_enabled(session, message_text, conv_id)
+                with (
+                    self._tracer.start_span("memory.retrieve", attributes=span_attributes)
+                    if self._tracer
+                    else nullcontext()
+                ):
+                    memory_response = await self._retrieve_memory_if_enabled(
+                        session, message_text, conv_id
+                    )
 
                 # 🔍 Span: User callback execution
-                with self._tracer.start_span("conversation.ready", attributes=span_attributes) if self._tracer else nullcontext():
+                with (
+                    self._tracer.start_span("conversation.ready", attributes=span_attributes)
+                    if self._tracer
+                    else nullcontext()
+                ):
                     callback_start = time.time()
-                    response = await self.tac.trigger_message_ready(message_text, session, memory_response)
+                    response = await self.tac.trigger_message_ready(
+                        message_text, session, memory_response
+                    )
                     callback_duration = time.time() - callback_start
 
                     if self._metrics:
@@ -336,13 +372,23 @@ class MessagingChannel(BaseChannel):
 
                 # Auto-send if callback returned a string (None = manual send_response flow)
                 if response is not None:
+                    # Add output to the message.processing span (only if message content is enabled)
+                    if message_span and self._tracer.include_message_content:
+                        message_span.set_attribute("output", response)
+
                     # 🔍 Span: Send response
-                    with self._tracer.start_span("message.send", attributes=span_attributes) if self._tracer else nullcontext():
+                    with (
+                        self._tracer.start_span("message.send", attributes=span_attributes)
+                        if self._tracer
+                        else nullcontext()
+                    ):
                         await self.send_response(conv_id, response, role="assistant")
 
                         # 📊 Metric: Message sent
                         if self._metrics:
-                            self._metrics.message_sent_count.add(1, attributes={"channel": channel_name})
+                            self._metrics.message_sent_count.add(
+                                1, attributes={"channel": channel_name}
+                            )
 
             except Exception as e:
                 # 📊 Metric: Message error
@@ -381,21 +427,20 @@ class MessagingChannel(BaseChannel):
             return
 
         if status == "CLOSED":
-            # 🔍 Span: Conversation end
+            # 📊 Metric: Conversation end
             channel_name = self.get_channel_name()
-            span_attributes = {"channel": channel_name, "conversation_id": conv_id, "reason": "completed"}
-            with self._tracer.start_span("conversation.end", attributes=span_attributes) if self._tracer else nullcontext():
-                end_start_time = time.time()
+            end_start_time = time.time()
 
-                if self._metrics:
-                    self._metrics.conversation_active_count.add(-1)
+            if self._metrics:
+                self._metrics.conversation_active_count.add(-1)
 
-                await self._end_conversation(conv_id)
+            await self._end_conversation(conv_id)
 
-                if self._metrics:
-                    self._metrics.conversation_end_duration.record(
-                        time.time() - end_start_time, attributes={"channel": channel_name, "reason": "completed"}
-                    )
+            if self._metrics:
+                self._metrics.conversation_end_duration.record(
+                    time.time() - end_start_time,
+                    attributes={"channel": channel_name, "reason": "completed"},
+                )
         elif status == "INACTIVE" and self.memory_mode == "once":
             # Invalidate cached memory when conversation becomes inactive
             # Memory is updated by Conversation Orchestrator on INACTIVE transition

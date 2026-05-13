@@ -1,6 +1,7 @@
 """TAC Tracer - Singleton for creating spans"""
 
 import logging
+import os
 import threading
 from typing import Optional
 
@@ -41,6 +42,18 @@ class TracerClient:
         logger.info("Initializing TAC TracerClient")
         tracer_provider = trace.get_tracer_provider()
         self.tracer: Tracer = tracer_provider.get_tracer("tac.telemetry")
+
+        # Check if message content should be included in traces (default: False for privacy)
+        self.include_message_content = os.getenv(
+            "TAC_TELEMETRY_INCLUDE_MESSAGE_CONTENT", "false"
+        ).lower() in ("true", "1", "yes")
+        if self.include_message_content:
+            logger.warning(
+                "TAC_TELEMETRY_INCLUDE_MESSAGE_CONTENT is enabled - message content "
+                "(input/output) will be sent to your observability backend. "
+                "Ensure this complies with your privacy policy."
+            )
+
         self._initialized = True
 
     def start_span(self, name: str, attributes: dict[str, str] | None = None):

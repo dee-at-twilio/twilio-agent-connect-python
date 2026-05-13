@@ -49,8 +49,18 @@ if PUBLIC_KEY and SECRET_KEY:
     # Traces → Langfuse
     auth_string = f"{PUBLIC_KEY}:{SECRET_KEY}"
     auth_b64 = base64.b64encode(auth_string.encode()).decode()
-    os.environ["OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"] = "http://localhost:3001/api/public/otel/v1/traces"
+    os.environ["OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"] = (
+        "http://localhost:3001/api/public/otel/v1/traces"
+    )
     os.environ["OTEL_EXPORTER_OTLP_HEADERS"] = f"Authorization=Basic {auth_b64}"
+
+    # PRIVACY: Include message content (input/output) in traces?
+    # WARNING: This sends user messages and LLM responses to your observability backend.
+    # Only enable if you have proper data handling agreements and comply with privacy regulations.
+    # Default: false (disabled for privacy)
+    os.environ["TAC_TELEMETRY_INCLUDE_MESSAGE_CONTENT"] = os.getenv(
+        "TAC_TELEMETRY_INCLUDE_MESSAGE_CONTENT", "false"
+    )
 # ============================================================================
 
 from tac import TAC, TACConfig
@@ -69,7 +79,7 @@ if PUBLIC_KEY and SECRET_KEY:
     from tac.telemetry import TACTelemetry
 
     telemetry = TACTelemetry()
-    telemetry.setup_meter(enable_otlp_exporter=True)   # Metrics → Grafana
+    telemetry.setup_meter(enable_otlp_exporter=True)  # Metrics → Grafana
     telemetry.setup_tracer(enable_otlp_exporter=True)  # Traces → Langfuse
     print("✅ OpenTelemetry enabled - data will be sent to Grafana and Langfuse")
 else:

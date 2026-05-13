@@ -101,7 +101,9 @@ class MemoryClient(BaseAPIClient):
 
         except httpx.HTTPError as e:
             # Extract status code if available
-            status_code = getattr(e.response, "status_code", None) if hasattr(e, "response") else None
+            status_code = (
+                getattr(e.response, "status_code", None) if hasattr(e, "response") else None
+            )
 
             # Record API metrics for error
             self._record_api_request("POST", start_time, status_code=status_code, error=e)

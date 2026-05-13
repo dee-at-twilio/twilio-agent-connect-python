@@ -261,17 +261,15 @@ class VoiceChannel(BaseChannel):
 
         self._websocket_manager.add_websocket(conv_id, websocket)
 
-        # 🔍 Span: Conversation start (session initialization)
-        span_attributes = {"channel": "voice", "conversation_id": conv_id}
-        with self._tracer.start_span("conversation.start", attributes=span_attributes) if self._tracer else nullcontext():
-            start_conv_time = time.time()
-            session = self._start_conversation(conv_id, profile_id)
+        # 📊 Metric: Conversation start (session initialization)
+        start_conv_time = time.time()
+        session = self._start_conversation(conv_id, profile_id)
 
-            if self._metrics:
-                self._metrics.conversation_start_duration.record(
-                    time.time() - start_conv_time, attributes={"channel": "voice"}
-                )
-                self._metrics.conversation_active_count.add(1)
+        if self._metrics:
+            self._metrics.conversation_start_duration.record(
+                time.time() - start_conv_time, attributes={"channel": "voice"}
+            )
+            self._metrics.conversation_active_count.add(1)
 
         session_state = None
         if self.session_manager is not None:
@@ -696,8 +694,6 @@ class VoiceChannel(BaseChannel):
             conv_id: Conversation ID
             message: Parsed PromptMessage containing user's transcribed speech
         """
-        start_time = time.time()
-
         if conv_id not in self._conversations:
             self.logger.error(
                 f"Received prompt for unknown conversation {conv_id}. "
@@ -709,23 +705,58 @@ class VoiceChannel(BaseChannel):
         message_body = message.voice_prompt or ""
         session = self._conversations[conv_id]
 
-        span_attributes = {"channel": "voice", "conversation_id": conv_id}
+        span_attributes = {
+            "channel": "voice",
+            "conversation_id": conv_id,
+        }
+
+        # Only include message content if explicitly enabled (privacy-safe by default)
+        if self._tracer and self._tracer.include_message_content:
+            span_attributes["input"] = message_body
 
         # Start root span for entire message processing
-        with self._tracer.start_span("message.processing", attributes=span_attributes) if self._tracer else nullcontext():
+        # We need to manually start the span to be able to add attributes later
+        if self._tracer:
+            from opentelemetry import trace
+
+            message_span = self._tracer.tracer.start_span(
+                "message.processing", attributes=span_attributes
+            )
+            span_context = trace.use_span(message_span, end_on_exit=True)
+        else:
+            message_span = None
+            span_context = nullcontext()
+
+        with span_context:
             try:
+                # Add user ID to span if profile_id is available
+                if message_span and session.profile_id:
+                    message_span.set_attribute("enduser.id", session.profile_id)
+
                 # 📊 Metric: Message received
                 if self._metrics:
                     self._metrics.message_received_count.add(1, attributes={"channel": "voice"})
 
                 # 🔍 Span: Memory retrieval
-                with self._tracer.start_span("memory.retrieve", attributes=span_attributes) if self._tracer else nullcontext():
-                    memory_response = await self._retrieve_memory_if_enabled(session, message_body, conv_id)
+                with (
+                    self._tracer.start_span("memory.retrieve", attributes=span_attributes)
+                    if self._tracer
+                    else nullcontext()
+                ):
+                    memory_response = await self._retrieve_memory_if_enabled(
+                        session, message_body, conv_id
+                    )
 
                 # 🔍 Span: User callback execution
-                with self._tracer.start_span("conversation.ready", attributes=span_attributes) if self._tracer else nullcontext():
+                with (
+                    self._tracer.start_span("conversation.ready", attributes=span_attributes)
+                    if self._tracer
+                    else nullcontext()
+                ):
                     callback_start = time.time()
-                    response = await self.tac.trigger_message_ready(message_body, session, memory_response)
+                    response = await self.tac.trigger_message_ready(
+                        message_body, session, memory_response
+                    )
                     callback_duration = time.time() - callback_start
 
                     if self._metrics:
@@ -735,8 +766,16 @@ class VoiceChannel(BaseChannel):
 
                 # Auto-send if callback returned a string (None = manual send_response flow)
                 if response is not None:
+                    # Add output to the message.processing span (only if message content is enabled)
+                    if message_span and self._tracer.include_message_content:
+                        message_span.set_attribute("output", response)
+
                     # 🔍 Span: Send response
-                    with self._tracer.start_span("message.send", attributes=span_attributes) if self._tracer else nullcontext():
+                    with (
+                        self._tracer.start_span("message.send", attributes=span_attributes)
+                        if self._tracer
+                        else nullcontext()
+                    ):
                         await self.send_response(conv_id, response, role="assistant")
 
                         # 📊 Metric: Message sent
@@ -804,20 +843,19 @@ class VoiceChannel(BaseChannel):
             self.session_manager.remove_session(conv_id)
 
         if not self.tac.is_orchestrator_enabled() and conv_id in self._conversations:
-            # 🔍 Span: Conversation end
-            span_attributes = {"channel": "voice", "conversation_id": conv_id, "reason": "completed"}
-            with self._tracer.start_span("conversation.end", attributes=span_attributes) if self._tracer else nullcontext():
-                end_start_time = time.time()
+            # 📊 Metric: Conversation end
+            end_start_time = time.time()
 
-                if self._metrics:
-                    self._metrics.conversation_active_count.add(-1)
+            if self._metrics:
+                self._metrics.conversation_active_count.add(-1)
 
-                await self._end_conversation(conv_id)
+            await self._end_conversation(conv_id)
 
-                if self._metrics:
-                    self._metrics.conversation_end_duration.record(
-                        time.time() - end_start_time, attributes={"channel": "voice", "reason": "completed"}
-                    )
+            if self._metrics:
+                self._metrics.conversation_end_duration.record(
+                    time.time() - end_start_time,
+                    attributes={"channel": "voice", "reason": "completed"},
+                )
 
         self.logger.debug(
             "Cleaned up WebSocket and session resources",
