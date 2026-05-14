@@ -463,7 +463,7 @@ class TestVoiceChannel:
         twiml = await channel.handle_incoming_call(
             VoiceServerURLs(
                 websocket_url="wss://example.ngrok.io/ws",
-                conversation_relay_callback_url="https://example.ngrok.io/flex_handoff",
+                action_url="https://example.ngrok.io/flex_handoff",
             ),
         )
 
@@ -486,7 +486,7 @@ class TestVoiceChannel:
         twiml = await channel.handle_incoming_call(
             VoiceServerURLs(
                 websocket_url="wss://test.ngrok.io/ws",
-                conversation_relay_callback_url="https://example.ngrok.io/flex_handoff",
+                action_url="https://example.ngrok.io/flex_handoff",
             ),
         )
 
@@ -1171,7 +1171,7 @@ class TestVoiceChannel:
         twiml = await channel.handle_incoming_call(
             VoiceServerURLs(
                 websocket_url="wss://example.ngrok.io/ws",
-                conversation_relay_callback_url="https://example.ngrok.io/callback",
+                action_url="https://example.ngrok.io/callback",
             ),
         )
 
@@ -1312,7 +1312,7 @@ class TestHandleIncomingCallMerge:
 
     @pytest.mark.asyncio
     async def test_callback_url_beats_studio_handoff(self) -> None:
-        """server_urls.conversation_relay_callback_url wins over Studio handoff so
+        """server_urls.action_url wins over Studio handoff so
         relay-only session cleanup callbacks aren't silently swallowed."""
         flow_sid = "FW" + "a" * 32
         tac = TAC({**get_test_config(), "studio_handoff_flow_sid": flow_sid})
@@ -1320,7 +1320,7 @@ class TestHandleIncomingCallMerge:
         twiml = await channel.handle_incoming_call(
             VoiceServerURLs(
                 websocket_url="wss://example.com/ws",
-                conversation_relay_callback_url="https://cleanup.example.com/end",
+                action_url="https://cleanup.example.com/end",
             ),
         )
         assert 'action="https://cleanup.example.com/end"' in twiml
@@ -1333,7 +1333,7 @@ class TestHandleIncomingCallMerge:
         twiml = await channel.handle_incoming_call(
             VoiceServerURLs(
                 websocket_url="wss://example.com/ws",
-                conversation_relay_callback_url="https://fallback.example.com/end",
+                action_url="https://fallback.example.com/end",
             ),
         )
         assert 'action="https://fallback.example.com/end"' in twiml
@@ -1363,7 +1363,7 @@ class TestHandleIncomingCallMerge:
         twiml = await channel.handle_incoming_call(
             VoiceServerURLs(
                 websocket_url="wss://example.com/ws",
-                conversation_relay_callback_url="https://callback.example.com/end",
+                action_url="https://callback.example.com/end",
             ),
         )
         assert 'action="https://static.example.com/end"' in twiml
