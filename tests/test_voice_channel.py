@@ -1159,8 +1159,8 @@ class TestVoiceChannel:
         channel = VoiceChannel(
             tac,
             config=VoiceChannelConfig(
-                welcome_greeting="Welcome!",
                 twiml_options=TwiMLOptions(
+                    welcome_greeting="Welcome!",
                     custom_parameters={
                         "session_id": "sess_abc123",
                         "user_language": "es",
