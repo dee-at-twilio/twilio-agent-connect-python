@@ -1,11 +1,10 @@
 # Models API Reference
 
-(Coming soon)
+API data models used throughout TAC.
 
-This page will document all Pydantic models:
-
-- Memory models
-- Conversation models
-- Session models
-- Voice models
-- Knowledge models
+::: tac.models
+    options:
+      show_root_heading: false
+      show_source: false
+      members_order: source
+      group_by_category: true

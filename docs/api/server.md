@@ -1,9 +1,6 @@
 # Server API Reference
 
-(Coming soon)
-
-This page will document:
-
-- TACFastAPIServer
-- Server configuration
-- Custom endpoints
+::: tac.server.TACFastAPIServer
+    options:
+      show_root_heading: true
+      show_source: false
