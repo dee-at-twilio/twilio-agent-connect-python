@@ -43,11 +43,15 @@ plugins:
           paths: [src]
           options:
             docstring_style: google
-            show_source: true
+            show_source: false
             show_root_heading: true
             show_symbol_type_heading: true
             show_symbol_type_toc: true
             members_order: source
+            filters:
+              - "!^_"  # Exclude private members (starting with _)
+              - "!^model_"  # Exclude Pydantic internal methods
+            show_if_no_docstring: false  # Hide undocumented members
 
 markdown_extensions:
   - pymdownx.highlight:
