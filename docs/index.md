@@ -106,25 +106,17 @@ TACFastAPIServer(tac=tac, voice_channel=voice_channel, messaging_channels=[sms_c
 - Routes responses to the appropriate channel
 - Injects conversation memory and user profile into OpenAI calls
 
-For detailed setup instructions, see the [Getting Started Guide](getting-started/index.md).
+For detailed setup instructions, see the [GitHub README](https://github.com/twilio/twilio-agent-connect-python).
 
-## How It Works
+## API Reference
 
-TAC simplifies building AI agents by handling the integration between Twilio's communication channels and your LLM:
+Explore the complete API documentation:
 
-1. **Webhook/Connection Received**: Twilio sends webhook (SMS) or WebSocket connection (Voice) to your server
-2. **Channel Processing**: Channel validates and processes the incoming event
-3. **Memory Retrieval**: TAC optionally retrieves user memories and profile from Memory
-4. **Callback Invoked**: Your `on_message_ready` callback receives user message, context, and optional memory response
-5. **Response Handling**: Your callback returns a response string that TAC routes to the appropriate channel
-
-## Next Steps
-
-- [Installation Guide](getting-started/installation.md)
-- [Quick Start Tutorial](getting-started/quickstart.md)
-- [Architecture Overview](guides/architecture.md)
-- [Examples](examples/index.md)
-- [API Reference](api/core.md)
+- [Core API](api/core.md) - TAC, TACConfig, context models
+- [Channels](api/channels.md) - Voice, SMS, RCS, WhatsApp, Chat
+- [Models](api/models.md) - Data models for conversations, memory, sessions
+- [Adapters](api/adapters.md) - OpenAI integration
+- [Server](api/server.md) - FastAPI server setup
 
 ## Learn More
 

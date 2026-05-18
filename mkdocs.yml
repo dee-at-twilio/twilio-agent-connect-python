@@ -71,28 +71,12 @@ markdown_extensions:
 
 nav:
   - Home: index.md
-  - Getting Started:
-    - Overview: getting-started/index.md
-    - Installation: getting-started/installation.md
-    - Quick Start: getting-started/quickstart.md
-    - Twilio Setup: getting-started/twilio-setup.md
-  - Guides:
-    - Architecture: guides/architecture.md
-    - Channels: guides/channels.md
-    - Memory Management: guides/memory.md
-    - OpenAI Adapter: guides/openai-adapter.md
-    - Server Setup: guides/server.md
-  - Examples:
-    - Overview: examples/index.md
-    - OpenAI Integration: examples/openai.md
-    - AWS Integration: examples/aws.md
   - API Reference:
     - Core: api/core.md
     - Channels: api/channels.md
     - Models: api/models.md
     - Adapters: api/adapters.md
     - Server: api/server.md
-  - Contributing: contributing.md
 
 extra:
   social:
