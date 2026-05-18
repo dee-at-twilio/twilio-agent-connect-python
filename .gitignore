@@ -165,3 +165,5 @@ getting_started/examples/partners/.strands_sessions/
 
 # Local Makefile overrides
 Makefile.local
+/site/
+*.pyc

@@ -1,0 +1,104 @@
+site_name: Twilio Agent Connect Python SDK
+site_description: A powerful SDK for building intelligent, context-aware AI agents with Twilio's communication technologies
+site_url: https://twilio.github.io/twilio-agent-connect-python/
+repo_url: https://github.com/twilio/twilio-agent-connect-python
+repo_name: twilio/twilio-agent-connect-python
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    # Light mode
+    - scheme: default
+      primary: red
+      accent: red
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Dark mode
+    - scheme: slate
+      primary: red
+      accent: red
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.tabs.link
+    - content.code.annotation
+    - content.code.copy
+  logo: https://raw.githubusercontent.com/twilio/twilio-agent-connect-python/main/logo.svg
+  favicon: https://raw.githubusercontent.com/twilio/twilio-agent-connect-python/main/logo.svg
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            members_order: source
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Overview: getting-started/index.md
+    - Installation: getting-started/installation.md
+    - Quick Start: getting-started/quickstart.md
+    - Twilio Setup: getting-started/twilio-setup.md
+  - Guides:
+    - Architecture: guides/architecture.md
+    - Channels: guides/channels.md
+    - Memory Management: guides/memory.md
+    - OpenAI Adapter: guides/openai-adapter.md
+    - Server Setup: guides/server.md
+  - Examples:
+    - Overview: examples/index.md
+    - OpenAI Integration: examples/openai.md
+    - AWS Integration: examples/aws.md
+  - API Reference:
+    - Core: api/core.md
+    - Channels: api/channels.md
+    - Models: api/models.md
+    - Adapters: api/adapters.md
+    - Server: api/server.md
+  - Contributing: contributing.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/twilio/twilio-agent-connect-python
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/twilio-agent-connect/
+  version:
+    provider: mike
