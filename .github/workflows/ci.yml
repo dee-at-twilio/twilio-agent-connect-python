@@ -33,7 +33,7 @@ jobs:
         run: |
           uv venv
           . .venv/bin/activate
-          uv sync --all-extras --all-groups --exclude-newer "$QUARANTINE_DATE"
+          uv sync --frozen --all-extras --all-groups --exclude-newer "$QUARANTINE_DATE"
 
       - name: Run ruff check
         run: |
@@ -78,7 +78,7 @@ jobs:
         run: |
           uv venv
           . .venv/bin/activate
-          uv sync --all-extras --all-groups --exclude-newer "$QUARANTINE_DATE"
+          uv sync --frozen --all-extras --all-groups --exclude-newer "$QUARANTINE_DATE"
 
       - name: Run mypy
         run: |
@@ -120,7 +120,7 @@ jobs:
         run: |
           uv venv
           . .venv/bin/activate
-          uv sync --all-extras --all-groups --exclude-newer "$QUARANTINE_DATE"
+          uv sync --frozen --all-extras --all-groups --exclude-newer "$QUARANTINE_DATE"
 
       - name: Run tests
         run: |
