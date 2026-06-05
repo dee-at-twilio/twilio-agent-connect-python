@@ -62,6 +62,7 @@ examples = [
 
 [tool.uv]
 default-groups = ["dev", "examples"]
+exclude-newer = "2 days"
 
 [tool.uv.workspace]
 members = ["tac"]
