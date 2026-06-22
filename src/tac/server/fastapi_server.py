@@ -10,6 +10,8 @@ Requires: pip install tac[server]
 from __future__ import annotations
 
 import asyncio
+import json
+import os
 from typing import TYPE_CHECKING, Any
 
 from tac.channels.base import BaseChannel
@@ -220,14 +222,16 @@ class TACFastAPIServer:
 
             @app.post(config.conversation_relay_callback_path)
             async def conversation_relay_callback(request: Request) -> Response:
-                """Handle ConversationRelay action callback (call ended)."""
-                try:
-                    form_data = await request.form()
-                    payload_dict = {k: str(v) for k, v in form_data.items()}
-                    await vc.handle_conversation_relay_callback(payload_dict)
-                except Exception:
-                    logger.error("Failed to process ConversationRelay callback", exc_info=True)
-                    return Response(content="", media_type="text/plain", status_code=400)
+                form_data = await request.form()
+                payload_dict = {k: str(v) for k, v in form_data.items()}
+                await vc.handle_conversation_relay_callback(payload_dict)
+
+                workflow_sid = os.environ.get("TWILIO_TASKROUTER_WORKFLOW_SID", "")
+                if workflow_sid and payload_dict.get("HandoffData"):
+                    task_attrs = json.dumps({"handoffData": payload_dict["HandoffData"]})
+                    twiml = f'<Response><Enqueue workflowSid="{workflow_sid}"><Task>{task_attrs}</Task></Enqueue></Response>'
+                    return Response(content=twiml, media_type="application/xml")
+
                 return Response(content="", media_type="text/plain", status_code=200)
 
         if config.cintel_webhook_path is not None:
