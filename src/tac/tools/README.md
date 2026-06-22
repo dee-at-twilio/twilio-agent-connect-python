@@ -1,24 +1,3 @@
-### Forked repo to enable outgoing TAC calls and then handover to Flex, if needed.
-
-## Make an outbound call
-```python
-from tac import TAC, TACConfig
-
-tac = TAC(config=TACConfig.from_env())
-voice_channel = VoiceChannel(tac, config=VoiceChannelConfig(memory_mode="always"))
-
-tac_voice_domain = os.getenv("TAC_SERVER_DOMAIN", "")
-
-opts = InitiateVoiceConversationOptions(
-    to="+4498767667",
-    websocket_url=f"wss://{tac_voice_domain}/ws",
-    welcome_greeting="Hello",
-    action_url=f"https://{tac_voice_domain}/conversation-relay-callback",
-)                   
-voice_channel.initiate_outbound_conversation(opts)
-```
-
-
 # TAC Tools
 
 Tool framework for LLM function calling that works with OpenAI and Anthropic APIs. Supports dependency injection to hide runtime values like API keys and client instances from LLM schemas.
