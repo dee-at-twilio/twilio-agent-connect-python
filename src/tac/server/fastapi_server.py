@@ -229,7 +229,10 @@ class TACFastAPIServer:
                 workflow_sid = os.environ.get("TWILIO_TASKROUTER_WORKFLOW_SID", "")
                 if workflow_sid and payload_dict.get("HandoffData"):
                     task_attrs = json.dumps({"handoffData": payload_dict["HandoffData"]})
-                    twiml = f'<Response><Enqueue workflowSid="{workflow_sid}"><Task>{task_attrs}</Task></Enqueue></Response>'
+                    twiml = (
+                        f'<Response><Enqueue workflowSid="{workflow_sid}">'
+                        f"<Task>{task_attrs}</Task></Enqueue></Response>"
+                    )
                     return Response(content=twiml, media_type="application/xml")
 
                 return Response(content="", media_type="text/plain", status_code=200)

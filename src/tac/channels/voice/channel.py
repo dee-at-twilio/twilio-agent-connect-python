@@ -6,6 +6,7 @@ from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from typing import Literal
     from twilio.rest import Client
 
 from pydantic import ValidationError
@@ -109,7 +110,9 @@ class VoiceChannel(BaseChannel):
             if voice_addr is None:
                 fixed.append(p)
                 continue
-            expected_type = "AI_AGENT" if voice_addr == agent_phone else "CUSTOMER"
+            expected_type: Literal["AI_AGENT", "CUSTOMER"] = (
+                "AI_AGENT" if voice_addr == agent_phone else "CUSTOMER"
+            )
             if p.type != expected_type:
                 self.logger.debug(
                     "Fixing participant role for outbound call",
@@ -126,7 +129,6 @@ class VoiceChannel(BaseChannel):
                 fixed.append(updated)
             else:
                 fixed.append(p)
-        
         return fixed
 
     def _get_twilio_client(self) -> Client:
