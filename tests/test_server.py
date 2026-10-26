@@ -70,16 +70,20 @@ class TestTACServerConfig:
     def test_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("TWILIO_SERVER_HOST", "127.0.0.1")
         monkeypatch.setenv("TWILIO_SERVER_PORT", "3000")
+        monkeypatch.setenv("TWILIO_SERVER_CINTEL_WEBHOOK_PATH", "/ci-webhook")
         config = TACServerConfig.from_env()
         assert config.host == "127.0.0.1"
         assert config.port == 3000
+        assert config.cintel_webhook_path == "/ci-webhook"
 
     def test_from_env_defaults(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("TWILIO_SERVER_HOST", raising=False)
         monkeypatch.delenv("TWILIO_SERVER_PORT", raising=False)
+        monkeypatch.delenv("TWILIO_SERVER_CINTEL_WEBHOOK_PATH", raising=False)
         config = TACServerConfig.from_env()
         assert config.host == "0.0.0.0"
         assert config.port == 8000
+        assert config.cintel_webhook_path is None
 
 
 class TestTACConfigStudioHandoffFlowSid:

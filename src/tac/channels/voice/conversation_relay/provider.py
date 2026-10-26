@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import AsyncGenerator
+import time
+from collections.abc import AsyncGenerator, Callable
+from contextvars import ContextVar
 from typing import TYPE_CHECKING, Any
 
 from pydantic import ValidationError
@@ -36,6 +38,7 @@ from tac.models.voice import (
 )
 from tac.session import SessionState
 from tac.utils.redaction import mask_phone, redact_twiml_parameters
+from tac.utils.tracing import SpanLike, begin_span, start_span
 
 if TYPE_CHECKING:
     from tac.channels.voice.channel import VoiceChannel
@@ -47,6 +50,10 @@ _POLL_BASE_DELAY = 0.25
 # total wait time — total worst case is comfortably bounded (~11s of sleep)
 # instead of growing exponentially with attempt count.
 _POLL_MAX_DELAY = 1.5
+
+# The current turn's "llm" span and when its prompt arrived, so send_response
+# can record time to first token whether the app streams or returns a string.
+_current_turn: ContextVar[tuple[SpanLike, float] | None] = ContextVar("_current_turn", default=None)
 
 
 class ConversationRelayProvider(VoiceProvider):
@@ -376,6 +383,7 @@ class ConversationRelayProvider(VoiceProvider):
         # "prompt". Still non-None in `finally` means the call ended before
         # any prompt arrived.
         init_task: asyncio.Task[tuple[str, SessionState | None]] | None = None
+        end_call_span: Callable[[], None] | None = None
 
         try:
             # First message should be 'setup'
@@ -383,6 +391,19 @@ class ConversationRelayProvider(VoiceProvider):
             if data.get("type") == "setup":
                 setup_msg = SetupMessage(**data)
                 call_sid = setup_msg.call_sid
+
+                # Root span for the call. Current for the rest of this
+                # handler, so every task started below (and the app's
+                # callbacks and tools) records its spans in this trace.
+                end_call_span = begin_span(
+                    "conversation",
+                    {
+                        "call.sid": call_sid,
+                        "call.direction": setup_msg.direction,
+                        "call.from": setup_msg.from_number,
+                        "call.to": setup_msg.to_number,
+                    },
+                )
 
                 # Kick off the CO conversation lookup now, in the background,
                 # instead of waiting for the first prompt. ConversationRelay
@@ -487,6 +508,8 @@ class ConversationRelayProvider(VoiceProvider):
             if conv_id:
                 self.logger.debug("Cleanup - removing WebSocket", conversation_id=conv_id)
                 await self._cleanup_connection(conv_id)
+            if end_call_span is not None:
+                end_call_span()
             if cancelled_error is not None and not we_cancelled_it:
                 # A real external cancellation, not the one we caused above —
                 # propagate it now that cleanup ran.
@@ -748,6 +771,7 @@ class ConversationRelayProvider(VoiceProvider):
 
                         try:
                             await websocket.send_text(json.dumps(json_template))
+                            self._record_time_to_first_token()
                         except (WebSocketDisconnectError, RuntimeError):
                             self.logger.info(
                                 "WebSocket closed during streaming",
@@ -775,6 +799,7 @@ class ConversationRelayProvider(VoiceProvider):
                 await websocket.send_text(
                     json.dumps({"type": "text", "token": response, "last": True})
                 )
+                self._record_time_to_first_token()
                 delivered = bool(response)
 
             # If a handoff is pending, send the WS "end" message now that the
@@ -823,6 +848,15 @@ class ConversationRelayProvider(VoiceProvider):
                 f"Error sending response: {e}", conversation_id=conversation_id, exc_info=True
             )
 
+    @staticmethod
+    def _record_time_to_first_token() -> None:
+        """Set ``metrics.ttfb`` on this turn's ``llm`` span at its first send."""
+        turn = _current_turn.get()
+        if turn is not None:
+            _current_turn.set(None)
+            llm_span, prompt_received_at = turn
+            llm_span.set_attribute("metrics.ttfb", time.monotonic() - prompt_received_at)
+
     def get_websocket(self, conversation_id: str) -> WebSocketProtocol | None:
         """
         Get the WebSocket connection for a specific conversation.
@@ -853,20 +887,33 @@ class ConversationRelayProvider(VoiceProvider):
 
         message_body = message.voice_prompt or ""
         session = self.channel._conversations[conv_id]
+        prompt_received_at = time.monotonic()
+
+        # Twilio transcribes before the prompt arrives, so this span only
+        # carries the text.
+        with start_span("stt", {"transcript": message_body}):
+            pass
 
         # Retrieve memory if memory_mode is enabled and Twilio Memory is configured
-        memory_response = await self.channel._retrieve_memory_if_enabled(
-            session, message_body, conv_id
-        )
+        with start_span("memory.retrieve", {"memory.mode": self.channel.memory_mode}):
+            memory_response = await self.channel._retrieve_memory_if_enabled(
+                session, message_body, conv_id
+            )
 
         # Trigger message ready callback
         try:
-            response = await self.channel.tac.trigger_message_ready(
-                message_body, session, memory_response
-            )
-            # Auto-send if callback returned a string (None = manual send_response flow)
-            if response is not None:
-                await self.send_response(conv_id, response, role="assistant")
+            # Covers the app's whole turn, so its LLM and tool spans nest here.
+            with start_span("llm") as llm_span:
+                turn = _current_turn.set((llm_span, prompt_received_at))
+                try:
+                    response = await self.channel.tac.trigger_message_ready(
+                        message_body, session, memory_response
+                    )
+                    # Auto-send if callback returned a string (None = manual send_response flow)
+                    if response is not None:
+                        await self.send_response(conv_id, response, role="assistant")
+                finally:
+                    _current_turn.reset(turn)
         except Exception as e:
             self.logger.error(
                 "Error in message ready callback",

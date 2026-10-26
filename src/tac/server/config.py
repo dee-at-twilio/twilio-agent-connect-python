@@ -34,6 +34,8 @@ class TACServerConfig(BaseModel):
         Environment variables:
             TWILIO_SERVER_HOST: Host to bind to (default: 0.0.0.0)
             TWILIO_SERVER_PORT: Port to bind to (default: 8000)
+            TWILIO_SERVER_CINTEL_WEBHOOK_PATH: Path for the Conversation Intelligence
+                webhook route, e.g. ``/ci-webhook`` (default: unset, route disabled)
 
         TWILIO_VOICE_PUBLIC_DOMAIN is read by ``TACConfig.from_env`` instead.
         """
@@ -46,5 +48,9 @@ class TACServerConfig(BaseModel):
         port = os.environ.get("TWILIO_SERVER_PORT")
         if port:
             kwargs["port"] = int(port)
+
+        cintel_webhook_path = os.environ.get("TWILIO_SERVER_CINTEL_WEBHOOK_PATH")
+        if cintel_webhook_path:
+            kwargs["cintel_webhook_path"] = cintel_webhook_path
 
         return cls(**kwargs)

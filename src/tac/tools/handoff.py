@@ -10,6 +10,7 @@ from tac.models.handoff import HandoffPayload, PendingHandoffData
 from tac.models.session import ConversationSession
 from tac.tools.base import InjectedToolArg, TACTool, function_tool
 from tac.utils.redaction import mask_address
+from tac.utils.tracing import start_span
 
 if TYPE_CHECKING:
     from tac.core.tac import TAC
@@ -142,6 +143,21 @@ async def _handoff_impl(
         with an ``error`` key so the LLM can tell the user rather than
         claiming success over a dropped connection.
     """
+    with start_span(
+        "llm_tool_call",
+        {"function.name": "handoff", "handoff.reason": reason, "channel": session.channel},
+    ) as span:
+        result = await _run_handoff(reason, tac_instance, session, extra_attributes)
+        span.set_attribute("tool.result", result["status"])
+        return result
+
+
+async def _run_handoff(
+    reason: str,
+    tac_instance: Any,
+    session: ConversationSession,
+    extra_attributes: dict[str, Any],
+) -> dict[str, Any]:
     attributes = {**extra_attributes, "reason": reason}
 
     payload = build_handoff_payload(
@@ -157,10 +173,11 @@ async def _handoff_impl(
     # Downstream (Studio/Flex) flips it back to ACTIVE on pickup and CLOSED
     # on hangup — we don't close it ourselves.
     try:
-        await co_client.update_conversation(
-            conversation_id=session.conversation_id,
-            status="INACTIVE",
-        )
+        with start_span("handoff.set_inactive"):
+            await co_client.update_conversation(
+                conversation_id=session.conversation_id,
+                status="INACTIVE",
+            )
     except Exception as e:
         logger.warning(
             f"Failed to set conversation INACTIVE during handoff: {e}",
@@ -169,9 +186,10 @@ async def _handoff_impl(
 
     # 2. Clear statusCallbacks so TAC stops receiving webhook events
     try:
-        await co_client.clear_status_callbacks(
-            conversation_id=session.conversation_id,
-        )
+        with start_span("handoff.clear_status_callbacks"):
+            await co_client.clear_status_callbacks(
+                conversation_id=session.conversation_id,
+            )
     except Exception as e:
         logger.warning(
             f"Failed to clear status callbacks during handoff: {e}",
@@ -207,14 +225,15 @@ async def _handoff_impl(
         else:
             from_address = config.phone_number
         try:
-            await post_studio_handoff(
-                payload,
-                session,
-                handoff_url=studio_executions_url(config.studio_handoff_flow_sid),
-                from_address=from_address,
-                api_key=config.api_key,
-                api_secret=config.api_secret,
-            )
+            with start_span("handoff.studio_post"):
+                await post_studio_handoff(
+                    payload,
+                    session,
+                    handoff_url=studio_executions_url(config.studio_handoff_flow_sid),
+                    from_address=from_address,
+                    api_key=config.api_key,
+                    api_secret=config.api_secret,
+                )
         except Exception as e:
             logger.error(
                 f"Failed to deliver handoff payload: {e}",

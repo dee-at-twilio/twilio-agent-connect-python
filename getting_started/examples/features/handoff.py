@@ -11,6 +11,7 @@ vars — see ``.env.example``.
 
 from typing import Any
 
+import coval  # type: ignore[import-not-found]  # sibling file: features/coval.py
 from agents import Agent, Runner, set_tracing_disabled
 from dotenv import load_dotenv
 
@@ -20,6 +21,7 @@ from tac.channels.voice import ConversationRelayProviderConfig, VoiceChannel
 from tac.models.session import ConversationSession
 from tac.models.tac import TACMemoryResponse
 from tac.server import TACFastAPIServer
+from tac.server.config import TACServerConfig
 from tac.tools.handoff import create_studio_handoff_tool
 
 load_dotenv()
@@ -84,6 +86,10 @@ tac.on_message_ready(handle_message_ready)
 
 if __name__ == "__main__":
     server = TACFastAPIServer(
-        tac=tac, voice_channel=voice_channel, messaging_channels=[sms_channel]
+        tac=tac,
+        voice_channel=voice_channel,
+        messaging_channels=[sms_channel],
+        config=TACServerConfig(cintel_webhook_path="/ci-webhook"),
     )
+    coval.setup(server.app, voice_channel)
     server.start()
